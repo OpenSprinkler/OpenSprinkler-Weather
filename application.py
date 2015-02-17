@@ -33,6 +33,17 @@ def isFloat(s):
         return 0
     return 1
 
+def IP2Int(ip):
+    o = map(int, ip.split('.'))
+    res = (16777216 * o[0]) + (65536 * o[1]) + (256 * o[2]) + o[3]
+    return res
+
+def getClientAddress(environ):
+    try:
+        return environ['HTTP_X_FORWARDED_FOR'].split(',')[-1].strip()
+    except KeyError:
+        return environ['REMOTE_ADDR']
+
 def application(environ, start_response):
     path = environ.get('PATH_INFO')
     parameters = cgi.parse_qs(environ.get('QUERY_STRING', ''))
@@ -56,6 +67,8 @@ def application(environ, start_response):
         fwv = ''
 
     maxh, minh, meant, pre, pre_today, h_today, sunrise, sunset, scale, toffset = [-1, -1, -500, -1, -1, -1, -1, -1, -1, -1]
+
+    eip = IP2Int(getClientAddress(environ))
 
     # if loc is GPS coordinate itself
     sp = loc.split(',', 1)
@@ -212,9 +225,9 @@ def application(environ, start_response):
         sunset =  int(((sunset +delta)%86400)/60)
 
     if of=='json' or of=='JSON':
-        output = '{"scale":%d, "tz":%d, "sunrise":%d, "sunset":%d, "maxh":%d, "minh":%d, "meant":%d, "pre":%f, "prec":%f, "hc":%d}' % (scale, toffset, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today))
+        output = '{"scale":%d, "tz":%d, "sunrise":%d, "sunset":%d, "maxh":%d, "minh":%d, "meant":%d, "pre":%f, "prec":%f, "hc":%d, "eip":%d}' % (scale, toffset, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today), eip)
     else:
-        output = '&scale=%d&tz=%d&sunrise=%d&sunset=%d&maxh=%d&minh=%d&meant=%d&pre=%f&prec=%f&hc=%d' % (scale, toffset, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today))
+        output = '&scale=%d&tz=%d&sunrise=%d&sunset=%d&maxh=%d&minh=%d&meant=%d&pre=%f&prec=%f&hc=%d&eip=%d' % (scale, toffset, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today), eip)
 
     response_headers = [('Content-type', 'text/plain'),('Content-Length', str(len(output)))]
     start_response(status, response_headers)
