@@ -12,4 +12,4 @@ The production version runs on Amazon Elastic Beanstalk (AWS EB) and therefore t
 
 ## Privacy
 
-The script does use Google Analytics to collect anonymous data regarding each query such as the firmware of the device querying, the location entered in the device options, and result of the water adjustment. 
+The script does use Google Analytics to collect anonymous data regarding each query such as the firmware of the device querying, the location entered in the device options, and result of the weather adjustment. These are used to improve the accuracy of location resolution and precision of weather adjustments.
