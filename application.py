@@ -138,8 +138,8 @@ def application(environ, start_response):
             tzone = None
 
     if (lat) and (lon):
-        owm_loc = 'lat='+lat+'&lon='+lon
-        loc = ''+lat+','+lon
+        if not loc.startswith('pws:') and not loc.startswith('icao:'):
+            loc = ''+lat+','+lon
 
         home = ephem.Observer()
 
@@ -151,8 +151,6 @@ def application(environ, start_response):
 
         sunrise = calendar.timegm(home.next_rising(sun).datetime().utctimetuple())
         sunset = calendar.timegm(home.next_setting(sun).datetime().utctimetuple())
-    else:
-        owm_loc = 'q='+urllib.quote(loc)
 
     if tzone:
         try:
