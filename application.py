@@ -72,7 +72,7 @@ def application(environ, start_response):
     else:
         fwv = ''
 
-    maxh, minh, meant, pre, pre_today, h_today, sunrise, sunset, scale, toffset = [-1, -1, -500, -1, -1, -1, -1, -1, -1, -1]
+    restrict, maxh, minh, meant, pre, pre_today, h_today, sunrise, sunset, scale, toffset = [0, -1, -1, -500, -1, -1, -1, -1, -1, -1, -1]
 
     eip = IP2Int(getClientAddress(environ))
 
@@ -237,7 +237,7 @@ def application(environ, start_response):
                 preTotal = pre_today + pre + pre_beforeYesterday
 
                 if (preTotal > 0.01):
-                    scale = 0
+                    restrict = 1
         except:
             pass
 
@@ -253,9 +253,9 @@ def application(environ, start_response):
         sunset =  int(((sunset +delta)%86400)/60)
 
     if of=='json' or of=='JSON':
-        output = '{"scale":%d, "tz":%d, "sunrise":%d, "sunset":%d, "maxh":%d, "minh":%d, "meant":%d, "pre":%f, "prec":%f, "hc":%d, "eip":%d}' % (scale, toffset, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today), eip)
+        output = '{"scale":%d, "restrict":%d, "tz":%d, "sunrise":%d, "sunset":%d, "maxh":%d, "minh":%d, "meant":%d, "pre":%f, "prec":%f, "hc":%d, "eip":%d}' % (scale, restrict, toffset, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today), eip)
     else:
-        output = '&scale=%d&tz=%d&sunrise=%d&sunset=%d&maxh=%d&minh=%d&meant=%d&pre=%f&prec=%f&hc=%d&eip=%d' % (scale, toffset, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today), eip)
+        output = '&scale=%d&restrict=%d&tz=%d&sunrise=%d&sunset=%d&maxh=%d&minh=%d&meant=%d&pre=%f&prec=%f&hc=%d&eip=%d' % (scale, restrict, toffset, sunrise, sunset, int(maxh), int(minh), int(meant), pre, pre_today, int(h_today), eip)
 
     response_headers = [('Content-type', 'text/plain'),('Content-Length', str(len(output)))]
     start_response(status, response_headers)
