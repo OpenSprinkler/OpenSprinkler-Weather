@@ -166,7 +166,7 @@ def application(environ, start_response):
         except:
             toffset=-1
 
-    if (uwt > 0):
+    if (key != ''):
         try:
             req = urllib2.urlopen('http://api.wunderground.com/api/'+key+'/yesterday/conditions/q/'+urllib.quote(loc)+'.json')
             dat = json.load(req)
@@ -195,26 +195,27 @@ def application(environ, start_response):
                 if v:
                     h_today = safe_float(v, h_today)
 
-            # calculate water time scale, per https://github.com/rszimm/sprinklers_pi/blob/master/Weather.cpp
-            hf = 0
-            if (maxh>=0) and (minh>=0):
-                hf = 30 - (maxh+minh)/2
-            #elif (h_today>=0):
-            #  hf = 30 - h_today
-            tf = 0
-            if (meant > -500):
-                tf = (meant - 70) * 4
-            rf = 0
-            if (pre>=0):
-                rf -= pre * 200
-            if (pre_today>=0):
-                rf -= pre_today * 200
-            scale = (int)(100 + hf + tf + rf)
+            if (uwt === 1):
+                # calculate water time scale, per https://github.com/rszimm/sprinklers_pi/blob/master/Weather.cpp
+                hf = 0
+                if (maxh>=0) and (minh>=0):
+                    hf = 30 - (maxh+minh)/2
+                #elif (h_today>=0):
+                #  hf = 30 - h_today
+                tf = 0
+                if (meant > -500):
+                    tf = (meant - 70) * 4
+                rf = 0
+                if (pre>=0):
+                    rf -= pre * 200
+                if (pre_today>=0):
+                    rf -= pre_today * 200
+                scale = (int)(100 + hf + tf + rf)
 
-            if (scale<0):
-                scale = 0
-            if (scale>200):
-                scale = 200
+                if (scale<0):
+                    scale = 0
+                if (scale>200):
+                    scale = 200
 
             # Check weather modifier bits and apply scale modification
             if ((uwt>>7) & 1):
