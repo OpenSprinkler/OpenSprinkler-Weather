@@ -195,7 +195,7 @@ def application(environ, start_response):
                 if v:
                     h_today = safe_float(v, h_today)
 
-            if (uwt === 1):
+            if ((uwt & ~(1 << 7)) == 1):
                 # calculate water time scale, per https://github.com/rszimm/sprinklers_pi/blob/master/Weather.cpp
                 hf = 0
                 if (maxh>=0) and (minh>=0):
