@@ -1,8 +1,8 @@
 #!/usr/bin/python
-import urllib, urllib2, cgi
+import urllib, urllib2, cgi, re
 import json, datetime, time, sys, calendar
 import pytz, ephem
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 def safe_float(s, dv):
     r = dv
     try:
@@ -46,8 +46,14 @@ def getClientAddress(environ):
 
 def application(environ, start_response):
     path = environ.get('PATH_INFO')
+    uwt = re.match('/weather(\d+)\.py',path)
     parameters = cgi.parse_qs(environ.get('QUERY_STRING', ''))
     status = '200 OK'
+
+    if uwt:
+        uwt = safe_int(uwt.group(1),0)
+    else:
+        uwt = 0
 
     if 'loc' in parameters:
         loc = parameters['loc'][0]
@@ -160,7 +166,7 @@ def application(environ, start_response):
         except:
             toffset=-1
 
-    if (path == '/weather1.py'):
+    if (uwt > 0):
         try:
             req = urllib2.urlopen('http://api.wunderground.com/api/'+key+'/yesterday/conditions/q/'+urllib.quote(loc)+'.json')
             dat = json.load(req)
@@ -204,10 +210,33 @@ def application(environ, start_response):
             if (pre_today>=0):
                 rf -= pre_today * 200
             scale = (int)(100 + hf + tf + rf)
+
             if (scale<0):
                 scale = 0
             if (scale>200):
                 scale = 200
+
+            # Check weather modifier bits and apply scale modification
+            if ((uwt>>7) & 1):
+                # California modification to prevent watering when rain has occured within 48 hours
+
+                # Get before yesterday's weather data
+                beforeYesterday = date.today() - timedelta(2)
+
+                req = urllib2.urlopen('http://api.wunderground.com/api/'+key+'/history_'+beforeYesterday.strftime('%Y%m%d')+'/q/'+urllib.quote(loc)+'.json')
+                dat = json.load(req)
+
+                if dat['history'] and dat['history']['dailysummary']:
+                    info = dat['history']['dailysummary'][0]
+                    if info:
+                        v = info['precipi']
+                        if v:
+                            pre_beforeYesterday = safe_float(v, -1)
+
+                preTotal = pre_today + pre + pre_beforeYesterday
+
+                if (preTotal > 0.01):
+                    scale = 0
         except:
             pass
 
