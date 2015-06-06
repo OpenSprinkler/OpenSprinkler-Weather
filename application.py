@@ -370,14 +370,14 @@ def application(environ, start_response):
                 if (pre_today >= 0):
                     rf -= pre_today * 200
 
-                if 'temp' in wto:
-                    tf = tf * (wto['temp'] / 100.0)
+                if 't' in wto:
+                    tf = tf * (wto['t'] / 100.0)
 
-                if 'humidity' in wto:
-                    hf = hf * (wto['humidity'] / 100.0)
+                if 'h' in wto:
+                    hf = hf * (wto['h'] / 100.0)
 
-                if 'rain' in wto:
-                    rf = rf * (wto['rain'] / 100.0)
+                if 'r' in wto:
+                    rf = rf * (wto['r'] / 100.0)
 
                 scale = (int)(100 + hf + tf + rf)
 
