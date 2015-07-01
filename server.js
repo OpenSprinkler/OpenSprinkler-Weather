@@ -3,6 +3,10 @@ var express = require( "express" ),
 	port    = process.env.PORT || 3000;
 	app		= express();
 
+if ( !process.env.PORT ) {
+	require( "dotenv" ).load();
+}
+
 // Handle requests matching /weatherID.py where ID corresponds to the
 // weather adjustment method selector.
 // This endpoint is considered deprecated and supported for prior firmware

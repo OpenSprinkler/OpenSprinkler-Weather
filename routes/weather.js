@@ -97,7 +97,7 @@ exports.getWeather = function( req, res ) {
 		weatherUndergroundKey	= req.query.key,
 		outputFormat			= req.query.format,
 		firmwareVersion			= req.query.fwv,
-		remoteAddress			= req.headers[ "x-forwarded-for" ].split(",")[0] || req.connection.remoteAddress,
+		remoteAddress			= req.headers[ "x-forwarded-for" ] || req.connection.remoteAddress,
 		weather					= {},
 
 		// After the location is resolved, this function will run to complete the weather request
@@ -161,7 +161,7 @@ exports.getWeather = function( req, res ) {
 				rh = weather.observation.imperial.rh || 0,
 
 				// The absolute precipitation in the past 48 hours
-				precip = weather.observation.imperial.precip_2day;
+				precip = weather.observation.imperial.precip_2day || weather.observation.imperial.precip_24hour;
 
 			if ( typeof temp !== "number" ) {
 
@@ -217,6 +217,8 @@ exports.getWeather = function( req, res ) {
 
 			return false;
 		};
+
+	remoteAddress = remoteAddress.split(",")[0];
 
 	// Parse weather adjustment options
 	try {
