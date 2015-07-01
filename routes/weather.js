@@ -68,7 +68,7 @@ function resolveCoordinates( location, callback ) {
 
 	httpRequest( url, function( data ) {
 		data = JSON.parse( data );
-		if ( data.hasOwnProperty( "RESULTS" ) ) {
+		if ( typeof data.RESULTS === "object" && data.RESULTS.length ) {
 			callback( [ data.RESULTS[0].lat, data.RESULTS[0].lon ] );
 		}
 	} );
@@ -77,14 +77,109 @@ function resolveCoordinates( location, callback ) {
 // Accepts a time string formatted in ISO-8601 and returns the timezone.
 // The timezone output is formatted for OpenSprinkler Unified firmware.
 function getTimezone( time ) {
-	var time = time.match( filters.time ),
-		hour = parseInt( time[7] + time[8] ),
+	time = time.match( filters.time );
+
+	var hour = parseInt( time[7] + time[8] ),
 		minute = parseInt( time[9] );
 
 	minute = ( minute / 15 >> 0 ) / 4.0;
 	hour = hour + ( hour >=0 ? minute : -minute );
 
 	return ( ( hour + 12 ) * 4 ) >> 0;
+}
+
+// Retrieve weather data to complete the weather request
+function getWeatherData( location, callback ) {
+
+	// Get the API key from the environment variables
+	var WSI_API_KEY = process.env.WSI_API_KEY,
+
+		// Generate URL using The Weather Company API v1 in Imperial units
+		url = "http://api.weather.com/v1/geocode/" + location[0] + "/" + location[1] +
+			 "/observations/current.json?apiKey=" + WSI_API_KEY + "&language=en-US&units=e";
+
+	// Perform the HTTP request to retrieve the weather data
+	httpRequest( url, function( data ) {
+		callback( JSON.parse( data ) );
+	} );
+}
+
+// Calculates the resulting water scale using the provided weather data, adjustment method and options
+function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
+
+	// Calculate the average temperature
+	var temp = ( weather.observation.imperial.temp_max_24hour + weather.observation.imperial.temp_min_24hour ) / 2,
+
+		// Relative humidity and if unavailable default to 0
+		rh = weather.observation.imperial.rh || 0,
+
+		// The absolute precipitation in the past 48 hours
+		precip = weather.observation.imperial.precip_2day || weather.observation.imperial.precip_24hour;
+
+	if ( typeof temp !== "number" ) {
+
+		// If the maximum and minimum temperatures are not available then use the current temperature
+		temp = weather.observation.imperial.temp;
+	}
+
+	// Zimmerman method
+	if ( adjustmentMethod == 1 ) {
+
+		var humidityFactor = ( 30 - rh ),
+			tempFactor = ( ( temp - 70 ) * 4 ),
+			precipFactor = ( precip * -2 );
+
+		// Apply adjustment options if available
+		if ( adjustmentOptions ) {
+			if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
+				humidityFactor = humidityFactor * ( adjustmentOptions.h / 100 );
+			}
+
+			if ( adjustmentOptions.hasOwnProperty( "t" ) ) {
+				tempFactor = tempFactor * ( adjustmentOptions.t / 100 );
+			}
+
+			if ( adjustmentOptions.hasOwnProperty( "r" ) ) {
+				precipFactor = precipFactor * ( adjustmentOptions.r / 100 );
+			}
+		}
+
+		return parseInt( Math.min( Math.max( 0, 100 + humidityFactor + tempFactor + precipFactor ), 200 ) );
+	}
+
+	return -1;
+}
+
+// Function to return the sunrise and sunset times from the weather reply
+function getSunData( weather ) {
+
+	// Sun times must be converted from strings into date objects and processed into minutes from midnight
+	var sunrise = weather.observation.sunrise.match( filters.time ),
+		sunset	= weather.observation.sunset.match( filters.time );
+
+	return [
+		parseInt( sunrise[4] ) * 60 + parseInt( sunrise[5] ),
+		parseInt( sunset[4] ) * 60 + parseInt( sunset[5] )
+	];
+}
+
+// Checks if the weather data meets any of the restrictions set by OpenSprinkler.
+// Restrictions prevent any watering from occurring and are similar to 0% watering level.
+// California watering restriction prevents watering if precipitation over two days is greater
+// than 0.01" over the past 48 hours.
+function checkWeatherRestriction( adjustmentValue, weather ) {
+	var californiaRestriction = ( adjustmentValue >> 7 ) & 1;
+
+	if ( californiaRestriction ) {
+
+		// If the California watering restriction is in use then prevent watering
+		// if more then 0.01" of rain has accumulated in the past 48 hours
+		if ( weather.observation.imperial.precip_2day > 0.01 || weather.observation.imperial.precip_24hour > 0.01 ) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 // API Handler when using the weatherX.py where X represents the
@@ -98,125 +193,40 @@ exports.getWeather = function( req, res ) {
 		outputFormat			= req.query.format,
 		firmwareVersion			= req.query.fwv,
 		remoteAddress			= req.headers[ "x-forwarded-for" ] || req.connection.remoteAddress,
-		weather					= {},
-
-		// After the location is resolved, this function will run to complete the weather request
-		getWeatherData = function() {
-
-			// Get the API key from the environment variables
-			var WSI_API_KEY = process.env.WSI_API_KEY,
-
-				// Generate URL using The Weather Company API v1 in Imperial units
-				url = "http://api.weather.com/v1/geocode/" + location[0] + "/" + location[1] +
-					 "/observations/current.json?apiKey=" + WSI_API_KEY + "&language=en-US&units=e";
-
-			// Perform the HTTP request to retrieve the weather data
-			httpRequest( url, function( data ) {
-				weather = JSON.parse( data );
-
-				var scale = calculateWeatherScale(),
-					restrict = checkWeatherRestriction() ? 1 : 0,
-					sunData = getSunData(),
-					timezone = getTimezone( weather.observation.obs_time_local );
-
-				// Return the response to the client
-				if ( outputFormat === "json" ) {
-					res.json( {
-						scale:	scale,
-						restrict: restrict,
-						tz: timezone,
-						sunrise: sunData[0],
-						sunset: sunData[1],
-						eip: ipToInt( remoteAddress )
-					} );
-				} else {
-					res.send(	"&scale=" + scale +
-								"&restrict=" + restrict +
-								"&tz=" + timezone +
-								"&sunrise=" + sunData[0] +
-								"&sunset=" + sunData[1] +
-								"&eip=" + ipToInt( remoteAddress )
-					);
-				}
-			} );
-		},
-		getSunData = function() {
-
-			// Sun times must be converted from strings into date objects and processed into minutes from midnight
-			// TODO: Need to use the timezone to adjust sun times
-			var sunrise = weather.observation.sunrise.match( filters.time ),
-				sunset	= weather.observation.sunset.match( filters.time );
-
-			return [
-				parseInt( sunrise[4] ) * 60 + parseInt( sunrise[5] ),
-				parseInt( sunset[4] ) * 60 + parseInt( sunset[5] )
-			];
-		},
-		calculateWeatherScale = function() {
-
-			// Calculate the average temperature
-			var temp = ( weather.observation.imperial.temp_max_24hour + weather.observation.imperial.temp_min_24hour ) / 2,
-
-				// Relative humidity and if unavailable default to 0
-				rh = weather.observation.imperial.rh || 0,
-
-				// The absolute precipitation in the past 48 hours
-				precip = weather.observation.imperial.precip_2day || weather.observation.imperial.precip_24hour;
-
-			if ( typeof temp !== "number" ) {
-
-				// If the maximum and minimum temperatures are not available then use the current temperature
-				temp = weather.observation.imperial.temp;
+		finishRequest = function( weather ) {
+			if ( !weather || typeof weather.observation !== "object" || typeof weather.observation.imperial !== "object" ) {
+				res.send( "Error: No weather data found." );
+				return;
 			}
 
-			console.log( {
-				temp: temp,
-				humidity: rh,
-				precip_48hr: precip
-			} );
+			var data = {
+					scale:	calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ),
+					restrict: checkWeatherRestriction( req.params[0], weather ) ? 1 : 0,
+					tz: getTimezone( weather.observation.obs_time_local ),
+					sunrise: getSunData( weather )[0],
+					sunset: getSunData( weather )[1],
+					eip: ipToInt( remoteAddress )
+				};
 
-			if ( adjustmentMethod == 1 ) {
-
-				// Zimmerman method
-
-				var humidityFactor = ( 30 - rh ),
-					tempFactor = ( ( temp - 70 ) * 4 ),
-					precipFactor = ( precip * -2 );
-
-				// Apply adjustment options if available
-				if ( adjustmentOptions ) {
-					if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
-						humidityFactor = humidityFactor * ( adjustmentOptions.h / 100 );
-					}
-
-					if ( adjustmentOptions.hasOwnProperty( "t" ) ) {
-						tempFactor = tempFactor * ( adjustmentOptions.t / 100 );
-					}
-
-					if ( adjustmentOptions.hasOwnProperty( "r" ) ) {
-						precipFactor = precipFactor * ( adjustmentOptions.r / 100 );
-					}
-				}
-
-				return parseInt( Math.min( Math.max( 0, 100 + humidityFactor + tempFactor + precipFactor ), 200 ) );
+			// Return the response to the client
+			if ( outputFormat === "json" ) {
+				res.json( data );
+			} else {
+				res.send(	"&scale=" + data.scale +
+							"&restrict=" + data.restrict +
+							"&tz=" + data.tz +
+							"&sunrise=" + data.sunrise +
+							"&sunset=" + data.sunset +
+							"&eip=" + data.eip
+				);
 			}
-
-			return -1;
-		},
-		checkWeatherRestriction = function() {
-			var californiaRestriction = ( req.params[0] >> 7 ) & 1;
-
-			if ( californiaRestriction ) {
-
-				// If the California watering restriction is in use then prevent watering
-				// if more then 0.01" of rain has accumulated in the past 48 hours
-				if ( weather.observation.imperial.precip_2day > 0.01 ) {
-					return true;
-				}
-			}
-
-			return false;
 		};
+
+	// Exit if no location is provided
+	if ( !location ) {
+		res.send( "Error: No location provided." );
+		return;
+	}
 
 	remoteAddress = remoteAddress.split(",")[0];
 
@@ -235,21 +245,26 @@ exports.getWeather = function( req, res ) {
 		// Handle GPS coordinates
 		location = location.split( "," );
 		location = [ parseFloat( location[0] ), parseFloat( location[1] ) ];
-		getWeatherData();
+		getWeatherData( location, finishRequest );
 
     } else if ( filters.pws.test( location ) ) {
+
+		if ( !weatherUndergroundKey ) {
+			res.send( "Error: Weather Underground key required when using PWS or ICAO location." );
+			return;
+		}
 
 		// Handle Weather Underground specific location
 		getPWSCoordinates( location, weatherUndergroundKey, function( result ) {
 			location = result;
-			getWeatherData();
+			getWeatherData( location, finishRequest );
 		} );
     } else {
 
 		// Attempt to resolve provided location to GPS coordinates
 		resolveCoordinates( location, function( result ) {
 			location = result;
-			getWeatherData();
+			getWeatherData( location, finishRequest );
 		} );
     }
 };

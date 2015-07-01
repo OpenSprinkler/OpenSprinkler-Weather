@@ -15,7 +15,7 @@ app.get( /weather(\d+)\.py/, weather.getWeather );
 // Handle 404 error
 app.use( function( req, res ) {
 	res.status( 404 );
-	res.send( "Not found" );
+	res.send( "Error: Request not found" );
 } );
 
 // Start listening on the service port
