@@ -1,7 +1,8 @@
 ( function() {
 
 	// Define regex filters to match against location
-	var http	= require( "http" ),
+	var http		= require( "http" ),
+		parseXML	= require( "xml2js" ).parseString,
 		filters = {
 			gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
 			pws: /^(?:pws|icao):/,
@@ -44,6 +45,11 @@
 	    ip = ip.split( "." );
 	    return ( ( ( ( ( ( +ip[0] ) * 256 ) + ( +ip[1] ) ) * 256 ) + ( +ip[2] ) ) * 256 ) + ( +ip[3] );
 	}
+
+	// Resolves the Month / Day / Year of a Date object
+	Date.prototype.toUSDate = function(){
+		return ( this.getMonth() + 1 ) + "/" + this.getDate() + "/" + this.getFullYear();
+	};
 
 	// Takes a PWS or ICAO location and resolves the GPS coordinates
 	function getPWSCoordinates( location, weatherUndergroundKey, callback ) {
@@ -103,6 +109,27 @@
 		// Perform the HTTP request to retrieve the weather data
 		httpRequest( url, function( data ) {
 			callback( JSON.parse( data ) );
+		} );
+	}
+
+	// Retrieve the historical weather data for the provided location
+	function getYesterdayWeatherData( location, callback ) {
+
+		// Get the API key from the environment variables
+		var WSI_HISTORY_KEY = process.env.WSI_HISTORY_KEY,
+			today			= new Date(),
+			yesterday		= new Date( today.getTime() - 1000 * 60 * 60 * 24 ),
+
+			// Generate URL using WSI Cleaned History API in Imperial units showing daily average values
+			url = "http://cleanedobservations.wsi.com/CleanedObs.svc/GetObs?ID=" + WSI_HISTORY_KEY +
+				 "&Lat=" + location[0] + "&Long=" + location[1] +
+				 "&Req=davg&startdate=" + yesterday.toUSDate() + "&enddate=" + today.toUSDate() + "&TS=LST";
+
+		// Perform the HTTP request to retrieve the weather data
+		httpRequest( url, function( xml ) {
+			parseXML( xml, function ( err, result ) {
+				callback( result.WeatherResponse.WeatherRecords[0].WeatherData[0].$ );
+			});
 		} );
 	}
 
