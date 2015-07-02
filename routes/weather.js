@@ -123,7 +123,7 @@
 			// Generate URL using WSI Cleaned History API in Imperial units showing daily average values
 			url = "http://cleanedobservations.wsi.com/CleanedObs.svc/GetObs?ID=" + WSI_HISTORY_KEY +
 				 "&Lat=" + location[0] + "&Long=" + location[1] +
-				 "&Req=davg&startdate=" + yesterday.toUSDate() + "&enddate=" + today.toUSDate() + "&TS=LST";
+				 "&Req=davg&startdate=" + yesterday.toUSDate() + "&enddate=" + yesterday.toUSDate() + "&TS=LST";
 
 		// Perform the HTTP request to retrieve the weather data
 		httpRequest( url, function( xml ) {
