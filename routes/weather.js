@@ -87,6 +87,10 @@
 
 				// If it is, reply with an array containing the GPS coordinates
 				callback( [ data.RESULTS[0].lat, data.RESULTS[0].lon ] );
+			} else {
+
+				// Otherwise, indicate no data was found
+				callback( false );
 			}
 		} );
 	}
@@ -121,8 +125,16 @@
 		// Perform the HTTP request to retrieve the weather data
 		httpRequest( url, function( data ) {
 
-			// Return the data to the callback function
-			callback( JSON.parse( data ) );
+			try {
+
+				// Return the data to the callback function if successful
+				callback( JSON.parse( data ) );
+			} catch (err) {
+
+				// Otherwise indicate the request failed
+				callback( false );
+			}
+
 		} );
 	}
 
@@ -280,7 +292,7 @@
 						eip:		ipToInt( remoteAddress )
 					};
 
-				// Return the response to the client
+				// Return the response to the client in the requested format
 				if ( outputFormat === "json" ) {
 					res.json( data );
 				} else {
@@ -336,6 +348,11 @@
 			}
 
 			getPWSCoordinates( location, weatherUndergroundKey, function( result ) {
+				if ( result === false ) {
+					res.send( "Error: Unable to resolve location" );
+					return;
+				}
+
 				location = result;
 				getWeatherData( location, finishRequest );
 			} );
@@ -344,6 +361,11 @@
 			// Attempt to resolve provided location to GPS coordinates when it does not match
 			// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
 			resolveCoordinates( location, function( result ) {
+				if ( result === false ) {
+					res.send( "Error: Unable to resolve location" );
+					return;
+				}
+
 				location = result;
 				getWeatherData( location, finishRequest );
 			} );
