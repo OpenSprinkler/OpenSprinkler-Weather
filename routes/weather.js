@@ -67,17 +67,17 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 		try {
 			var data = JSON.parse( data ),
 
-				date = new Date( Date.UTC( 1970, 0, 1, 0, 0, data.current_observation.local_epoch, 0 ) ),
+				tzOffset = getTimezone( data.current_observation.local_tz_offset, "minutes" ),
 
 				// Calculate sunrise and sunset since Weather Underground does not provide it
-				sunData = SunCalc.getTimes( date,
+				sunData = SunCalc.getTimes( data.current_observation.local_epoch * 1000,
 											data.current_observation.observation_location.latitude,
 											data.current_observation.observation_location.longitude ),
 				weather = {
 					icon:		data.current_observation.icon,
 					timezone:	data.current_observation.local_tz_offset,
-					sunrise:	( sunData.sunrise.getHours() * 60 + sunData.sunrise.getMinutes() ),
-					sunset:		( sunData.sunset.getHours() * 60 + sunData.sunset.getMinutes() ),
+					sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ) + tzOffset,
+					sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() ) + tzOffset,
 					maxTemp:	parseInt( data.history.dailysummary[0].maxtempi ),
 					minTemp:	parseInt( data.history.dailysummary[0].mintempi ),
 					temp:		data.current_observation.temp_f,
@@ -87,8 +87,6 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 					wind:		parseInt( data.history.dailysummary[0].meanwindspdi ),
 					elevation:	data.current_observation.observation_location.elevation
 				};
-
-				console.log( date, date.getTimezoneOffset() );
 
 		    if ( weather.sunrise > weather.sunset ) {
 				weather.sunset += 1440;
@@ -425,19 +423,27 @@ function httpRequest( url, callback ) {
 // Accepts a time string formatted in ISO-8601 or just the timezone
 // offset and returns the timezone.
 // The timezone output is formatted for OpenSprinkler Unified firmware.
-function getTimezone( time ) {
+function getTimezone( time, format ) {
 
 	// Match the provided time string against a regex for parsing
 	time = time.match( filters.time ) || time.match( filters.timezone );
 
 	var hour = parseInt( time[7] + time[8] ),
-		minute = parseInt( time[9] );
+		minute = parseInt( time[9] ),
+		tz;
 
-	// Convert the timezone into the OpenSprinkler encoded format
-	minute = ( minute / 15 >> 0 ) / 4;
-	hour = hour + ( hour >= 0 ? minute : -minute );
+	if ( format === "minutes" ) {
+		tz = ( hour * 60 ) + minute;
+	} else {
 
-	return ( ( hour + 12 ) * 4 ) >> 0;
+		// Convert the timezone into the OpenSprinkler encoded format
+		minute = ( minute / 15 >> 0 ) / 4;
+		hour = hour + ( hour >= 0 ? minute : -minute );
+
+		tz = ( ( hour + 12 ) * 4 ) >> 0;
+	}
+
+	return tz;
 }
 
 // Function to return the sunrise and sunset times from the weather reply
