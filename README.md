@@ -3,12 +3,14 @@
 ## Description
 This script is used by OpenSprinkler Unified Firmware to update the water level of the device. It also provides timezone information based on user location along with other local information (sunrise, sunset, daylights saving time, etc).
 
-The production version runs on Amazon Elastic Beanstalk (AWS EB) and therefore this package is tailored to be zipped and uploaded to AWS EB. The script is written in Python.
+The production version runs on Amazon Elastic Beanstalk (AWS EB) and therefore this package is tailored to be zipped and uploaded to AWS EB. The script is written in Javascript for Node.JS.
 
 ## File Detail
-**Requirements.txt** is used to define the required Python modules needed to run the script.
+**server.js** is the primary file launching the API daemon.
 
-**Application.py** parses the incoming URL and returns the appropriate values. The script defaults to URL format return however a 'format' parameter can be passed with the value 'json' in order to output JSON.
+**routes/*.js** contains all the endpoints for the API service. Currently, only one exists for weather adjustment.
+
+**models/*.js** contains all the database models used by the routes. Currently, only one exists to manage weather cache data.
 
 ## Privacy
 
