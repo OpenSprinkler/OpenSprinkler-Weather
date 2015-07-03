@@ -12,22 +12,6 @@ var http		= require( "http" ),
 		timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
 	};
 
-// Takes a PWS or ICAO location and resolves the GPS coordinates
-function getPWSCoordinates( location, weatherUndergroundKey, callback ) {
-	var url = "http://api.wunderground.com/api/" + weatherUndergroundKey +
-			"/conditions/forecast/q/" + encodeURIComponent( location ) + ".json";
-
-	httpRequest( url, function( data ) {
-		data = JSON.parse( data );
-		if ( typeof data === "object" && data.current_observation && data.current_observation.observation_location ) {
-			callback( [ data.current_observation.observation_location.latitude,
-				data.current_observation.observation_location.longitude ] );
-		} else {
-			callback( false );
-		}
-	} );
-}
-
 // If location does not match GPS or PWS/ICAO, then attempt to resolve
 // location using Weather Underground autocomplete API
 function resolveCoordinates( location, callback ) {
@@ -344,33 +328,19 @@ exports.getWeather = function( req, res ) {
 	}
 
 	// Parse location string
-    if ( filters.pws.test( location ) ) {
-
-		// Handle locations using PWS or ICAO (Weather Underground)
-		if ( !weatherUndergroundKey ) {
-
-			// If no key is provided for Weather Underground then the PWS or ICAO cannot be resolved
-			res.send( "Error: Weather Underground key required when using PWS or ICAO location." );
-			return;
-		}
-
-		getPWSCoordinates( location, weatherUndergroundKey, function( result ) {
-			if ( result === false ) {
-				res.send( "Error: Unable to resolve location" );
-				return;
-			}
-
-			location = result;
-			getWeatherData( location, finishRequest );
-		} );
-	} else if ( weatherUndergroundKey ) {
+    if ( weatherUndergroundKey ) {
 
 		// The current weather script uses Weather Underground and during the transition period
 		// both will be supported and users who provide a Weather Underground API key will continue
 		// using Weather Underground until The Weather Service becomes the default API
 
 		getWeatherUndergroundData( location, weatherUndergroundKey, finishRequest );
-    } else if ( filters.gps.test( location ) ) {
+	} else if ( filters.pws.test( location ) ) {
+
+		// If no key is provided for Weather Underground then the PWS or ICAO cannot be resolved
+		res.send( "Error: Weather Underground key required when using PWS or ICAO location." );
+		return;
+	} else if ( filters.gps.test( location ) ) {
 
 		// Handle GPS coordinates by storing each coordinate in an array
 		location = location.split( "," );
