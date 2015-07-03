@@ -69,7 +69,7 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 					minTemp:	parseInt( data.history.dailysummary[0].mintempi ),
 					temp:		parseInt( data.current_observation.temp_f ),
 					humidity:	( parseInt( data.history.dailysummary[0].maxhumidity ) + parseInt( data.history.dailysummary[0].minhumidity ) ) / 2,
-					precip:		parseInt( data.current_observation.precip_today_in ) + parseInt( data.history.dailysummary[0].precipi ),
+					precip:		( parseInt( data.current_observation.precip_today_in ) || 0 ) + ( parseInt( data.history.dailysummary[0].precipi ) || 0 ),
 					solar:		parseInt( data.current_observation.UV ),
 					wind:		parseInt( data.history.dailysummary[0].meanwindspdi ),
 					elevation:	parseInt( data.current_observation.observation_location.elevation )
