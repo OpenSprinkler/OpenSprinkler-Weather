@@ -204,7 +204,7 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 			humidityFactor = ( 30 - weather.humidity ),
 			tempFactor = ( ( temp - 70 ) * 4 ),
 			precipFactor = ( weather.precip * -200 );
-console.log(temp, humidityFactor, tempFactor, precipFactor);
+
 		// Apply adjustment options, if provided, by multiplying the percentage against the factor
 		if ( adjustmentOptions ) {
 			if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
