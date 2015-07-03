@@ -66,15 +66,13 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 	httpRequest( url, function( data ) {
 		try {
 			var data = JSON.parse( data ),
-				date = new Date( data.current_observation.local_epoch * 1000 );
 
-	        date.setMinutes( date.getMinutes() + date.getTimezoneOffset() );
+				date = new Date( Date.UTC( 1970, 0, 1, 0, 0, data.current_observation.local_epoch, 0 ) ),
 
-			// Calculate sunrise and sunset since Weather Underground does not provide it
-			var sunData = SunCalc.getTimes( date,
+				// Calculate sunrise and sunset since Weather Underground does not provide it
+				sunData = SunCalc.getTimes( date,
 											data.current_observation.observation_location.latitude,
 											data.current_observation.observation_location.longitude ),
-
 				weather = {
 					icon:		data.current_observation.icon,
 					timezone:	data.current_observation.local_tz_offset,
@@ -89,6 +87,8 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 					wind:		parseInt( data.history.dailysummary[0].meanwindspdi ),
 					elevation:	data.current_observation.observation_location.elevation
 				};
+
+				console.log( date, date.getTimezoneOffset() );
 
 		    if ( weather.sunrise > weather.sunset ) {
 				weather.sunset += 1440;
