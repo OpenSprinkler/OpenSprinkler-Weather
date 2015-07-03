@@ -65,12 +65,16 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 	// Perform the HTTP request to retrieve the weather data
 	httpRequest( url, function( data ) {
 		try {
-			var data = JSON.parse( data );
+			var data = JSON.parse( data ),
+				date = new Date( data.current_observation.local_epoch * 1000 );
+
+	        date.setMinutes( date.getMinutes() + date.getTimezoneOffset() );
 
 			// Calculate sunrise and sunset since Weather Underground does not provide it
-			var sunData = SunCalc.getTimes( new Date( data.current_observation.local_epoch * 1000 ),
+			var sunData = SunCalc.getTimes( date,
 											data.current_observation.observation_location.latitude,
 											data.current_observation.observation_location.longitude ),
+
 				weather = {
 					icon:		data.current_observation.icon,
 					timezone:	data.current_observation.local_tz_offset,
