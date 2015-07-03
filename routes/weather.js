@@ -90,32 +90,28 @@ function getWeatherData( location, callback ) {
 
 	} );
 }
-/*
+
 // Retrieve the historical weather data for the provided location
 function getYesterdayWeatherData( location, callback ) {
 
 	// Get the API key from the environment variables
 	var WSI_HISTORY_KEY = process.env.WSI_HISTORY_KEY,
 
-		// Generate a Date object for the current time
-		today			= new Date(),
-
 		// Generate a Date object for the previous day by subtracting a day (in milliseconds) from today
-		yesterday		= new Date( today.getTime() - 1000 * 60 * 60 * 24 ),
+		yesterday		= toUSDate( new Date( new Date().getTime() - 1000 * 60 * 60 * 24 ) ),
 
 		// Generate URL using WSI Cleaned History API in Imperial units showing daily average values
 		url = "http://cleanedobservations.wsi.com/CleanedObs.svc/GetObs?ID=" + WSI_HISTORY_KEY +
 			 "&Lat=" + location[0] + "&Long=" + location[1] +
-			 "&Req=davg&startdate=" + toUSDate( yesterday ) + "&enddate=" + toUSDate( yesterday ) + "&TS=LST";
+			 "&Req=davg&startdate=" +  yesterday + "&enddate=" + yesterday + "&TS=LST";
 
 	// Perform the HTTP request to retrieve the weather data
 	httpRequest( url, function( xml ) {
-		parseXML( xml, function ( err, result ) {
+		parseXML( xml, function( err, result ) {
 			callback( result.WeatherResponse.WeatherRecords[0].WeatherData[0].$ );
-		});
+		} );
 	} );
 }
-*/
 
 // Update weather cache record in the local database
 function updateCache( location, weather ) {
@@ -236,7 +232,7 @@ exports.getWeather = function( req, res ) {
 		location				= req.query.loc,
 		weatherUndergroundKey	= req.query.key,
 		outputFormat			= req.query.format,
-//			firmwareVersion			= req.query.fwv,
+		firmwareVersion			= req.query.fwv,
 		remoteAddress			= req.headers[ "x-forwarded-for" ] || req.connection.remoteAddress,
 
 		// Function that will accept the weather after it is received from the API
@@ -405,7 +401,6 @@ function ipToInt( ip ) {
     return ( ( ( ( ( ( +ip[0] ) * 256 ) + ( +ip[1] ) ) * 256 ) + ( +ip[2] ) ) * 256 ) + ( +ip[3] );
 }
 
-/*
 function f2c( temp ) {
 	return ( temp - 32 ) * 5 / 9;
 }
@@ -419,7 +414,6 @@ function ft2m( x ) {
 }
 
 // Resolves the Month / Day / Year of a Date object
-function toUSDate( date ){
+function toUSDate( date ) {
 	return ( date.getMonth() + 1 ) + "/" + date.getDate() + "/" + date.getFullYear();
 }
-*/
