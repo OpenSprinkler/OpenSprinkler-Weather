@@ -12,47 +12,6 @@
 			time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/
 		};
 
-	// Generic HTTP request handler that parses the URL and uses the
-	// native Node.js http module to perform the request
-	function httpRequest( url, callback ) {
-		url = url.match( filters.url );
-
-		var options = {
-			host: url[1],
-			port: url[2] || 80,
-			path: url[3]
-		};
-
-		http.get( options, function( response ) {
-	        var data = "";
-
-	        // Reassemble the data as it comes in
-	        response.on( "data", function( chunk ) {
-	            data += chunk;
-	        } );
-
-	        // Once the data is completely received, return it to the callback
-	        response.on( "end", function() {
-	            callback( data );
-	        } );
-		} ).on( "error", function() {
-
-			// If the HTTP request fails, return false
-			callback( false );
-		} );
-	}
-
-	// Converts IP string to integer
-	function ipToInt( ip ) {
-	    ip = ip.split( "." );
-	    return ( ( ( ( ( ( +ip[0] ) * 256 ) + ( +ip[1] ) ) * 256 ) + ( +ip[2] ) ) * 256 ) + ( +ip[3] );
-	}
-
-	// Resolves the Month / Day / Year of a Date object
-	Date.prototype.toUSDate = function(){
-		return ( this.getMonth() + 1 ) + "/" + this.getDate() + "/" + this.getFullYear();
-	};
-
 	// Takes a PWS or ICAO location and resolves the GPS coordinates
 	function getPWSCoordinates( location, weatherUndergroundKey, callback ) {
 		var url = "http://api.wunderground.com/api/" + weatherUndergroundKey +
@@ -94,23 +53,6 @@
 				callback( false );
 			}
 		} );
-	}
-
-	// Accepts a time string formatted in ISO-8601 and returns the timezone.
-	// The timezone output is formatted for OpenSprinkler Unified firmware.
-	function getTimezone( time ) {
-
-		// Match the provided time string against a regex for parsing
-		time = time.match( filters.time );
-
-		var hour = parseInt( time[7] + time[8] ),
-			minute = parseInt( time[9] );
-
-		// Convert the timezone into the OpenSprinkler encoded format
-		minute = ( minute / 15 >> 0 ) / 4;
-		hour = hour + ( hour >=0 ? minute : -minute );
-
-		return ( ( hour + 12 ) * 4 ) >> 0;
 	}
 
 	// Retrieve weather data to complete the weather request
@@ -247,21 +189,6 @@
 		}
 
 		return -1;
-	}
-
-	// Function to return the sunrise and sunset times from the weather reply
-	function getSunData( weather ) {
-
-		// Sun times are parsed from string against a regex to identify the timezone
-		var sunrise = weather.observation.sunrise.match( filters.time ),
-			sunset	= weather.observation.sunset.match( filters.time );
-
-		return [
-
-			// Values are converted to minutes from midnight for the controller
-			parseInt( sunrise[4] ) * 60 + parseInt( sunrise[5] ),
-			parseInt( sunset[4] ) * 60 + parseInt( sunset[5] )
-		];
 	}
 
 	// Checks if the weather data meets any of the restrictions set by OpenSprinkler.
@@ -410,5 +337,90 @@
 			} );
 	    }
 	};
-} )();
 
+	// Generic HTTP request handler that parses the URL and uses the
+	// native Node.js http module to perform the request
+	function httpRequest( url, callback ) {
+		url = url.match( filters.url );
+
+		var options = {
+			host: url[1],
+			port: url[2] || 80,
+			path: url[3]
+		};
+
+		http.get( options, function( response ) {
+	        var data = "";
+
+	        // Reassemble the data as it comes in
+	        response.on( "data", function( chunk ) {
+	            data += chunk;
+	        } );
+
+	        // Once the data is completely received, return it to the callback
+	        response.on( "end", function() {
+	            callback( data );
+	        } );
+		} ).on( "error", function() {
+
+			// If the HTTP request fails, return false
+			callback( false );
+		} );
+	}
+
+	// Accepts a time string formatted in ISO-8601 and returns the timezone.
+	// The timezone output is formatted for OpenSprinkler Unified firmware.
+	function getTimezone( time ) {
+
+		// Match the provided time string against a regex for parsing
+		time = time.match( filters.time );
+
+		var hour = parseInt( time[7] + time[8] ),
+			minute = parseInt( time[9] );
+
+		// Convert the timezone into the OpenSprinkler encoded format
+		minute = ( minute / 15 >> 0 ) / 4;
+		hour = hour + ( hour >=0 ? minute : -minute );
+
+		return ( ( hour + 12 ) * 4 ) >> 0;
+	}
+
+	// Function to return the sunrise and sunset times from the weather reply
+	function getSunData( weather ) {
+
+		// Sun times are parsed from string against a regex to identify the timezone
+		var sunrise = weather.observation.sunrise.match( filters.time ),
+			sunset	= weather.observation.sunset.match( filters.time );
+
+		return [
+
+			// Values are converted to minutes from midnight for the controller
+			parseInt( sunrise[4] ) * 60 + parseInt( sunrise[5] ),
+			parseInt( sunset[4] ) * 60 + parseInt( sunset[5] )
+		];
+	}
+
+	// Converts IP string to integer
+	function ipToInt( ip ) {
+	    ip = ip.split( "." );
+	    return ( ( ( ( ( ( +ip[0] ) * 256 ) + ( +ip[1] ) ) * 256 ) + ( +ip[2] ) ) * 256 ) + ( +ip[3] );
+	}
+
+	function F2C( temp ) {
+		return ( temp - 32 ) * 5 / 9;
+	}
+
+	function mm2in( x ) {
+		return x * 0.03937008;
+	}
+
+	function ft2m( x ) {
+		return x * 0.3048;
+	}
+
+	// Resolves the Month / Day / Year of a Date object
+	Date.prototype.toUSDate = function(){
+		return ( this.getMonth() + 1 ) + "/" + this.getDate() + "/" + this.getFullYear();
+	};
+
+} )();
