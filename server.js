@@ -3,7 +3,7 @@ var express		= require( "express" ),
     mongoose	= require( "mongoose" ),
     Cache		= require( "./models/Cache" ),
     CronJob		= require( "cron" ).CronJob,
-	port		= process.env.PORT || 3000;
+	port		= process.env.PORT || 3000,
 	app			= express();
 
 if ( !process.env.PORT ) {
@@ -30,7 +30,7 @@ app.use( function( req, res ) {
 } );
 
 // Start listening on the service port
-var server = app.listen( port, "127.0.0.1", function() {
+app.listen( port, "127.0.0.1", function() {
 
   console.log( "OpenSprinkler Weather Service now listening on port %s", port );
 } );

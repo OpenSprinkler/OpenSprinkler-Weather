@@ -1,7 +1,7 @@
 ( function() {
 
 	var http		= require( "http" ),
-		parseXML	= require( "xml2js" ).parseString,
+//		parseXML	= require( "xml2js" ).parseString,
 		Cache		= require( "../models/Cache" ),
 
 		// Define regex filters to match against location
@@ -92,7 +92,7 @@
 
 		} );
 	}
-
+/*
 	// Retrieve the historical weather data for the provided location
 	function getYesterdayWeatherData( location, callback ) {
 
@@ -108,7 +108,7 @@
 			// Generate URL using WSI Cleaned History API in Imperial units showing daily average values
 			url = "http://cleanedobservations.wsi.com/CleanedObs.svc/GetObs?ID=" + WSI_HISTORY_KEY +
 				 "&Lat=" + location[0] + "&Long=" + location[1] +
-				 "&Req=davg&startdate=" + yesterday.toUSDate() + "&enddate=" + yesterday.toUSDate() + "&TS=LST";
+				 "&Req=davg&startdate=" + toUSDate( yesterday ) + "&enddate=" + toUSDate( yesterday ) + "&TS=LST";
 
 		// Perform the HTTP request to retrieve the weather data
 		httpRequest( url, function( xml ) {
@@ -117,7 +117,7 @@
 			});
 		} );
 	}
-
+*/
 	// Update weather cache record in the local database
 	function updateCache( location, weather ) {
 
@@ -163,7 +163,7 @@
 		}
 
 		// Zimmerman method
-		if ( adjustmentMethod == 1 ) {
+		if ( adjustmentMethod === 1 ) {
 
 			var humidityFactor = ( 30 - rh ),
 				tempFactor = ( ( temp - 70 ) * 4 ),
@@ -237,7 +237,7 @@
 			location				= req.query.loc,
 			weatherUndergroundKey	= req.query.key,
 			outputFormat			= req.query.format,
-			firmwareVersion			= req.query.fwv,
+//			firmwareVersion			= req.query.fwv,
 			remoteAddress			= req.headers[ "x-forwarded-for" ] || req.connection.remoteAddress,
 
 			// Function that will accept the weather after it is received from the API
@@ -406,7 +406,8 @@
 	    return ( ( ( ( ( ( +ip[0] ) * 256 ) + ( +ip[1] ) ) * 256 ) + ( +ip[2] ) ) * 256 ) + ( +ip[3] );
 	}
 
-	function F2C( temp ) {
+/*
+	function f2c( temp ) {
 		return ( temp - 32 ) * 5 / 9;
 	}
 
@@ -419,8 +420,8 @@
 	}
 
 	// Resolves the Month / Day / Year of a Date object
-	Date.prototype.toUSDate = function(){
-		return ( this.getMonth() + 1 ) + "/" + this.getDate() + "/" + this.getFullYear();
-	};
-
+	function toUSDate( date ){
+		return ( date.getMonth() + 1 ) + "/" + date.getDate() + "/" + date.getFullYear();
+	}
+*/
 } )();
