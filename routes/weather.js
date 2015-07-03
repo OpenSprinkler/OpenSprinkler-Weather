@@ -80,12 +80,12 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 					sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() ) + tzOffset,
 					maxTemp:	parseInt( data.history.dailysummary[0].maxtempi ),
 					minTemp:	parseInt( data.history.dailysummary[0].mintempi ),
-					temp:		data.current_observation.temp_f,
+					temp:		parseInt( data.current_observation.temp_f ),
 					humidity:	( parseInt( data.history.dailysummary[0].maxhumidity ) + parseInt( data.history.dailysummary[0].minhumidity ) ) / 2,
 					precip:		parseInt( data.current_observation.precip_today_in ) + parseInt( data.history.dailysummary[0].precipi ),
 					solar:		parseInt( data.current_observation.UV ),
 					wind:		parseInt( data.history.dailysummary[0].meanwindspdi ),
-					elevation:	data.current_observation.observation_location.elevation
+					elevation:	parseInt( data.current_observation.observation_location.elevation )
 				};
 
 		    if ( weather.sunrise > weather.sunset ) {
@@ -207,6 +207,11 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 
 	// Zimmerman method
 	if ( adjustmentMethod === 1 ) {
+
+		// Check to make sure valid data exists for all factors
+		if ( !validateValues( [ "temp", "humidity", "precip" ], weather ) ) {
+			return -1;
+		}
 
 		var temp = ( ( weather.maxTemp + weather.minTemp ) / 2 ) || weather.temp,
 			humidityFactor = ( 30 - weather.humidity ),
@@ -418,6 +423,25 @@ function httpRequest( url, callback ) {
 		// If the HTTP request fails, return false
 		callback( false );
 	} );
+}
+
+// Checks to make sure an array contains the keys provided and returns true or false
+function validateValues( keys, array ) {
+	var key;
+
+	for ( key in keys ) {
+		if ( !keys.hasOwnProperty( key ) ) {
+			continue;
+		}
+
+		key = keys[key];
+
+		if ( !array.hasOwnProperty( key ) || typeof array[key] !== "number" || isNaN( array[key] ) || array[key] === null ) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 // Accepts a time string formatted in ISO-8601 or just the timezone
