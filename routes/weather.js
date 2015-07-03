@@ -2,6 +2,7 @@
 
 	var http		= require( "http" ),
 		parseXML	= require( "xml2js" ).parseString,
+		Cache		= require( "../models/Cache" ),
 
 		// Define regex filters to match against location
 		filters		= {
@@ -126,9 +127,20 @@
 		httpRequest( url, function( data ) {
 
 			try {
+				var weather = JSON.parse( data );
 
-				// Return the data to the callback function if successful
-				callback( JSON.parse( data ) );
+				location = location.join( "," );
+
+				Cache.findOne( { location: location }, function( err, record ) {
+					if ( record && record.hasOwnProperty( "yesterdayHumidity" ) ) {
+						weather.yesterdayHumidity = record.yesterdayHumidity;
+					}
+
+					// Return the data to the callback function if successful
+					callback( weather );
+				} );
+
+				updateCache( location, weather );
 			} catch (err) {
 
 				// Otherwise indicate the request failed
@@ -160,6 +172,28 @@
 			parseXML( xml, function ( err, result ) {
 				callback( result.WeatherResponse.WeatherRecords[0].WeatherData[0].$ );
 			});
+		} );
+	}
+
+	// Update weather cache record in the local database
+	function updateCache( location, weather ) {
+
+		// Search for a cache record for the provided location
+		Cache.findOne( { location: location }, function( err, record ) {
+
+			// If a record is found update the data and save it
+			if ( record ) {
+				record.currentHumidityTotal += weather.observation.imperial.rh;
+				record.currentHumidityCount++;
+				record.save();
+			} else {
+
+				// If no cache record is found, generate a new one and save it
+				new Cache( {
+					currentHumidityTotal: weather.observation.imperial.rh,
+					currentHumidityCount: 1
+				} ).save();
+			}
 		} );
 	}
 
