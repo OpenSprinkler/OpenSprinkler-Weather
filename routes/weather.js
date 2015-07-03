@@ -1,6 +1,6 @@
 var http		= require( "http" ),
 	SunCalc		= require( "suncalc" ),
-//	parseXML	= require( "xml2js" ).parseString,
+	parseXML	= require( "xml2js" ).parseString,
 	Cache		= require( "../models/Cache" ),
 
 	// Define regex filters to match against location
@@ -19,7 +19,6 @@ function getPWSCoordinates( location, weatherUndergroundKey, callback ) {
 
 	httpRequest( url, function( data ) {
 		data = JSON.parse( data );
-
 		if ( typeof data === "object" && data.current_observation && data.current_observation.observation_location ) {
 			callback( [ data.current_observation.observation_location.latitude,
 				data.current_observation.observation_location.longitude ] );
@@ -60,7 +59,7 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 
 	// Generate URL using The Weather Company API v1 in Imperial units
 	var url = "http://api.wunderground.com/api/" + weatherUndergroundKey +
-		"/yesterday/conditions/q/" + location + ".json";
+		"/yesterday/conditions/q/" + encodeURIComponent( location ) + ".json";
 
 	// Perform the HTTP request to retrieve the weather data
 	httpRequest( url, function( data ) {
@@ -485,18 +484,6 @@ function parseDayTime( time ) {
 function ipToInt( ip ) {
     ip = ip.split( "." );
     return ( ( ( ( ( ( +ip[0] ) * 256 ) + ( +ip[1] ) ) * 256 ) + ( +ip[2] ) ) * 256 ) + ( +ip[3] );
-}
-
-function f2c( temp ) {
-	return ( temp - 32 ) * 5 / 9;
-}
-
-function mm2in( x ) {
-	return x * 0.03937008;
-}
-
-function ft2m( x ) {
-	return x * 0.3048;
 }
 
 // Resolves the Month / Day / Year of a Date object
