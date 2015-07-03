@@ -71,8 +71,8 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 
 				// Calculate sunrise and sunset since Weather Underground does not provide it
 				sunData = SunCalc.getTimes( data.current_observation.local_epoch * 1000,
-											data.current_observation.observation_location.latitude,
-											data.current_observation.observation_location.longitude );
+											data.current_observation.observation_location.latitude || data.current_observation.display_location.latitude,
+											data.current_observation.observation_location.longitude || data.current_observation.display_location.longitude );
 
 			sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
 			sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
