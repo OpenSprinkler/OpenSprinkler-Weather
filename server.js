@@ -36,7 +36,7 @@ var server = app.listen( port, "127.0.0.1", function() {
 } );
 
 // Schedule a cronjob daily to consildate the weather cache data, runs daily
-new CronJob( "0 * * * * *", function() {
+new CronJob( "0 0 0 * * *", function() {
 
 	// Find all records in the weather cache
 	Cache.find( {}, function( err, records ) {
