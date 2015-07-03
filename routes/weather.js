@@ -132,7 +132,8 @@
 				location = location.join( "," );
 
 				Cache.findOne( { location: location }, function( err, record ) {
-					if ( record && record.hasOwnProperty( "yesterdayHumidity" ) ) {
+
+					if ( record && record.yesterdayHumidity !== null ) {
 						weather.yesterdayHumidity = record.yesterdayHumidity;
 					}
 
@@ -183,16 +184,20 @@
 
 			// If a record is found update the data and save it
 			if ( record ) {
+
 				record.currentHumidityTotal += weather.observation.imperial.rh;
 				record.currentHumidityCount++;
 				record.save();
+
 			} else {
 
 				// If no cache record is found, generate a new one and save it
 				new Cache( {
+					location: location,
 					currentHumidityTotal: weather.observation.imperial.rh,
 					currentHumidityCount: 1
 				} ).save();
+
 			}
 		} );
 	}
@@ -204,7 +209,7 @@
 		var temp = ( weather.observation.imperial.temp_max_24hour + weather.observation.imperial.temp_min_24hour ) / 2,
 
 			// Relative humidity and if unavailable default to 0
-			rh = weather.observation.imperial.rh || 0,
+			rh = weather.yesterdayHumidity || weather.observation.imperial.rh || 0,
 
 			// The absolute precipitation in the past 48 hours
 			precip = weather.observation.imperial.precip_2day || weather.observation.imperial.precip_24hour;
