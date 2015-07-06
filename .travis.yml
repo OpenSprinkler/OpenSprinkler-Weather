@@ -1,0 +1,10 @@
+bundler_args: --retry 3
+language: node
+before_install:
+ - export TZ=America/Chicago
+ - npm install -g grunt-cli
+install: npm install
+before_script:
+ - grunt
+notifications:
+  on_failure: change
