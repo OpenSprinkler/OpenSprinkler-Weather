@@ -10,8 +10,7 @@ The production version runs on Amazon Elastic Beanstalk (AWS EB) and therefore t
 
 [official]: https://opensprinkler.com
 [help]: http://support.opensprinkler.com
-[changelog]: https://github.com/OpenSprinkler/OpenSprinkler-App/releases
-[salbahra]: http://albahra.com
+[changelog]: https://github.com/OpenSprinkler/OpenSprinkler-Weather/releases
 
 #### File Detail
 
