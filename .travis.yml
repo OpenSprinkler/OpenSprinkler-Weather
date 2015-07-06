@@ -1,5 +1,5 @@
 bundler_args: --retry 3
-language: node
+language: node_js
 before_install:
  - export TZ=America/Chicago
  - npm install -g grunt-cli
