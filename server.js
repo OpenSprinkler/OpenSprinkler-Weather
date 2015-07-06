@@ -22,6 +22,7 @@ mongoose.connection.on( "error", function() {
 // weather adjustment method selector.
 // This endpoint is considered deprecated and supported for prior firmware
 app.get( /weather(\d+)\.py/, weather.getWeather );
+app.get( /(\d+)/, weather.getWeather );
 
 // Handle 404 error
 app.use( function( req, res ) {
@@ -42,7 +43,7 @@ new CronJob( "0 0 0 * * *", function() {
 	Cache.find( {}, function( err, records ) {
 
 		// Cycle through each record
-		records.forEach( function( record ){
+		records.forEach( function( record ) {
 
 			// If the record contains any unaveraged data, then process the record
 			if ( record.currentHumidityCount > 0 ) {
