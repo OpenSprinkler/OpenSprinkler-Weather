@@ -406,7 +406,7 @@ function validateValues( keys, array ) {
 
 		key = keys[key];
 
-		if ( !array.hasOwnProperty( key ) || typeof array[key] !== "number" || isNaN( array[key] ) || array[key] === null ) {
+		if ( !array.hasOwnProperty( key ) || typeof array[key] !== "number" || isNaN( array[key] ) || array[key] === null || array[key] === -999 ) {
 			return false;
 		}
 	}
