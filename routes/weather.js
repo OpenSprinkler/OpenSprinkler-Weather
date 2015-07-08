@@ -194,7 +194,7 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 
 		// Check to make sure valid data exists for all factors
 		if ( !validateValues( [ "temp", "humidity", "precip" ], weather ) ) {
-			return -1;
+			return 100;
 		}
 
 		var temp = ( ( weather.maxTemp + weather.minTemp ) / 2 ) || weather.temp,
