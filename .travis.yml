@@ -8,5 +8,8 @@ before_install:
 install: npm install
 before_script:
  - grunt
+after_script:
+ - istanbul cover ./node_modules/mocha/bin/_mocha -- -R spec
+ - cat coverage/lcov.info | ./node_modules/codecov.io/bin/codecov.io.js
 notifications:
   on_failure: change
