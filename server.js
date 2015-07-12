@@ -61,3 +61,5 @@ new CronJob( "0 0 0 * * *", function() {
 		} );
 	} );
 }, null, true, "UTC" );
+
+exports.app = app;

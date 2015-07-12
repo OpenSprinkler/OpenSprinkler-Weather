@@ -3,6 +3,9 @@
   "description": "OpenSprinkler Weather Service",
   "version": "0.0.1",
   "repository": "https://github.com/OpenSprinkler/Weather-Adjustments/",
+  "scripts": {
+    "test": "mocha test"
+  },
   "dependencies": {
     "cron": "^1.0.9",
     "dotenv": "^1.2.0",
@@ -14,7 +17,11 @@
     "xml2js": "^0.4.9"
   },
   "devDependencies": {
+    "chai": "^3.0.0",
     "grunt": "^0.4.5",
-    "grunt-contrib-jshint": "^0.11.2"
+    "grunt-contrib-jshint": "^0.11.2",
+    "hippie": "^0.3.0",
+    "mocha": "^2.2.5",
+    "nock": "^2.7.0"
   }
 }
