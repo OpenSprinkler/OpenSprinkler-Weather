@@ -1,16 +1,35 @@
-var hippie	= require( "hippie" ),
-	nock	= require( "nock" ),
-	replies	= require( "./replies" ),
-	server	= require( "../server" ).app;
+var hippie		= require( "hippie" ),
+	nock		= require( "nock" ),
+	expect		= require( "chai" ).expect,
+	replies		= require( "./replies" ),
+	expected	= require( "./expected" ),
+	server		= require( "../server" ).app;
+
+describe( "Weather API", function() {
+	describe( "/:method endpoint", function() {
+		it( "The Weather Channel Source Test", function( done ) {
+			for ( var test in expected ) {
+				if ( expected.hasOwnProperty( test ) ) {
+					apiTest( {
+						method: 1,
+						loc: test,
+						expected: expected[test],
+						callback: function( reply ) {
+							done();
+						}
+					} );
+				}
+			}
+		} );
+	} );
+} );
 
 function apiTest( opt ) {
 
 	var opt = extend( {}, {
 			method: 0,
-			loc: "",
 			key: "",
-			format: "json",
-			callback: function() {}
+			format: "json"
 		}, opt ),
 		url = "/" + opt.method + "?loc=" + opt.loc + "&key=" + opt.key + "&format=" + opt.format;
 
@@ -24,11 +43,14 @@ function apiTest( opt ) {
 			if ( err ) {
 				throw err;
 			}
+			expect( body ).to.eql( opt.expected );
 			opt.callback( body );
 		} );
 }
 
 function setupMocks( location ) {
+	nock.cleanAll();
+
 	nock( "http://autocomplete.wunderground.com" )
 		.filteringPath( function( path ) {
 	        return "/";
@@ -50,20 +72,6 @@ function setupMocks( location ) {
 	    .get( "/" )
 		.reply( 200, replies[location].WSIcurrent );
 }
-
-describe( "Weather API", function() {
-	describe( "/:method endpoint", function() {
-		it( "The Weather Channel Source Test", function( done ) {
-			apiTest( {
-				method: 1,
-				loc: "01002",
-				callback: function( reply ) {
-					done();
-				}
-			} );
-		} );
-	} );
-} );
 
 function extend( target ) {
     var sources = [].slice.call( arguments, 1 );
