@@ -8,12 +8,43 @@ var hippie		= require( "hippie" ),
 describe( "Weather API", function() {
 	describe( "/:method endpoint", function() {
 		it( "The Weather Channel Source Test", function( done ) {
-			for ( var test in expected ) {
-				if ( expected.hasOwnProperty( test ) ) {
+			for ( var test in expected.WSI ) {
+				if ( expected.WSI.hasOwnProperty( test ) ) {
 					apiTest( {
 						method: 1,
 						loc: test,
-						expected: expected[test],
+						expected: expected.WSI[test],
+						callback: function( reply ) {
+							done();
+						}
+					} );
+				}
+			}
+		} );
+
+		it( "Weather Underground Source Test", function( done ) {
+			for ( var test in expected.WU ) {
+				if ( expected.WU.hasOwnProperty( test ) ) {
+					apiTest( {
+						method: 1,
+						loc: test,
+						key: process.env.WU_API_KEY,
+						expected: expected.WU[test],
+						callback: function( reply ) {
+							done();
+						}
+					} );
+				}
+			}
+		} );
+
+		it( "Information lookup without weather lookup", function( done ) {
+			for ( var test in expected.noWeather ) {
+				if ( expected.noWeather.hasOwnProperty( test ) ) {
+					apiTest( {
+						method: 0,
+						loc: test,
+						expected: expected.noWeather[test],
 						callback: function( reply ) {
 							done();
 						}
