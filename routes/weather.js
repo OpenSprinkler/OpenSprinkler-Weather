@@ -283,9 +283,14 @@ exports.getWeather = function( req, res ) {
 				return;
 			}
 
+			var scale = calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather );
+
+			if ( checkWeatherRestriction( req.params[0], weather ) ) {
+				scale = 0;
+			}
+
 			var data = {
-					scale:		calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ),
-					restrict:	checkWeatherRestriction( req.params[0], weather ) ? 1 : 0,
+					scale:		scale,
 					tz:			getTimezone( weather.timezone ),
 					sunrise:	weather.sunrise,
 					sunset:		weather.sunset,
@@ -297,7 +302,6 @@ exports.getWeather = function( req, res ) {
 				res.json( data );
 			} else {
 				res.send(	"&scale="		+	data.scale +
-							"&restrict="	+	data.restrict +
 							"&tz="			+	data.tz +
 							"&sunrise="		+	data.sunrise +
 							"&sunset="		+	data.sunset +
