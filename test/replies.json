@@ -20,7 +20,8 @@
 	            "termsofService": "http://www.wunderground.com/weather/api/d/terms.html",
 	            "features": {
 	                "yesterday": 1,
-	                "conditions": 1
+	                "conditions": 1,
+	                "astronomy": 1
 	            }
 	        },
 	        "current_observation": {
@@ -107,6 +108,34 @@
 	            "ob_url": "http://www.wunderground.com/cgi-bin/findweather/getForecast?query=42.408440,-72.504799",
 	            "nowcast": ""
 	        },
+			"moon_phase": {
+				"percentIlluminated": "48",
+			     "ageOfMoon": "7",
+			     "phaseofMoon": "Waxing Crescent",
+			     "hemisphere": "North",
+			     "current_time": {
+			     	"hour": "18",
+			     	"minute": "08"
+			     },
+			     "sunrise": {
+			     	"hour": "6",
+			     	"minute": "27"
+			     },
+			     "sunset": {
+			     	"hour": "20",
+			     	"minute": "23"
+			     }
+			},
+			"sun_phase": {
+				"sunrise": {
+					"hour": "5",
+					"minute": "24"
+				},
+			    "sunset": {
+			    	"hour": "20",
+			    	"minute": "28"
+			    }
+			},
 	        "history": {
 	            "date": {
 	                "pretty": "July 11, 2015",

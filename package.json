@@ -12,7 +12,6 @@
     "express": "^4.13.0",
     "grunt": "^0.4.5",
     "mongoose": "^4.0.6",
-    "suncalc": "^1.6.0",
     "xml2js": "^0.4.9"
   },
   "devDependencies": {

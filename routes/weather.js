@@ -1,5 +1,4 @@
 var http		= require( "http" ),
-	SunCalc		= require( "suncalc" ),
 	parseXML	= require( "xml2js" ).parseString,
 	Cache		= require( "../models/Cache" ),
 
@@ -41,39 +40,29 @@ function resolveCoordinates( location, callback ) {
 // Retrieve weather data to complete the weather request using Weather Underground
 function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) {
 
-	// Generate URL using The Weather Company API v1 in Imperial units
+	// Generate URL using Weather Underground yesterday conditions
 	var url = "http://api.wunderground.com/api/" + weatherUndergroundKey +
-		"/yesterday/conditions/q/" + encodeURIComponent( location ) + ".json";
+		"/yesterday/conditions/astronomy/q/" + encodeURIComponent( location ) + ".json";
 
 	// Perform the HTTP request to retrieve the weather data
 	httpRequest( url, function( data ) {
 		try {
 			data = JSON.parse( data );
 
-			var tzOffset = getTimezone( data.current_observation.local_tz_offset, "minutes" ),
-
-				// Calculate sunrise and sunset since Weather Underground does not provide it
-				sunData = SunCalc.getTimes( data.current_observation.local_epoch * 1000,
-											data.current_observation.observation_location.latitude || data.current_observation.display_location.latitude,
-											data.current_observation.observation_location.longitude || data.current_observation.display_location.longitude );
-
-			sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
-			sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
-
 			var weather = {
-					icon:		data.current_observation.icon,
-					timezone:	data.current_observation.local_tz_offset,
-					sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
-					sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() ),
-					maxTemp:	parseInt( data.history.dailysummary[0].maxtempi ),
-					minTemp:	parseInt( data.history.dailysummary[0].mintempi ),
-					temp:		parseInt( data.current_observation.temp_f ),
-					humidity:	( parseInt( data.history.dailysummary[0].maxhumidity ) + parseInt( data.history.dailysummary[0].minhumidity ) ) / 2,
-					precip:		( parseFloat( data.current_observation.precip_today_in ) || 0 ) + ( parseFloat( data.history.dailysummary[0].precipi ) || 0 ),
-					solar:		parseInt( data.current_observation.UV ),
-					wind:		parseInt( data.history.dailysummary[0].meanwindspdi ),
-					elevation:	parseInt( data.current_observation.observation_location.elevation )
-				};
+				icon:		data.current_observation.icon,
+				timezone:	data.current_observation.local_tz_offset,
+				sunrise:	parseInt( data.sun_phase.sunrise.hour ) * 60 + parseInt( data.sun_phase.sunrise.minute ),
+				sunset:		parseInt( data.sun_phase.sunset.hour ) * 60 + parseInt( data.sun_phase.sunset.minute ),
+				maxTemp:	parseInt( data.history.dailysummary[0].maxtempi ),
+				minTemp:	parseInt( data.history.dailysummary[0].mintempi ),
+				temp:		parseInt( data.current_observation.temp_f ),
+				humidity:	( parseInt( data.history.dailysummary[0].maxhumidity ) + parseInt( data.history.dailysummary[0].minhumidity ) ) / 2,
+				precip:		( parseFloat( data.current_observation.precip_today_in ) || 0 ) + ( parseFloat( data.history.dailysummary[0].precipi ) || 0 ),
+				solar:		parseInt( data.current_observation.UV ),
+				wind:		parseInt( data.history.dailysummary[0].meanwindspdi ),
+				elevation:	parseInt( data.current_observation.observation_location.elevation )
+			};
 
 			callback( weather );
 
