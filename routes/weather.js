@@ -8,6 +8,7 @@ var http		= require( "http" ),
 		pws: /^(?:pws|icao):/,
 		url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
 		time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
+		time12: /(\d{1,2}):(\d{2})\s(am|pm)/i,
 		timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
 	};
 
@@ -34,6 +35,21 @@ function resolveCoordinates( location, callback ) {
 			// Otherwise, indicate no data was found
 			callback( false );
 		}
+	} );
+}
+
+// When using WxData API, resolve the location name to ID
+function resolveWxLocation( location, callback ) {
+
+	// Generate URL for the request
+	var url = "http://wxdata.weather.com/wxdata/search/search?where=" +
+		encodeURIComponent( location );
+
+	httpRequest( url, function( xml ) {
+
+		parseXML( xml, function( err, result ) {
+			callback( result.search.loc[0].$.id );
+		} );
 	} );
 }
 
@@ -72,6 +88,46 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 			callback( false );
 		}
 
+	} );
+}
+
+// Retrieve weather data to complete weather request using Weather.com's WxData API
+function getWxWeatherData( location, callback ) {
+
+	// Generate URL using The Weather Company API v1 in Imperial units
+	var url = "http://wxdata.weather.com/wxdata/weather/local/" + encodeURIComponent( location ) + "?cc=*&dayf=1&unit=i";
+
+	// Perform the HTTP request to retrieve the weather data
+	httpRequest( url, function( xml ) {
+
+		parseXML( xml, function( err, data ) {
+			data = data.weather;
+
+			var tz = parseInt( data.loc[0].zone[0] ),
+				weather = {
+					iconCode:	parseInt( data.cc[0].icon[0] ),
+					timezone:	( tz > 0 ? "+" : "" ) + pad( tz ) + "00",
+					sunrise:	parse12HourTime( data.loc[0].sunr[0] ),
+					sunset:		parse12HourTime( data.loc[0].suns[0] ),
+					temp:		parseInt( data.cc[0].tmp[0] ),
+					humidity:	parseInt( data.cc[0].hmid[0] ),
+					solar:		parseInt( data.cc[0].uv[0].i[0] ),
+					wind:		parseInt( data.cc[0].wind[0].s[0] )
+				};
+
+			Cache.findOne( { location: location }, function( err, record ) {
+
+				if ( record && record.yesterdayHumidity !== null ) {
+					weather.yesterdayHumidity = record.yesterdayHumidity;
+				}
+
+				// Return the data to the callback function if successful
+				callback( weather );
+			} );
+
+			updateCache( location, weather );
+
+		} );
 	} );
 }
 
@@ -441,6 +497,32 @@ function parseDayTime( time ) {
 
 	// Values are converted to minutes from midnight for the controller
 	return parseInt( time[4] ) * 60 + parseInt( time[5] );
+}
+
+// Function to return the sunrise and sunset times from weather reply using 12 hour format
+function parse12HourTime( time ) {
+
+	// Time is parsed from string against a regex
+	time = time.match( filters.time12 );
+
+	var hour = parseInt( time[1] ),
+		minute = parseInt( time[2] );
+
+	if ( time[3].toLowerCase() === "pm" ) {
+		hour += 12;
+	}
+
+	// Values are converted to minutes from midnight for the controller
+	return parseInt( hour ) * 60 + parseInt( minute );
+}
+
+// Pad a single digit with a leading zero
+function pad( number ) {
+    var r = String( number );
+    if ( r.length === 1 ) {
+        r = "0" + r;
+    }
+    return r;
 }
 
 // Converts IP string to integer
