@@ -272,22 +272,11 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 // Checks if the weather data meets any of the restrictions set by OpenSprinkler.
 // Restrictions prevent any watering from occurring and are similar to 0% watering level.
 //
-// All queries will return a restrict flag if the current weather indicates rain.
+// All queries will return a scale of 0 if the current weather indicates rain.
 //
 // California watering restriction prevents watering if precipitation over two days is greater
 // than 0.01" over the past 48 hours.
 function checkWeatherRestriction( adjustmentValue, weather ) {
-
-	// Define all the weather codes that indicate rain
-	var adverseCodes = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47 ],
-		adverseWords = [ "flurries", "sleet", "rain", "sleet", "snow", "tstorms" ];
-
-	if ( ( weather.iconCode && adverseCodes.indexOf( weather.iconCode ) !== -1 ) || ( weather.icon && adverseWords.indexOf( weather.icon ) !== -1 ) ) {
-
-		// If the current weather indicates rain, add a restrict flag to the weather script indicating
-		// the controller should not water.
-		return true;
-	}
 
 	var californiaRestriction = ( adjustmentValue >> 7 ) & 1;
 
@@ -298,6 +287,23 @@ function checkWeatherRestriction( adjustmentValue, weather ) {
 		if ( weather.precip > 0.01 ) {
 			return true;
 		}
+	}
+
+	return false;
+}
+
+// Checks if the weather indicates it is raining and returns a boolean representation
+function checkRainStatus( weather ) {
+
+	// Define all the weather codes that indicate rain
+	var adverseCodes = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47 ],
+		adverseWords = [ "flurries", "sleet", "rain", "sleet", "snow", "tstorms" ];
+
+	if ( ( weather.iconCode && adverseCodes.indexOf( weather.iconCode ) !== -1 ) || ( weather.icon && adverseWords.indexOf( weather.icon ) !== -1 ) ) {
+
+		// If the current weather indicates rain, add a rain delay flag to the weather script indicating
+		// the controller should not water.
+		return true;
 	}
 
 	return false;
@@ -328,14 +334,31 @@ exports.getWeather = function( req, res ) {
 				return;
 			}
 
-			var scale = calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather );
+			var scale = calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ),
+				rainDelay = -1;
 
+			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
 			if ( checkWeatherRestriction( req.params[0], weather ) ) {
 				scale = 0;
 			}
 
+			// If any weather adjustment is being used, check the rain status
+			if ( adjustmentMethod > 0 && checkRainStatus( weather ) ) {
+
+				// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
+				if ( adjustmentMethod === 2 ) {
+
+					rainDelay = ( adjustmentOptions && adjustmentOptions.hasOwnProperty( "r" ) ) ? adjustmentOptions.r : 1440;
+				} else {
+
+					// For any other adjustment method, apply a scale of 0 (as the scale will revert when the rain stops)
+					scale = 0;
+				}
+			}
+
 			var data = {
 					scale:		scale,
+					rd:			rainDelay,
 					tz:			getTimezone( weather.timezone ),
 					sunrise:	weather.sunrise,
 					sunset:		weather.sunset,
@@ -347,6 +370,7 @@ exports.getWeather = function( req, res ) {
 				res.json( data );
 			} else {
 				res.send(	"&scale="		+	data.scale +
+							"&rd="			+	data.rd +
 							"&tz="			+	data.tz +
 							"&sunrise="		+	data.sunrise +
 							"&sunset="		+	data.sunset +

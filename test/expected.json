@@ -2,6 +2,7 @@
 	"WSI": {
 		"01002": {
 			"scale": 83,
+			"rd": -1,
 			"tz": 32,
 			"sunrise": 324,
 			"sunset": 1226,
@@ -11,6 +12,7 @@
 	"WU": {
 		"01002": {
 			"scale": 61,
+			"rd": -1,
 			"tz": 32,
 			"sunrise": 324,
 			"sunset": 1228,
@@ -20,6 +22,7 @@
 	"noWeather": {
 		"01002": {
 			"scale": -1,
+			"rd": -1,
 			"tz": 32,
 			"sunrise": 324,
 			"sunset": 1226,
