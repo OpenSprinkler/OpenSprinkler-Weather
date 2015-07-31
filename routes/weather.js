@@ -348,7 +348,7 @@ exports.getWeather = function( req, res ) {
 				// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
 				if ( adjustmentMethod === 2 ) {
 
-					rainDelay = ( adjustmentOptions && adjustmentOptions.hasOwnProperty( "r" ) ) ? adjustmentOptions.r : 1440;
+					rainDelay = ( adjustmentOptions && adjustmentOptions.hasOwnProperty( "d" ) ) ? adjustmentOptions.d : 1440;
 				} else {
 
 					// For any other adjustment method, apply a scale of 0 (as the scale will revert when the rain stops)
