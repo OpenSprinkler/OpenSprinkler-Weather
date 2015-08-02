@@ -5,7 +5,7 @@ var http		= require( "http" ),
 	// Define regex filters to match against location
 	filters		= {
 		gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
-		pws: /^(?:pws|icao):/,
+		pws: /^(?:pws|icao|zmw):/,
 		url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
 		time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
 		time12: /(\d{1,2}):(\d{2})\s(am|pm)/i,
