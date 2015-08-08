@@ -119,7 +119,9 @@ function getWxWeatherData( location, callback ) {
 				key: "yesterdayHumidity",
 				location: location
 			}, function( record ) {
-				weather.yesterdayHumidity = record.yesterdayHumidity;
+				if ( record ) {
+					weather.yesterdayHumidity = record.yesterdayHumidity;
+				}
 
 				// Return the data to the callback function if successful
 				callback( weather );
@@ -167,7 +169,9 @@ function getWeatherData( location, callback ) {
 				key: "yesterdayHumidity",
 				location: location
 			}, function( record ) {
-				weather.yesterdayHumidity = record.yesterdayHumidity;
+				if ( record ) {
+					weather.yesterdayHumidity = record.yesterdayHumidity;
+				}
 
 				// Return the data to the callback function if successful
 				callback( weather );
