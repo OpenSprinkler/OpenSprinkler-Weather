@@ -115,11 +115,11 @@ function getWxWeatherData( location, callback ) {
 					wind:		parseInt( data.cc[0].wind[0].s[0] )
 				};
 
-			Cache.findOne( { location: location }, function( err, record ) {
-
-				if ( record && record.yesterdayHumidity !== null ) {
-					weather.yesterdayHumidity = record.yesterdayHumidity;
-				}
+			getCache( {
+				key: "yesterdayHumidity",
+				location: location
+			}, function( record ) {
+				weather.yesterdayHumidity = record.yesterdayHumidity;
 
 				// Return the data to the callback function if successful
 				callback( weather );
@@ -163,11 +163,11 @@ function getWeatherData( location, callback ) {
 
 			location = location.join( "," );
 
-			Cache.findOne( { location: location }, function( err, record ) {
-
-				if ( record && record.yesterdayHumidity !== null ) {
-					weather.yesterdayHumidity = record.yesterdayHumidity;
-				}
+			getCache( {
+				key: "yesterdayHumidity",
+				location: location
+			}, function( record ) {
+				weather.yesterdayHumidity = record.yesterdayHumidity;
 
 				// Return the data to the callback function if successful
 				callback( weather );
@@ -202,6 +202,26 @@ function getYesterdayWeatherData( location, callback ) {
 		parseXML( xml, function( err, result ) {
 			callback( result.WeatherResponse.WeatherRecords[0].WeatherData[0].$ );
 		} );
+	} );
+}
+
+// Retrieve cached record for a given location
+// opt is defined as an object with two required items
+// opt.location defines the location for the cache record
+// opt.key defines the key to return for the location
+function getCache( opt, callback ) {
+
+	// Find the cache entry for the provided location
+	Cache.findOne( { location: opt.location }, function( err, record ) {
+
+		// If a record is found for the provided key, return it
+		if ( record && record[ opt.key ] !== null ) {
+			callback( record[ opt.key ] );
+		} else {
+
+			// Otherwise return null indicating no match is found
+			callback( null );
+		}
 	} );
 }
 
@@ -391,6 +411,9 @@ exports.getWeather = function( req, res ) {
 
 	// Parse weather adjustment options
 	try {
+
+		// Parse data that may be encoded
+		adjustmentOptions = decodeURIComponent( adjustmentOptions.replace( /\\x/g, "%" ) );
 
 		// Reconstruct JSON string from deformed controller output
 		adjustmentOptions = JSON.parse( "{" + adjustmentOptions + "}" );
