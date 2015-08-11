@@ -48,6 +48,11 @@ function resolveWxLocation( location, callback ) {
 	httpRequest( url, function( xml ) {
 
 		parseXML( xml, function( err, result ) {
+			if ( err ) {
+				callback( null );
+				return;
+			}
+
 			callback( result.search.loc[0].$.id );
 		} );
 	} );
@@ -101,6 +106,11 @@ function getWxWeatherData( location, callback ) {
 	httpRequest( url, function( xml ) {
 
 		parseXML( xml, function( err, data ) {
+			if ( err ) {
+				callback( null );
+				return;
+			}
+
 			data = data.weather;
 
 			var tz = parseInt( data.loc[0].zone[0] ),
@@ -117,14 +127,9 @@ function getWxWeatherData( location, callback ) {
 
 			getCache( {
 				key: "yesterdayHumidity",
-				location: location
-			}, function( record ) {
-				if ( record ) {
-					weather.yesterdayHumidity = record.yesterdayHumidity;
-				}
-
-				// Return the data to the callback function if successful
-				callback( weather );
+				location: location,
+				weather: weather,
+				callback: callback
 			} );
 
 			updateCache( location, weather );
@@ -167,14 +172,9 @@ function getWeatherData( location, callback ) {
 
 			getCache( {
 				key: "yesterdayHumidity",
-				location: location
-			}, function( record ) {
-				if ( record ) {
-					weather.yesterdayHumidity = record.yesterdayHumidity;
-				}
-
-				// Return the data to the callback function if successful
-				callback( weather );
+				location: location,
+				weather: weather,
+				callback: callback
 			} );
 
 			updateCache( location, weather );
@@ -204,6 +204,11 @@ function getYesterdayWeatherData( location, callback ) {
 	// Perform the HTTP request to retrieve the weather data
 	httpRequest( url, function( xml ) {
 		parseXML( xml, function( err, result ) {
+			if ( err ) {
+				callback( null );
+				return;
+			}
+
 			callback( result.WeatherResponse.WeatherRecords[0].WeatherData[0].$ );
 		} );
 	} );
@@ -218,14 +223,16 @@ function getCache( opt, callback ) {
 	// Find the cache entry for the provided location
 	Cache.findOne( { location: opt.location }, function( err, record ) {
 
+		if ( err ) {
+			return;
+		}
+
 		// If a record is found for the provided key, return it
 		if ( record && record[ opt.key ] !== null ) {
-			callback( record[ opt.key ] );
-		} else {
-
-			// Otherwise return null indicating no match is found
-			callback( null );
+			opt.weather[ opt.key ] = record[ opt.key ];
 		}
+
+		callback( opt.weather );
 	} );
 }
 
@@ -234,6 +241,10 @@ function updateCache( location, weather ) {
 
 	// Search for a cache record for the provided location
 	Cache.findOne( { location: location }, function( err, record ) {
+
+		if ( err ) {
+			return;
+		}
 
 		// If a record is found update the data and save it
 		if ( record ) {
