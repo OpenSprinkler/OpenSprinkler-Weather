@@ -57,12 +57,13 @@ describe( "Weather API", function() {
 
 function apiTest( opt ) {
 
-	var opt = extend( {}, {
-			method: 0,
-			key: "",
-			format: "json"
-		}, opt ),
-		url = "/" + opt.method + "?loc=" + opt.loc + "&key=" + opt.key + "&format=" + opt.format;
+	opt = extend( {}, {
+		method: 0,
+		key: "",
+		format: "json"
+	}, opt );
+
+	var url = "/" + opt.method + "?loc=" + opt.loc + "&key=" + opt.key + "&format=" + opt.format;
 
 	setupMocks( opt.loc );
 

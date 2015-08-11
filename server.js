@@ -42,6 +42,10 @@ new CronJob( "0 0 0 * * *", function() {
 	// Find all records in the weather cache
 	Cache.find( {}, function( err, records ) {
 
+		if ( err ) {
+			return;
+		}
+
 		// Cycle through each record
 		records.forEach( function( record ) {
 
