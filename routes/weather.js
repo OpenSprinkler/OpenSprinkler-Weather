@@ -232,7 +232,7 @@ function getCache( opt, callback ) {
 			opt.weather[ opt.key ] = record[ opt.key ];
 		}
 
-		callback( opt.weather );
+		opt.callback( opt.weather );
 	} );
 }
 
