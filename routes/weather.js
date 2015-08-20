@@ -307,8 +307,6 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 // Checks if the weather data meets any of the restrictions set by OpenSprinkler.
 // Restrictions prevent any watering from occurring and are similar to 0% watering level.
 //
-// All queries will return a scale of 0 if the current weather indicates rain.
-//
 // California watering restriction prevents watering if precipitation over two days is greater
 // than 0.01" over the past 48 hours.
 function checkWeatherRestriction( adjustmentValue, weather ) {
