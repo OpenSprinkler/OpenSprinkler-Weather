@@ -1,6 +1,8 @@
 var http		= require( "http" ),
 	parseXML	= require( "xml2js" ).parseString,
 	Cache		= require( "../models/Cache" ),
+	SunCalc		= require( "suncalc" ),
+	moment		= require( "moment-timezone" ),
 
 	// Define regex filters to match against location
 	filters		= {
@@ -29,7 +31,7 @@ function resolveCoordinates( location, callback ) {
 		if ( typeof data.RESULTS === "object" && data.RESULTS.length ) {
 
 			// If it is, reply with an array containing the GPS coordinates
-			callback( [ data.RESULTS[0].lat, data.RESULTS[0].lon ] );
+			callback( [ data.RESULTS[0].lat, data.RESULTS[0].lon ], moment().tz( data.RESULTS[0].tz ).utcOffset() );
 		} else {
 
 			// Otherwise, indicate no data was found
@@ -462,14 +464,31 @@ exports.getWeather = function( req, res ) {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
 		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
-		resolveCoordinates( location, function( result ) {
+		resolveCoordinates( location, function( result, timezone ) {
 			if ( result === false ) {
 				res.send( "Error: Unable to resolve location" );
 				return;
 			}
 
 			location = result;
-			getWeatherData( location, finishRequest );
+			getWeatherData( location, function( weather ) {
+				if ( !weather ) {
+					var tzOffset = getTimezone( timezone, "minutes" ),
+
+					// Calculate sunrise and sunset since Weather Underground does not provide it
+					sunData = SunCalc.getTimes( new Date(), location[0], location[1] );
+
+					sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
+					sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
+
+					weather = {
+						timezone:	timezone,
+						sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
+						sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() )
+					};
+				}
+				finishRequest( weather );
+			} );
 		} );
     }
 };
@@ -528,12 +547,19 @@ function validateValues( keys, array ) {
 // The timezone output is formatted for OpenSprinkler Unified firmware.
 function getTimezone( time, format ) {
 
-	// Match the provided time string against a regex for parsing
-	time = time.match( filters.time ) || time.match( filters.timezone );
+	var hour, minute, tz;
 
-	var hour = parseInt( time[7] + time[8] ),
-		minute = parseInt( time[9] ),
-		tz;
+	if ( typeof time === "number" ) {
+		hour = Math.floor( time / 60);
+		minute = time % 60;
+	} else {
+
+		// Match the provided time string against a regex for parsing
+		time = time.match( filters.time ) || time.match( filters.timezone );
+
+		hour = parseInt( time[7] + time[8] );
+		minute = parseInt( time[9] );
+	}
 
 	if ( format === "minutes" ) {
 		tz = ( hour * 60 ) + minute;
