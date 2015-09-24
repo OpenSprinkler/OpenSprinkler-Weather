@@ -237,8 +237,8 @@ function getOWMWeatherData( location, callback ) {
 					if ( err ) {
 						callback( false );
 					} else {
-						var timezone = ( timezone.rawOffset + timezone.dstOffset ) / 60,
-							tzOffset = getTimezone( timezone, "minutes" ),
+						timezone = ( timezone.rawOffset + timezone.dstOffset ) / 60;
+						var tzOffset = getTimezone( timezone, "minutes" ),
 
 							// Calculate sunrise and sunset since Weather Underground does not provide it
 							sunData = SunCalc.getTimes( new Date(), location[ 0 ], location[ 1 ] );
