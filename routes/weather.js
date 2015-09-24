@@ -229,8 +229,6 @@ function getOWMWeatherData( location, callback ) {
 		try {
 
 			data = JSON.parse( data );
-			var	sunrise = new Date( data.sys.sunrise * 1000 ),
-				sunset = new Date( data.sys.sunset * 1000 );
 
 			timezoner.getTimeZone(
 				location[ 0 ],
@@ -239,10 +237,19 @@ function getOWMWeatherData( location, callback ) {
 					if ( err ) {
 						callback( false );
 					} else {
+						var timezone = ( timezone.rawOffset + timezone.dstOffset ) / 60,
+							tzOffset = getTimezone( timezone, "minutes" ),
+
+							// Calculate sunrise and sunset since Weather Underground does not provide it
+							sunData = SunCalc.getTimes( new Date(), location[ 0 ], location[ 1 ] );
+
+							sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
+							sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
+
 						var weather = {
-							timezone:	( timezone.rawOffset + timezone.dstOffset ) / 60,
-							sunrise:	( sunrise.getHours() * 60 + sunrise.getMinutes() ),
-							sunset:		( sunset.getHours() * 60 + sunset.getMinutes() ),
+							timezone:	timezone,
+							sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
+							sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() ),
 							temp:		parseInt( data.main.temp ),
 							humidity:	parseInt( data.main.humidity ),
 							wind:		parseInt( data.wind.speed )
