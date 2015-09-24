@@ -14,6 +14,7 @@
     "moment-timezone": "^0.4.0",
     "mongoose": "^4.0.6",
     "suncalc": "^1.6.0",
+    "timezoner": "^0.1.9",
     "xml2js": "^0.4.9"
   },
   "devDependencies": {

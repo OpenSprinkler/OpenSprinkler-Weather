@@ -3,6 +3,7 @@ var http		= require( "http" ),
 	Cache		= require( "../models/Cache" ),
 	SunCalc		= require( "suncalc" ),
 	moment		= require( "moment-timezone" ),
+	timezoner	= require( "timezoner" ),
 
 	// Define regex filters to match against location
 	filters		= {
@@ -31,7 +32,7 @@ function resolveCoordinates( location, callback ) {
 		if ( typeof data.RESULTS === "object" && data.RESULTS.length ) {
 
 			// If it is, reply with an array containing the GPS coordinates
-			callback( [ data.RESULTS[0].lat, data.RESULTS[0].lon ], moment().tz( data.RESULTS[0].tz ).utcOffset() );
+			callback( [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ], moment().tz( data.RESULTS[ 0 ].tz ).utcOffset() );
 		} else {
 
 			// Otherwise, indicate no data was found
@@ -55,7 +56,7 @@ function resolveWxLocation( location, callback ) {
 				return;
 			}
 
-			callback( result.search.loc[0].$.id );
+			callback( result.search.loc[ 0 ].$.id );
 		} );
 	} );
 }
@@ -77,13 +78,13 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 				timezone:	data.current_observation.local_tz_offset,
 				sunrise:	parseInt( data.sun_phase.sunrise.hour ) * 60 + parseInt( data.sun_phase.sunrise.minute ),
 				sunset:		parseInt( data.sun_phase.sunset.hour ) * 60 + parseInt( data.sun_phase.sunset.minute ),
-				maxTemp:	parseInt( data.history.dailysummary[0].maxtempi ),
-				minTemp:	parseInt( data.history.dailysummary[0].mintempi ),
+				maxTemp:	parseInt( data.history.dailysummary[ 0 ].maxtempi ),
+				minTemp:	parseInt( data.history.dailysummary[ 0 ].mintempi ),
 				temp:		parseInt( data.current_observation.temp_f ),
-				humidity:	( parseInt( data.history.dailysummary[0].maxhumidity ) + parseInt( data.history.dailysummary[0].minhumidity ) ) / 2,
-				precip:		( parseFloat( data.current_observation.precip_today_in ) || 0 ) + ( parseFloat( data.history.dailysummary[0].precipi ) || 0 ),
+				humidity:	( parseInt( data.history.dailysummary[ 0 ].maxhumidity ) + parseInt( data.history.dailysummary[ 0 ].minhumidity ) ) / 2,
+				precip:		( parseFloat( data.current_observation.precip_today_in ) || 0 ) + ( parseFloat( data.history.dailysummary[ 0 ].precipi ) || 0 ),
 				solar:		parseInt( data.current_observation.UV ),
-				wind:		parseInt( data.history.dailysummary[0].meanwindspdi ),
+				wind:		parseInt( data.history.dailysummary[ 0 ].meanwindspdi ),
 				elevation:	parseInt( data.current_observation.observation_location.elevation )
 			};
 
@@ -115,16 +116,16 @@ function getWxWeatherData( location, callback ) {
 
 			data = data.weather;
 
-			var tz = parseInt( data.loc[0].zone[0] ),
+			var tz = parseInt( data.loc[ 0 ].zone[ 0 ] ),
 				weather = {
-					iconCode:	parseInt( data.cc[0].icon[0] ),
+					iconCode:	parseInt( data.cc[ 0 ].icon[ 0 ] ),
 					timezone:	( tz > 0 ? "+" : "" ) + pad( tz ) + "00",
-					sunrise:	parse12HourTime( data.loc[0].sunr[0] ),
-					sunset:		parse12HourTime( data.loc[0].suns[0] ),
-					temp:		parseInt( data.cc[0].tmp[0] ),
-					humidity:	parseInt( data.cc[0].hmid[0] ),
-					solar:		parseInt( data.cc[0].uv[0].i[0] ),
-					wind:		parseInt( data.cc[0].wind[0].s[0] )
+					sunrise:	parse12HourTime( data.loc[ 0 ].sunr[ 0 ] ),
+					sunset:		parse12HourTime( data.loc[ 0 ].suns[ 0 ] ),
+					temp:		parseInt( data.cc[ 0 ].tmp[ 0 ] ),
+					humidity:	parseInt( data.cc[ 0 ].hmid[ 0 ] ),
+					solar:		parseInt( data.cc[ 0 ].uv[ 0 ].i[ 0 ] ),
+					wind:		parseInt( data.cc[ 0 ].wind[ 0 ].s[ 0 ] )
 				};
 
 			getCache( {
@@ -147,7 +148,7 @@ function getWeatherData( location, callback ) {
 	var WSI_API_KEY = process.env.WSI_API_KEY,
 
 		// Generate URL using The Weather Company API v1 in Imperial units
-		url = "http://api.weather.com/v1/geocode/" + location[0] + "/" + location[1] +
+		url = "http://api.weather.com/v1/geocode/" + location[ 0 ] + "/" + location[ 1 ] +
 			 "/observations/current.json?apiKey=" + WSI_API_KEY + "&language=en-US&units=e";
 
 	// Perform the HTTP request to retrieve the weather data
@@ -200,7 +201,7 @@ function getYesterdayWeatherData( location, callback ) {
 
 		// Generate URL using WSI Cleaned History API in Imperial units showing daily average values
 		url = "http://cleanedobservations.wsi.com/CleanedObs.svc/GetObs?ID=" + WSI_HISTORY_KEY +
-			 "&Lat=" + location[0] + "&Long=" + location[1] +
+			 "&Lat=" + location[ 0 ] + "&Long=" + location[ 1 ] +
 			 "&Req=davg&startdate=" +  yesterday + "&enddate=" + yesterday + "&TS=LST";
 
 	// Perform the HTTP request to retrieve the weather data
@@ -211,8 +212,59 @@ function getYesterdayWeatherData( location, callback ) {
 				return;
 			}
 
-			callback( result.WeatherResponse.WeatherRecords[0].WeatherData[0].$ );
+			callback( result.WeatherResponse.WeatherRecords[ 0 ].WeatherData[ 0 ].$ );
 		} );
+	} );
+}
+
+// Retrieve weather data from Open Weather Map
+function getOWMWeatherData( location, callback ) {
+
+	// Generate URL using The Weather Company API v1 in Imperial units
+	var url = "http://api.openweathermap.org/data/2.5/weather?units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
+
+	// Perform the HTTP request to retrieve the weather data
+	httpRequest( url, function( data ) {
+
+		try {
+
+			data = JSON.parse( data );
+			var	sunrise = new Date( data.sys.sunrise * 1000 ),
+				sunset = new Date( data.sys.sunset * 1000 );
+
+			timezoner.getTimeZone(
+				location[ 0 ],
+				location[ 1 ],
+				function( err, timezone ) {
+					if ( err ) {
+						callback( false );
+					} else {
+						var weather = {
+							timezone:	( timezone.rawOffset + timezone.dstOffset ) / 60,
+							sunrise:	( sunrise.getHours() * 60 + sunrise.getMinutes() ),
+							sunset:		( sunset.getHours() * 60 + sunset.getMinutes() ),
+							temp:		parseInt( data.main.temp ),
+							humidity:	parseInt( data.main.humidity ),
+							wind:		parseInt( data.wind.speed )
+						};
+
+						getCache( {
+							key: "yesterdayHumidity",
+							location: location,
+							weather: weather,
+							callback: callback
+						} );
+
+						updateCache( location, weather );
+					}
+				}
+			);
+
+		} catch ( err ) {
+
+			// Otherwise indicate the request failed
+			callback( false );
+		}
 	} );
 }
 
@@ -352,7 +404,7 @@ exports.getWeather = function( req, res ) {
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
-	var adjustmentMethod		= req.params[0] & ~( 1 << 7 ),
+	var adjustmentMethod		= req.params[ 0 ] & ~( 1 << 7 ),
 		adjustmentOptions		= req.query.wto,
 		location				= req.query.loc,
 		weatherUndergroundKey	= req.query.key,
@@ -373,7 +425,7 @@ exports.getWeather = function( req, res ) {
 				rainDelay = -1;
 
 			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-			if ( checkWeatherRestriction( req.params[0], weather ) ) {
+			if ( checkWeatherRestriction( req.params[ 0 ], weather ) ) {
 				scale = 0;
 			}
 
@@ -422,7 +474,7 @@ exports.getWeather = function( req, res ) {
 
 	// X-Forwarded-For header may contain more than one IP address and therefore
 	// the string is split against a comma and the first value is selected
-	remoteAddress = remoteAddress.split( "," )[0];
+	remoteAddress = remoteAddress.split( "," )[ 0 ];
 
 	// Parse weather adjustment options
 	try {
@@ -455,10 +507,10 @@ exports.getWeather = function( req, res ) {
 
 		// Handle GPS coordinates by storing each coordinate in an array
 		location = location.split( "," );
-		location = [ parseFloat( location[0] ), parseFloat( location[1] ) ];
+		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
 
 		// Continue with the weather request
-		getWeatherData( location, finishRequest );
+		getOWMWeatherData( location, finishRequest );
 
     } else {
 
@@ -476,7 +528,7 @@ exports.getWeather = function( req, res ) {
 					var tzOffset = getTimezone( timezone, "minutes" ),
 
 					// Calculate sunrise and sunset since Weather Underground does not provide it
-					sunData = SunCalc.getTimes( new Date(), location[0], location[1] );
+					sunData = SunCalc.getTimes( new Date(), location[ 0 ], location[ 1 ] );
 
 					sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
 					sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
@@ -499,9 +551,9 @@ function httpRequest( url, callback ) {
 	url = url.match( filters.url );
 
 	var options = {
-		host: url[1],
-		port: url[2] || 80,
-		path: url[3]
+		host: url[ 1 ],
+		port: url[ 2 ] || 80,
+		path: url[ 3 ]
 	};
 
 	http.get( options, function( response ) {
@@ -532,9 +584,9 @@ function validateValues( keys, array ) {
 			continue;
 		}
 
-		key = keys[key];
+		key = keys[ key ];
 
-		if ( !array.hasOwnProperty( key ) || typeof array[key] !== "number" || isNaN( array[key] ) || array[key] === null || array[key] === -999 ) {
+		if ( !array.hasOwnProperty( key ) || typeof array[ key ] !== "number" || isNaN( array[ key ] ) || array[ key ] === null || array[ key ] === -999 ) {
 			return false;
 		}
 	}
@@ -550,15 +602,15 @@ function getTimezone( time, format ) {
 	var hour, minute, tz;
 
 	if ( typeof time === "number" ) {
-		hour = Math.floor( time / 60);
+		hour = Math.floor( time / 60 );
 		minute = time % 60;
 	} else {
 
 		// Match the provided time string against a regex for parsing
 		time = time.match( filters.time ) || time.match( filters.timezone );
 
-		hour = parseInt( time[7] + time[8] );
-		minute = parseInt( time[9] );
+		hour = parseInt( time[ 7 ] + time[ 8 ] );
+		minute = parseInt( time[ 9 ] );
 	}
 
 	if ( format === "minutes" ) {
@@ -582,7 +634,7 @@ function parseDayTime( time ) {
 	time = time.match( filters.time );
 
 	// Values are converted to minutes from midnight for the controller
-	return parseInt( time[4] ) * 60 + parseInt( time[5] );
+	return parseInt( time[ 4 ] ) * 60 + parseInt( time[ 5 ] );
 }
 
 // Function to return the sunrise and sunset times from weather reply using 12 hour format
@@ -591,10 +643,10 @@ function parse12HourTime( time ) {
 	// Time is parsed from string against a regex
 	time = time.match( filters.time12 );
 
-	var hour = parseInt( time[1] ),
-		minute = parseInt( time[2] );
+	var hour = parseInt( time[ 1 ] ),
+		minute = parseInt( time[ 2 ] );
 
-	if ( time[3].toLowerCase() === "pm" ) {
+	if ( time[ 3 ].toLowerCase() === "pm" ) {
 		hour += 12;
 	}
 
@@ -614,7 +666,7 @@ function pad( number ) {
 // Converts IP string to integer
 function ipToInt( ip ) {
     ip = ip.split( "." );
-    return ( ( ( ( ( ( +ip[0] ) * 256 ) + ( +ip[1] ) ) * 256 ) + ( +ip[2] ) ) * 256 ) + ( +ip[3] );
+    return ( ( ( ( ( ( +ip[ 0 ] ) * 256 ) + ( +ip[ 1 ] ) ) * 256 ) + ( +ip[ 2 ] ) ) * 256 ) + ( +ip[ 3 ] );
 }
 
 // Resolves the Month / Day / Year of a Date object
