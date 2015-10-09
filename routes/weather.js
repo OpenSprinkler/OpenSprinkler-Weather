@@ -221,7 +221,8 @@ function getYesterdayWeatherData( location, callback ) {
 function getOWMWeatherData( location, callback ) {
 
 	// Generate URL using The Weather Company API v1 in Imperial units
-	var url = "http://api.openweathermap.org/data/2.5/weather?units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
+	var OWM_API_KEY = process.env.OWM_API_KEY,
+		url = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
 
 	// Perform the HTTP request to retrieve the weather data
 	httpRequest( url, function( data ) {
