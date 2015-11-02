@@ -217,63 +217,34 @@ function getYesterdayWeatherData( location, callback ) {
 	} );
 }
 
-// Retrieve weather data from Open Weather Map
-function getOWMWeatherData( location, callback ) {
+// Calculate timezone and sun rise/set information
+function getTimeData( location, callback ) {
+	timezoner.getTimeZone(
+		location[ 0 ],
+		location[ 1 ],
+		function( err, timezone ) {
+			if ( err ) {
+				callback( false );
+			} else {
+				timezone = ( timezone.rawOffset + timezone.dstOffset ) / 60;
+				var tzOffset = getTimezone( timezone, "minutes" ),
 
-	// Generate URL using The Weather Company API v1 in Imperial units
-	var OWM_API_KEY = process.env.OWM_API_KEY,
-		url = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
+					// Calculate sunrise and sunset since Weather Underground does not provide it
+					sunData = SunCalc.getTimes( new Date(), location[ 0 ], location[ 1 ] );
 
-	// Perform the HTTP request to retrieve the weather data
-	httpRequest( url, function( data ) {
+					sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
+					sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
 
-		try {
+				var weather = {
+					timezone:	timezone,
+					sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
+					sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() )
+				};
 
-			data = JSON.parse( data );
-
-			timezoner.getTimeZone(
-				location[ 0 ],
-				location[ 1 ],
-				function( err, timezone ) {
-					if ( err ) {
-						callback( false );
-					} else {
-						timezone = ( timezone.rawOffset + timezone.dstOffset ) / 60;
-						var tzOffset = getTimezone( timezone, "minutes" ),
-
-							// Calculate sunrise and sunset since Weather Underground does not provide it
-							sunData = SunCalc.getTimes( new Date(), location[ 0 ], location[ 1 ] );
-
-							sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
-							sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
-
-						var weather = {
-							timezone:	timezone,
-							sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
-							sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() ),
-							temp:		parseInt( data.main.temp ),
-							humidity:	parseInt( data.main.humidity ),
-							wind:		parseInt( data.wind.speed )
-						};
-
-						getCache( {
-							key: "yesterdayHumidity",
-							location: location,
-							weather: weather,
-							callback: callback
-						} );
-
-						updateCache( location, weather );
-					}
-				}
-			);
-
-		} catch ( err ) {
-
-			// Otherwise indicate the request failed
-			callback( false );
+				callback( weather );
+			}
 		}
-	} );
+	);
 }
 
 // Retrieve cached record for a given location
