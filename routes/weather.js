@@ -489,7 +489,7 @@ exports.getWeather = function( req, res ) {
 		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
 
 		// Continue with the weather request
-		getOWMWeatherData( location, finishRequest );
+		getTimeData( location, finishRequest );
 
     } else {
 
