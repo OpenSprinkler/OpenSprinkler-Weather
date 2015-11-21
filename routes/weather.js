@@ -223,7 +223,7 @@ function getTimeData( location, callback ) {
 		location[ 0 ],
 		location[ 1 ],
 		function( err, timezone ) {
-			if ( err ) {
+			if ( err || timezone.status !== "OK" ) {
 				callback( false );
 			} else {
 				timezone = ( timezone.rawOffset + timezone.dstOffset ) / 60;
@@ -243,7 +243,8 @@ function getTimeData( location, callback ) {
 
 				callback( weather );
 			}
-		}
+		},
+		{ key: process.env.GOOGLE_API_KEY }
 	);
 }
 
