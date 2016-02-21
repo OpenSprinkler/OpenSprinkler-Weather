@@ -3,11 +3,14 @@ var express		= require( "express" ),
     mongoose	= require( "mongoose" ),
     Cache		= require( "./models/Cache" ),
     CronJob		= require( "cron" ).CronJob,
+	host		= process.env.HOST || "127.0.0.1",
 	port		= process.env.PORT || 3000,
 	app			= express();
 
-if ( !process.env.PORT ) {
+if ( !process.env.HOST || !process.env.PORT ) {
 	require( "dotenv" ).load();
+	host = process.env.HOST || host;
+	port = process.env.PORT || port;
 }
 
 // Connect to local MongoDB instance
@@ -24,6 +27,10 @@ mongoose.connection.on( "error", function() {
 app.get( /weather(\d+)\.py/, weather.getWeather );
 app.get( /(\d+)/, weather.getWeather );
 
+app.get('/', function (req, res) {
+  res.send('OpenSprinkler Weather Service');
+});
+
 // Handle 404 error
 app.use( function( req, res ) {
 	res.status( 404 );
@@ -31,9 +38,8 @@ app.use( function( req, res ) {
 } );
 
 // Start listening on the service port
-app.listen( port, "127.0.0.1", function() {
-
-  console.log( "OpenSprinkler Weather Service now listening on port %s", port );
+app.listen( port, host, function() {
+  console.log( "OpenSprinkler Weather Service now listening on %s:%s", host, port );
 } );
 
 // Schedule a cronjob daily to consildate the weather cache data, runs daily
