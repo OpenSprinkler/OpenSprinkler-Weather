@@ -9,8 +9,6 @@ var express		= require( "express" ),
 
 if ( !process.env.HOST || !process.env.PORT ) {
 	require( "dotenv" ).load();
-	host = process.env.HOST || host;
-	port = process.env.PORT || port;
 }
 
 // Connect to local MongoDB instance
@@ -18,7 +16,7 @@ mongoose.connect( "localhost" );
 
 // If the database connection cannot be established, throw an error
 mongoose.connection.on( "error", function() {
-  console.error( "MongoDB Connection Error. Please make sure that MongoDB is running." );
+	console.error( "MongoDB Connection Error. Please make sure that MongoDB is running." );
 } );
 
 // Handle requests matching /weatherID.py where ID corresponds to the
@@ -27,9 +25,9 @@ mongoose.connection.on( "error", function() {
 app.get( /weather(\d+)\.py/, weather.getWeather );
 app.get( /(\d+)/, weather.getWeather );
 
-app.get('/', function (req, res) {
-  res.send('OpenSprinkler Weather Service');
-});
+app.get( "/", function( req, res ) {
+	res.send( "OpenSprinkler Weather Service" );
+} );
 
 // Handle 404 error
 app.use( function( req, res ) {
@@ -39,7 +37,7 @@ app.use( function( req, res ) {
 
 // Start listening on the service port
 app.listen( port, host, function() {
-  console.log( "OpenSprinkler Weather Service now listening on %s:%s", host, port );
+	console.log( "OpenSprinkler Weather Service now listening on %s:%s", host, port );
 } );
 
 // Schedule a cronjob daily to consildate the weather cache data, runs daily
