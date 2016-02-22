@@ -9,6 +9,8 @@ var express		= require( "express" ),
 
 if ( !process.env.HOST || !process.env.PORT ) {
 	require( "dotenv" ).load();
+	host = process.env.HOST || host;
+	port = process.env.PORT || port;
 }
 
 // Connect to local MongoDB instance
