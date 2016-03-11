@@ -311,10 +311,17 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 			return 100;
 		}
 
+		// Get baseline conditions for 100% water level, if provided
+		if ( adjustmentOptions ) {
+			humidityBase = adjustmentOptions.hasOwnProperty( "bh" ) ? adjustmentOptions.bh : 30;
+			tempBase = adjustmentOptions.hasOwnProperty( "bt" ) ? adjustmentOptions.bt : 70;
+			precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : 0;
+		}
+
 		var temp = ( ( weather.maxTemp + weather.minTemp ) / 2 ) || weather.temp,
-			humidityFactor = ( 30 - weather.humidity ),
-			tempFactor = ( ( temp - 70 ) * 4 ),
-			precipFactor = ( weather.precip * -200 );
+			humidityFactor = ( humidityBase - weather.humidity ),
+			tempFactor = ( ( temp - tempBase ) * 4 ),
+			precipFactor = ( (precipBase - weather.precip ) * 200 );
 
 		// Apply adjustment options, if provided, by multiplying the percentage against the factor
 		if ( adjustmentOptions ) {
