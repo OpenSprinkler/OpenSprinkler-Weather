@@ -305,6 +305,7 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 
 	// Zimmerman method
 	if ( adjustmentMethod === 1 ) {
+		var humidityBase, tempBase, precipBase;
 
 		// Check to make sure valid data exists for all factors
 		if ( !validateValues( [ "temp", "humidity", "precip" ], weather ) ) {
