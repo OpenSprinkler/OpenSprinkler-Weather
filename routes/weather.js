@@ -305,16 +305,24 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 
 	// Zimmerman method
 	if ( adjustmentMethod === 1 ) {
+		var humidityBase = 30, tempBase = 70, precipBase = 0;
 
 		// Check to make sure valid data exists for all factors
 		if ( !validateValues( [ "temp", "humidity", "precip" ], weather ) ) {
 			return 100;
 		}
 
+		// Get baseline conditions for 100% water level, if provided
+		if ( adjustmentOptions ) {
+			humidityBase = adjustmentOptions.hasOwnProperty( "bh" ) ? adjustmentOptions.bh : humidityBase;
+			tempBase = adjustmentOptions.hasOwnProperty( "bt" ) ? adjustmentOptions.bt : tempBase;
+			precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
+		}
+
 		var temp = ( ( weather.maxTemp + weather.minTemp ) / 2 ) || weather.temp,
-			humidityFactor = ( 30 - weather.humidity ),
-			tempFactor = ( ( temp - 70 ) * 4 ),
-			precipFactor = ( weather.precip * -200 );
+			humidityFactor = ( humidityBase - weather.humidity ),
+			tempFactor = ( ( temp - tempBase ) * 4 ),
+			precipFactor = ( (precipBase - weather.precip ) * 200 );
 
 		// Apply adjustment options, if provided, by multiplying the percentage against the factor
 		if ( adjustmentOptions ) {
