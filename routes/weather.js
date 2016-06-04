@@ -73,20 +73,22 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 		try {
 			data = JSON.parse( data );
 
-			var weather = {
-				icon:		data.current_observation.icon,
-				timezone:	data.current_observation.local_tz_offset,
-				sunrise:	parseInt( data.sun_phase.sunrise.hour ) * 60 + parseInt( data.sun_phase.sunrise.minute ),
-				sunset:		parseInt( data.sun_phase.sunset.hour ) * 60 + parseInt( data.sun_phase.sunset.minute ),
-				maxTemp:	parseInt( data.history.dailysummary[ 0 ].maxtempi ),
-				minTemp:	parseInt( data.history.dailysummary[ 0 ].mintempi ),
-				temp:		parseInt( data.current_observation.temp_f ),
-				humidity:	( parseInt( data.history.dailysummary[ 0 ].maxhumidity ) + parseInt( data.history.dailysummary[ 0 ].minhumidity ) ) / 2,
-				precip:		( parseFloat( data.current_observation.precip_today_in ) || 0 ) + ( parseFloat( data.history.dailysummary[ 0 ].precipi ) || 0 ),
-				solar:		parseInt( data.current_observation.UV ),
-				wind:		parseInt( data.history.dailysummary[ 0 ].meanwindspdi ),
-				elevation:	parseInt( data.current_observation.observation_location.elevation )
-			};
+			var currentPrecip = parseFloat( data.current_observation.precip_today_in ),
+				yesterdayPrecip = parseFloat( data.history.dailysummary[ 0 ].precipi ),
+				weather = {
+					icon:		data.current_observation.icon,
+					timezone:	data.current_observation.local_tz_offset,
+					sunrise:	parseInt( data.sun_phase.sunrise.hour ) * 60 + parseInt( data.sun_phase.sunrise.minute ),
+					sunset:		parseInt( data.sun_phase.sunset.hour ) * 60 + parseInt( data.sun_phase.sunset.minute ),
+					maxTemp:	parseInt( data.history.dailysummary[ 0 ].maxtempi ),
+					minTemp:	parseInt( data.history.dailysummary[ 0 ].mintempi ),
+					temp:		parseInt( data.current_observation.temp_f ),
+					humidity:	( parseInt( data.history.dailysummary[ 0 ].maxhumidity ) + parseInt( data.history.dailysummary[ 0 ].minhumidity ) ) / 2,
+					precip:		( currentPrecip < 0 ? 0 : currentPrecip ) + ( yesterdayPrecip < 0 ? 0 : yesterdayPrecip ),
+					solar:		parseInt( data.current_observation.UV ),
+					wind:		parseInt( data.history.dailysummary[ 0 ].meanwindspdi ),
+					elevation:	parseInt( data.current_observation.observation_location.elevation )
+				};
 
 			callback( weather );
 
@@ -322,7 +324,7 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 		var temp = ( ( weather.maxTemp + weather.minTemp ) / 2 ) || weather.temp,
 			humidityFactor = ( humidityBase - weather.humidity ),
 			tempFactor = ( ( temp - tempBase ) * 4 ),
-			precipFactor = ( (precipBase - weather.precip ) * 200 );
+			precipFactor = ( ( precipBase - weather.precip ) * 200 );
 
 		// Apply adjustment options, if provided, by multiplying the percentage against the factor
 		if ( adjustmentOptions ) {
