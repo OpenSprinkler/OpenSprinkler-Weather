@@ -8,10 +8,10 @@
   },
   "dependencies": {
     "cron": "^1.0.9",
-    "dotenv": "^1.2.0",
+    "dotenv": "^2.0.0",
     "express": "^4.13.0",
-    "grunt": "^0.4.5",
-    "moment-timezone": "^0.4.0",
+    "grunt": "^1.0.1",
+    "moment-timezone": "^0.5.4",
     "mongoose": "^4.0.6",
     "suncalc": "^1.6.0",
     "timezoner": "^0.1.9",
@@ -20,10 +20,10 @@
   "devDependencies": {
     "chai": "^3.0.0",
     "codecov.io": "^0.1.5",
-    "grunt-contrib-jshint": "^0.11.2",
-    "hippie": "^0.4.0",
-    "istanbul": "^0.3.17",
+    "grunt-contrib-jshint": "^1.0.0",
+    "hippie": "^0.5.0",
+    "istanbul": "^0.4.3",
     "mocha": "^2.2.5",
-    "nock": "^2.7.0"
+    "nock": "^8.0.0"
   }
 }
