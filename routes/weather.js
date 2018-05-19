@@ -3,7 +3,7 @@ var http		= require( "http" ),
 	Cache		= require( "../models/Cache" ),
 	SunCalc		= require( "suncalc" ),
 	moment		= require( "moment-timezone" ),
-	timezoner	= require( "timezoner" ),
+	geoTZ	 	= require( "geo-tz" ),
 
 	// Define regex filters to match against location
 	filters		= {
@@ -220,33 +220,20 @@ function getYesterdayWeatherData( location, callback ) {
 
 // Calculate timezone and sun rise/set information
 function getTimeData( location, callback ) {
-	timezoner.getTimeZone(
-		location[ 0 ],
-		location[ 1 ],
-		function( err, timezone ) {
-			if ( err || timezone.status !== "OK" ) {
-				callback( false );
-			} else {
-				timezone = ( timezone.rawOffset + timezone.dstOffset ) / 60;
-				var tzOffset = getTimezone( timezone, "minutes" ),
+	var timezone = moment().tz( geoTZ( location[ 0 ], location[ 1 ] ) ).utcOffset();
+	var tzOffset = getTimezone( timezone, "minutes" );
 
-					// Calculate sunrise and sunset since Weather Underground does not provide it
-					sunData = SunCalc.getTimes( new Date(), location[ 0 ], location[ 1 ] );
+	// Calculate sunrise and sunset since Weather Underground does not provide it
+	var sunData = SunCalc.getTimes( new Date(), location[ 0 ], location[ 1 ] );
 
-					sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
-					sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
+	sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
+	sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
 
-				var weather = {
-					timezone:	timezone,
-					sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
-					sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() )
-				};
-
-				callback( weather );
-			}
-		},
-		{ key: process.env.GOOGLE_API_KEY }
-	);
+	callback( {
+		timezone:	timezone,
+		sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
+		sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() )
+	} );
 }
 
 // Retrieve cached record for a given location
