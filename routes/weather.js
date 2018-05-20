@@ -532,12 +532,12 @@ exports.getWeather = function( req, res ) {
 		return;
 	} else if ( filters.gps.test( location ) ) {
 
-			// Handle GPS coordinates by storing each coordinate in an array
-			location = location.split( "," );
-			location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
+		// Handle GPS coordinates by storing each coordinate in an array
+		location = location.split( "," );
+		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
 
-			// Continue with the weather request
-			getOWMWeatherData( location, finishRequest );
+		// Continue with the weather request
+		getOWMWeatherData( location, finishRequest );
 	} else {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
