@@ -229,14 +229,15 @@ function getOWMWeatherData( location, callback ) {
 	httpRequest( url, function( data ) {
 		try {
 			data = JSON.parse( data );
-			var weather = {
-				timezone:	timezone,
-				sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
-				sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() ),
-				temp:		parseInt( data.main.temp ),
-				humidity:	parseInt( data.main.humidity ),
-				wind:		parseInt( data.wind.speed )
-			};
+		} catch ( err ) {
+			// Otherwise indicate the request failed
+			callback( false );
+		}
+
+		getTimeData( location, function( weather ) {
+			weather.temp = parseInt( data.main.temp );
+			weather.humidity = parseInt( data.main.humidity );
+			weather.wind = parseInt( data.wind.speed );
 
 			location = location.join( "," );
 
@@ -248,11 +249,7 @@ function getOWMWeatherData( location, callback ) {
 			} );
 
 			updateCache( location, weather );
-		} catch ( err ) {
-
-			// Otherwise indicate the request failed
-			callback( false );
-		}
+		} );
 	} );
 }
 
