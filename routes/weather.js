@@ -227,7 +227,6 @@ function getOWMWeatherData( location, callback ) {
 
 	// Perform the HTTP request to retrieve the weather data
 	httpRequest( url, function( data ) {
-		console.log( url );
 		try {
 			data = JSON.parse( data );
 			var weather = {
