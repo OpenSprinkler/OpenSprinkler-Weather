@@ -239,7 +239,7 @@ function getOWMWeatherData( location, callback ) {
 			weather.temp = parseInt( data.list[ 0 ].main.temp );
 			weather.humidity = parseInt( data.list[ 0 ].main.humidity );
 			weather.wind = parseInt( data.list[ 0 ].wind.speed );
-			weather.precip = data.list[ 0 ].rain[ "3h" ];
+			weather.precip = parseFloat( data.list[ 0 ].rain[ "3h" ] );
 
 			location = location.join( "," );
 
