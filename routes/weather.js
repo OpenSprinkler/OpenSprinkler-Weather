@@ -223,34 +223,37 @@ function getOWMWeatherData( location, callback ) {
 
 	// Generate URL using The Weather Company API v1 in Imperial units
 	var OWM_API_KEY = process.env.OWM_API_KEY,
-		url = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
+		currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ],
+		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
 
-	// Perform the HTTP request to retrieve the weather data
-	httpRequest( url, function( data ) {
-		try {
-			data = JSON.parse( data );
-		} catch ( err ) {
-			// Otherwise indicate the request failed
-			callback( false );
-		}
+	getTimeData( location, function( weather ) {
 
-		getTimeData( location, function( weather ) {
+		// Perform the HTTP request to retrieve the weather data
+		httpRequest( currentUrl, function( data ) {
+			try {
+				data = JSON.parse( data );
+			} catch ( err ) {
+				// Otherwise indicate the request failed
+				callback( weather );
+			}
+
 			weather.temp = parseInt( data.main.temp );
 			weather.humidity = parseInt( data.main.humidity );
 			weather.wind = parseInt( data.wind.speed );
 
-			location = location.join( "," );
+			httpRequest( forecastUrl, function( forecastData ) {
+				try {
+					forecastData = JSON.parse( forecastData );
+					weather.precip = forecastData.list[ 0 ].rain[ "3h" ];
+					callback( weather );
+				} catch ( err ) {
 
-			getCache( {
-				key: "yesterdayHumidity",
-				location: location,
-				weather: weather,
-				callback: callback
+					// Otherwise indicate the request failed
+					callback( weather );
+				}
 			} );
-
-			updateCache( location, weather );
 		} );
-	} );
+	} );	
 }
 
 // Calculate timezone and sun rise/set information
