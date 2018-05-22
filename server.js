@@ -14,7 +14,7 @@ if ( !process.env.HOST || !process.env.PORT ) {
 }
 
 // Connect to local MongoDB instance
-mongoose.connect( "localhost" );
+mongoose.connect( "mongodb://localhost", { useMongoClient: true } );
 
 // If the database connection cannot be established, throw an error
 mongoose.connection.on( "error", function() {
