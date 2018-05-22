@@ -29,7 +29,7 @@ function resolveCoordinates( location, callback ) {
 		data = JSON.parse( data );
 
 		// Check if the data is valid
-		if ( typeof data.RESULTS === "object" && data.RESULTS.length ) {
+		if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
 
 			// If it is, reply with an array containing the GPS coordinates
 			callback( [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ], moment().tz( data.RESULTS[ 0 ].tz ).utcOffset() );
@@ -95,8 +95,8 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 
 			// Otherwise indicate the request failed
 			callback( false );
+			return;
 		}
-
 	} );
 }
 
@@ -137,7 +137,6 @@ function getWxWeatherData( location, callback ) {
 			} );
 
 			updateCache( location, weather );
-
 		} );
 	} );
 }
@@ -154,7 +153,6 @@ function getWeatherData( location, callback ) {
 
 	// Perform the HTTP request to retrieve the weather data
 	httpRequest( url, function( data ) {
-
 		try {
 			data = JSON.parse( data );
 
@@ -186,8 +184,8 @@ function getWeatherData( location, callback ) {
 
 			// Otherwise indicate the request failed
 			callback( false );
+			return;
 		}
-
 	} );
 }
 
@@ -232,8 +230,10 @@ function getOWMWeatherData( location, callback ) {
 			try {
 				data = JSON.parse( data );
 			} catch ( err ) {
+
 				// Otherwise indicate the request failed
 				callback( weather );
+				return;
 			}
 
 			weather.temp = parseInt( data.list[ 0 ].main.temp );
