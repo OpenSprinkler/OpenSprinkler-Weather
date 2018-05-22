@@ -239,7 +239,7 @@ function getOWMWeatherData( location, callback ) {
 			weather.temp = parseInt( data.list[ 0 ].main.temp );
 			weather.humidity = parseInt( data.list[ 0 ].main.humidity );
 			weather.wind = parseInt( data.list[ 0 ].wind.speed );
-			weather.precip = data.list[ 0 ].rain ? parseFloat( data.list[ 0 ].rain[ "3h" ] ) : "";
+			weather.precip = data.list[ 0 ].rain ? parseFloat( data.list[ 0 ].rain[ "3h" ] || 0 ) : "";
 
 			location = location.join( "," );
 
@@ -433,6 +433,8 @@ exports.getWeather = function( req, res ) {
 				getTimeData( location, finishRequest );
 				return;
 			}
+
+			console.log( weather );
 
 			var scale = calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ),
 				rainDelay = -1;
