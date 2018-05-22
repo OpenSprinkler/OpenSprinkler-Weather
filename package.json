@@ -19,7 +19,6 @@
   },
   "devDependencies": {
     "chai": "^3.0.0",
-    "codecov.io": "^0.1.5",
     "grunt-contrib-jshint": "^1.1.0",
     "hippie": "^0.5.1",
     "istanbul": "^0.4.5",
