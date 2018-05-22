@@ -434,8 +434,6 @@ exports.getWeather = function( req, res ) {
 				return;
 			}
 
-			console.log( weather );
-
 			var scale = calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ),
 				rainDelay = -1;
 
