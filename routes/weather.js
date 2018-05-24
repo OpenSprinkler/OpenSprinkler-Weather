@@ -29,7 +29,7 @@ function resolveCoordinates( location, callback ) {
 		data = JSON.parse( data );
 
 		// Check if the data is valid
-		if ( typeof data.RESULTS === "object" && data.RESULTS.length ) {
+		if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
 
 			// If it is, reply with an array containing the GPS coordinates
 			callback( [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ], moment().tz( data.RESULTS[ 0 ].tz ).utcOffset() );
@@ -95,8 +95,8 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 
 			// Otherwise indicate the request failed
 			callback( false );
+			return;
 		}
-
 	} );
 }
 
@@ -137,7 +137,6 @@ function getWxWeatherData( location, callback ) {
 			} );
 
 			updateCache( location, weather );
-
 		} );
 	} );
 }
@@ -154,7 +153,6 @@ function getWeatherData( location, callback ) {
 
 	// Perform the HTTP request to retrieve the weather data
 	httpRequest( url, function( data ) {
-
 		try {
 			data = JSON.parse( data );
 
@@ -186,8 +184,8 @@ function getWeatherData( location, callback ) {
 
 			// Otherwise indicate the request failed
 			callback( false );
+			return;
 		}
-
 	} );
 }
 
@@ -216,6 +214,45 @@ function getYesterdayWeatherData( location, callback ) {
 			callback( result.WeatherResponse.WeatherRecords[ 0 ].WeatherData[ 0 ].$ );
 		} );
 	} );
+}
+
+// Retrieve weather data from Open Weather Map
+function getOWMWeatherData( location, callback ) {
+
+	// Generate URL using OpenWeatherMap in Imperial units
+	var OWM_API_KEY = process.env.OWM_API_KEY,
+		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
+
+	getTimeData( location, function( weather ) {
+
+		// Perform the HTTP request to retrieve the weather data
+		httpRequest( forecastUrl, function( data ) {
+			try {
+				data = JSON.parse( data );
+			} catch ( err ) {
+
+				// Otherwise indicate the request failed
+				callback( weather );
+				return;
+			}
+
+			weather.temp = parseInt( data.list[ 0 ].main.temp );
+			weather.humidity = parseInt( data.list[ 0 ].main.humidity );
+			weather.wind = parseInt( data.list[ 0 ].wind.speed );
+			weather.precip = data.list[ 0 ].rain ? parseFloat( data.list[ 0 ].rain[ "3h" ] || 0 ) : 0;
+
+			location = location.join( "," );
+
+			getCache( {
+				key: "yesterdayHumidity",
+				location: location,
+				weather: weather,
+				callback: callback
+			} );
+
+			updateCache( location, weather );
+		} );
+	} );	
 }
 
 // Calculate timezone and sun rise/set information
@@ -393,7 +430,12 @@ exports.getWeather = function( req, res ) {
 		// and also calculate if a restriction is met to prevent watering.
 		finishRequest = function( weather ) {
 			if ( !weather ) {
-				res.send( "Error: No weather data found." );
+				if ( typeof location[ 0 ] === "number" && typeof location[ 1 ] === "number" ) {
+					getTimeData( location, finishRequest );
+				} else {
+					res.send( "Error: No weather data found." );
+				}
+
 				return;
 			}
 
@@ -486,9 +528,8 @@ exports.getWeather = function( req, res ) {
 		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
 
 		// Continue with the weather request
-		getTimeData( location, finishRequest );
-
-    } else {
+		getOWMWeatherData( location, finishRequest );
+	} else {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
 		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
@@ -499,24 +540,7 @@ exports.getWeather = function( req, res ) {
 			}
 
 			location = result;
-			getWeatherData( location, function( weather ) {
-				if ( !weather ) {
-					var tzOffset = getTimezone( timezone, "minutes" ),
-
-					// Calculate sunrise and sunset since Weather Underground does not provide it
-					sunData = SunCalc.getTimes( new Date(), location[ 0 ], location[ 1 ] );
-
-					sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
-					sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
-
-					weather = {
-						timezone:	timezone,
-						sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
-						sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() )
-					};
-				}
-				finishRequest( weather );
-			} );
+			getOWMWeatherData( location, finishRequest );
 		} );
     }
 };
