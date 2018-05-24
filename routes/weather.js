@@ -430,7 +430,12 @@ exports.getWeather = function( req, res ) {
 		// and also calculate if a restriction is met to prevent watering.
 		finishRequest = function( weather ) {
 			if ( !weather ) {
-				getTimeData( location, finishRequest );
+				if ( typeof location[ 0 ] === "number" && typeof location[ 1 ] === "number" ) {
+					getTimeData( location, finishRequest );
+				} else {
+					res.send( "Error: No weather data found." );
+				}
+
 				return;
 			}
 
