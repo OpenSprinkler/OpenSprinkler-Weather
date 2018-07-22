@@ -41,26 +41,6 @@ function resolveCoordinates( location, callback ) {
 	} );
 }
 
-// When using WxData API, resolve the location name to ID
-function resolveWxLocation( location, callback ) {
-
-	// Generate URL for the request
-	var url = "http://wxdata.weather.com/wxdata/search/search?where=" +
-		encodeURIComponent( location );
-
-	httpRequest( url, function( xml ) {
-
-		parseXML( xml, function( err, result ) {
-			if ( err ) {
-				callback( null );
-				return;
-			}
-
-			callback( result.search.loc[ 0 ].$.id );
-		} );
-	} );
-}
-
 // Retrieve weather data to complete the weather request using Weather Underground
 function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) {
 
@@ -97,122 +77,6 @@ function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) 
 			callback( false );
 			return;
 		}
-	} );
-}
-
-// Retrieve weather data to complete weather request using Weather.com's WxData API
-function getWxWeatherData( location, callback ) {
-
-	// Generate URL using The Weather Company API v1 in Imperial units
-	var url = "http://wxdata.weather.com/wxdata/weather/local/" + encodeURIComponent( location ) + "?cc=*&dayf=1&unit=i";
-
-	// Perform the HTTP request to retrieve the weather data
-	httpRequest( url, function( xml ) {
-
-		parseXML( xml, function( err, data ) {
-			if ( err ) {
-				callback( null );
-				return;
-			}
-
-			data = data.weather;
-
-			var tz = parseInt( data.loc[ 0 ].zone[ 0 ] ),
-				weather = {
-					iconCode:	parseInt( data.cc[ 0 ].icon[ 0 ] ),
-					timezone:	( tz > 0 ? "+" : "" ) + pad( tz ) + "00",
-					sunrise:	parse12HourTime( data.loc[ 0 ].sunr[ 0 ] ),
-					sunset:		parse12HourTime( data.loc[ 0 ].suns[ 0 ] ),
-					temp:		parseInt( data.cc[ 0 ].tmp[ 0 ] ),
-					humidity:	parseInt( data.cc[ 0 ].hmid[ 0 ] ),
-					solar:		parseInt( data.cc[ 0 ].uv[ 0 ].i[ 0 ] ),
-					wind:		parseInt( data.cc[ 0 ].wind[ 0 ].s[ 0 ] )
-				};
-
-			getCache( {
-				key: "yesterdayHumidity",
-				location: location,
-				weather: weather,
-				callback: callback
-			} );
-
-			updateCache( location, weather );
-		} );
-	} );
-}
-
-// Retrieve weather data to complete the weather request using The Weather Channel
-function getWeatherData( location, callback ) {
-
-	// Get the API key from the environment variables
-	var WSI_API_KEY = process.env.WSI_API_KEY,
-
-		// Generate URL using The Weather Company API v1 in Imperial units
-		url = "http://api.weather.com/v1/geocode/" + location[ 0 ] + "/" + location[ 1 ] +
-			 "/observations/current.json?apiKey=" + WSI_API_KEY + "&language=en-US&units=e";
-
-	// Perform the HTTP request to retrieve the weather data
-	httpRequest( url, function( data ) {
-		try {
-			data = JSON.parse( data );
-
-			var weather = {
-					iconCode:	data.observation.icon_code,
-					timezone:	data.observation.obs_time_local,
-					sunrise:	parseDayTime( data.observation.sunrise ),
-					sunset:		parseDayTime( data.observation.sunset ),
-					maxTemp:	data.observation.imperial.temp_max_24hour,
-					minTemp:	data.observation.imperial.temp_min_24hour,
-					temp:		data.observation.imperial.temp,
-					humidity:	data.observation.imperial.rh || 0,
-					precip:		data.observation.imperial.precip_2day || data.observation.imperial.precip_24hour,
-					solar:		data.observation.imperial.uv_index,
-					wind:		data.observation.imperial.wspd
-				};
-
-			location = location.join( "," );
-
-			getCache( {
-				key: "yesterdayHumidity",
-				location: location,
-				weather: weather,
-				callback: callback
-			} );
-
-			updateCache( location, weather );
-		} catch ( err ) {
-
-			// Otherwise indicate the request failed
-			callback( false );
-			return;
-		}
-	} );
-}
-
-// Retrieve the historical weather data for the provided location
-function getYesterdayWeatherData( location, callback ) {
-
-	// Get the API key from the environment variables
-	var WSI_HISTORY_KEY = process.env.WSI_HISTORY_KEY,
-
-		// Generate a Date object for the previous day by subtracting a day (in milliseconds) from today
-		yesterday		= toUSDate( new Date( new Date().getTime() - 1000 * 60 * 60 * 24 ) ),
-
-		// Generate URL using WSI Cleaned History API in Imperial units showing daily average values
-		url = "http://cleanedobservations.wsi.com/CleanedObs.svc/GetObs?ID=" + WSI_HISTORY_KEY +
-			 "&Lat=" + location[ 0 ] + "&Long=" + location[ 1 ] +
-			 "&Req=davg&startdate=" +  yesterday + "&enddate=" + yesterday + "&TS=LST";
-
-	// Perform the HTTP request to retrieve the weather data
-	httpRequest( url, function( xml ) {
-		parseXML( xml, function( err, result ) {
-			if ( err ) {
-				callback( null );
-				return;
-			}
-
-			callback( result.WeatherResponse.WeatherRecords[ 0 ].WeatherData[ 0 ].$ );
-		} );
 	} );
 }
 
@@ -422,7 +286,6 @@ exports.getWeather = function( req, res ) {
 		location				= req.query.loc,
 		weatherUndergroundKey	= req.query.key,
 		outputFormat			= req.query.format,
-		firmwareVersion			= req.query.fwv,
 		remoteAddress			= req.headers[ "x-forwarded-for" ] || req.connection.remoteAddress,
 
 		// Function that will accept the weather after it is received from the API
@@ -627,49 +490,8 @@ function getTimezone( time, format ) {
 	return tz;
 }
 
-// Function to return the sunrise and sunset times from the weather reply
-function parseDayTime( time ) {
-
-	// Time is parsed from string against a regex
-	time = time.match( filters.time );
-
-	// Values are converted to minutes from midnight for the controller
-	return parseInt( time[ 4 ] ) * 60 + parseInt( time[ 5 ] );
-}
-
-// Function to return the sunrise and sunset times from weather reply using 12 hour format
-function parse12HourTime( time ) {
-
-	// Time is parsed from string against a regex
-	time = time.match( filters.time12 );
-
-	var hour = parseInt( time[ 1 ] ),
-		minute = parseInt( time[ 2 ] );
-
-	if ( time[ 3 ].toLowerCase() === "pm" ) {
-		hour += 12;
-	}
-
-	// Values are converted to minutes from midnight for the controller
-	return parseInt( hour ) * 60 + parseInt( minute );
-}
-
-// Pad a single digit with a leading zero
-function pad( number ) {
-    var r = String( number );
-    if ( r.length === 1 ) {
-        r = "0" + r;
-    }
-    return r;
-}
-
 // Converts IP string to integer
 function ipToInt( ip ) {
     ip = ip.split( "." );
     return ( ( ( ( ( ( +ip[ 0 ] ) * 256 ) + ( +ip[ 1 ] ) ) * 256 ) + ( +ip[ 2 ] ) ) * 256 ) + ( +ip[ 3 ] );
-}
-
-// Resolves the Month / Day / Year of a Date object
-function toUSDate( date ) {
-	return ( date.getMonth() + 1 ) + "/" + date.getDate() + "/" + date.getFullYear();
 }
