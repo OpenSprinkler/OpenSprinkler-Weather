@@ -1,5 +1,4 @@
 var http		= require( "http" ),
-	parseXML	= require( "xml2js" ).parseString,
 	Cache		= require( "../models/Cache" ),
 	SunCalc		= require( "suncalc" ),
 	moment		= require( "moment-timezone" ),
@@ -11,7 +10,6 @@ var http		= require( "http" ),
 		pws: /^(?:pws|icao|zmw):/,
 		url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
 		time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
-		time12: /(\d{1,2}):(\d{2})\s(am|pm)/i,
 		timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
 	};
 

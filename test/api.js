@@ -7,21 +7,6 @@ var hippie		= require( "hippie" ),
 
 describe( "Weather API", function() {
 	describe( "/:method endpoint", function() {
-		it( "The Weather Channel Source Test", function( done ) {
-			for ( var test in expected.WSI ) {
-				if ( expected.WSI.hasOwnProperty( test ) ) {
-					apiTest( {
-						method: 1,
-						loc: test,
-						expected: expected.WSI[test],
-						callback: function( reply ) {
-							done();
-						}
-					} );
-				}
-			}
-		} );
-
 		it( "Weather Underground Source Test", function( done ) {
 			for ( var test in expected.WU ) {
 				if ( expected.WU.hasOwnProperty( test ) ) {
@@ -96,13 +81,6 @@ function setupMocks( location ) {
 	    } )
 	    .get( "/" )
 		.reply( 200, replies[location].WUyesterday );
-
-	nock( "http://api.weather.com" )
-		.filteringPath( function( path ) {
-	        return "/";
-	    } )
-	    .get( "/" )
-		.reply( 200, replies[location].WSIcurrent );
 }
 
 function extend( target ) {

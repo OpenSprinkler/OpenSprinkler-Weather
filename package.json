@@ -11,16 +11,15 @@
     "dotenv": "^2.0.0",
     "express": "^4.16.3",
     "geo-tz": "^4.0.1",
-    "grunt": "^1.0.2",
+    "grunt": "^1.0.3",
     "moment-timezone": "^0.5.17",
     "mongoose": "^4.13.13",
-    "suncalc": "^1.8.0",
-    "xml2js": "^0.4.19"
+    "suncalc": "^1.8.0"
   },
   "devDependencies": {
     "chai": "^3.0.0",
     "grunt-contrib-jshint": "^1.1.0",
-    "hippie": "^0.5.1",
+    "hippie": "^0.5.2",
     "istanbul": "^0.4.5",
     "mocha": "^5.2.0",
     "nock": "^9.2.6"
