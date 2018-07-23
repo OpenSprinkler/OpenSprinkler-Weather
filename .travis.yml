@@ -8,6 +8,6 @@ install: npm install
 before_script:
  - grunt
 after_script:
- - istanbul cover ./node_modules/mocha/bin/_mocha -- -R spec
+ - istanbul cover ./node_modules/mocha/bin/_mocha -- -R spec --exit
 notifications:
   on_failure: change
