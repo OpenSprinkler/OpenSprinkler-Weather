@@ -17,5 +17,3 @@ The production version runs on Amazon Elastic Beanstalk (AWS EB) and therefore t
 **server.js** is the primary file launching the API daemon.
 
 **routes/*.js** contains all the endpoints for the API service. Currently, only one exists for weather adjustment.
-
-**models/*.js** contains all the database models used by the routes. Currently, only one exists to manage weather cache data.

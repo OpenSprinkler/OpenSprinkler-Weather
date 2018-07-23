@@ -1,7 +1,5 @@
 bundler_args: --retry 3
 language: node_js
-services:
-  - mongodb
 before_install:
  - export TZ=America/Chicago
  - npm install -g grunt-cli
