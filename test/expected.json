@@ -6,7 +6,7 @@
 			"tz": 32,
 			"sunrise": 324,
 			"sunset": 1228,
-			"eip": 2130706433
+			"eip": null
 		}
 	},
 	"noWeather": {
@@ -14,9 +14,9 @@
 			"scale": -1,
 			"rd": -1,
 			"tz": 32,
-			"sunrise": 324,
-			"sunset": 1226,
-			"eip": 2130706433
+			"sunrise": 333,
+			"sunset": 1221,
+			"eip": null
 		}
 	}
 }

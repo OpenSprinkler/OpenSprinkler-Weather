@@ -1,5 +1,4 @@
 var http		= require( "http" ),
-	Cache		= require( "../models/Cache" ),
 	SunCalc		= require( "suncalc" ),
 	moment		= require( "moment-timezone" ),
 	geoTZ	 	= require( "geo-tz" ),
@@ -105,14 +104,7 @@ function getOWMWeatherData( location, callback ) {
 
 			location = location.join( "," );
 
-			getCache( {
-				key: "yesterdayHumidity",
-				location: location,
-				weather: weather,
-				callback: callback
-			} );
-
-			updateCache( location, weather );
+			callback( weather );
 		} );
 	} );	
 }
@@ -132,58 +124,6 @@ function getTimeData( location, callback ) {
 		timezone:	timezone,
 		sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
 		sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() )
-	} );
-}
-
-// Retrieve cached record for a given location
-// opt is defined as an object with two required items
-// opt.location defines the location for the cache record
-// opt.key defines the key to return for the location
-function getCache( opt, callback ) {
-
-	// Find the cache entry for the provided location
-	Cache.findOne( { location: opt.location }, function( err, record ) {
-
-		if ( err ) {
-			return;
-		}
-
-		// If a record is found for the provided key, return it
-		if ( record && record[ opt.key ] !== null ) {
-			opt.weather[ opt.key ] = record[ opt.key ];
-		}
-
-		opt.callback( opt.weather );
-	} );
-}
-
-// Update weather cache record in the local database
-function updateCache( location, weather ) {
-
-	// Search for a cache record for the provided location
-	Cache.findOne( { location: location }, function( err, record ) {
-
-		if ( err ) {
-			return;
-		}
-
-		// If a record is found update the data and save it
-		if ( record ) {
-
-			record.currentHumidityTotal += weather.humidity;
-			record.currentHumidityCount++;
-			record.save();
-
-		} else {
-
-			// If no cache record is found, generate a new one and save it
-			new Cache( {
-				location: location,
-				currentHumidityTotal: weather.humidity,
-				currentHumidityCount: 1
-			} ).save();
-
-		}
 	} );
 }
 
@@ -394,7 +334,7 @@ exports.getWeather = function( req, res ) {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
 		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
-		resolveCoordinates( location, function( result, timezone ) {
+		resolveCoordinates( location, function( result ) {
 			if ( result === false ) {
 				res.send( "Error: Unable to resolve location" );
 				return;

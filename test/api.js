@@ -15,7 +15,7 @@ describe( "Weather API", function() {
 						loc: test,
 						key: process.env.WU_API_KEY,
 						expected: expected.WU[test],
-						callback: function( reply ) {
+						callback: function() {
 							done();
 						}
 					} );
@@ -30,7 +30,7 @@ describe( "Weather API", function() {
 						method: 0,
 						loc: test,
 						expected: expected.noWeather[test],
-						callback: function( reply ) {
+						callback: function() {
 							done();
 						}
 					} );
@@ -69,18 +69,19 @@ function setupMocks( location ) {
 	nock.cleanAll();
 
 	nock( "http://autocomplete.wunderground.com" )
-		.filteringPath( function( path ) {
-	        return "/";
-	    } )
+		.filteringPath( function() { return "/"; } )
 	    .get( "/" )
 		.reply( 200,  replies[location].WUautoComplete );
 
 	nock( "http://api.wunderground.com" )
-		.filteringPath( function( path ) {
-	        return "/";
-	    } )
+		.filteringPath( function() { return "/"; } )
 	    .get( "/" )
 		.reply( 200, replies[location].WUyesterday );
+
+	nock( "http://api.openweathermap.org" )
+		.filteringPath( function() { return "/"; } )
+	    .get( "/" )
+		.reply( 200, replies[location].OWMData );
 }
 
 function extend( target ) {
