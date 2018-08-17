@@ -1,10 +1,11 @@
 {
   "name": "os-weather-service",
   "description": "OpenSprinkler Weather Service",
-  "version": "1.0.0",
-  "repository": "https://github.com/OpenSprinkler/Weather-Adjustments/",
+  "version": "1.0.1",
+  "repository": "https://github.com/OpenSprinkler/Weather-Weather",
   "scripts": {
-    "test": "mocha --exit test"
+    "test": "mocha --exit test",
+    "start": "node server"
   },
   "dependencies": {
     "dotenv": "^6.0.0",
