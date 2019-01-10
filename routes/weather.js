@@ -42,7 +42,7 @@ function resolveCoordinates( location, callback ) {
 function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) {
 
 	// Generate URL using Weather Underground yesterday conditions
-	var url = "http://api.wunderground.com/api/" + weatherUndergroundKey +
+	var url = "http://api.wunderground.com/api/" + encodeURIComponent( weatherUndergroundKey ) +
 		"/yesterday/conditions/astronomy/q/" + encodeURIComponent( location ) + ".json";
 
 	// Perform the HTTP request to retrieve the weather data
