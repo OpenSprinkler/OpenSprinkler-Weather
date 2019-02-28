@@ -38,45 +38,6 @@ function resolveCoordinates( location, callback ) {
 	} );
 }
 
-// Retrieve weather data to complete the weather request using Weather Underground
-function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) {
-
-	// Generate URL using Weather Underground yesterday conditions
-	var url = "http://api.wunderground.com/api/" + encodeURIComponent( weatherUndergroundKey ) +
-		"/yesterday/conditions/astronomy/q/" + encodeURIComponent( location ) + ".json";
-
-	// Perform the HTTP request to retrieve the weather data
-	httpRequest( url, function( data ) {
-		try {
-			data = JSON.parse( data );
-
-			var currentPrecip = parseFloat( data.current_observation.precip_today_in ),
-				yesterdayPrecip = parseFloat( data.history.dailysummary[ 0 ].precipi ),
-				weather = {
-					icon:		data.current_observation.icon,
-					timezone:	data.current_observation.local_tz_offset,
-					sunrise:	parseInt( data.sun_phase.sunrise.hour ) * 60 + parseInt( data.sun_phase.sunrise.minute ),
-					sunset:		parseInt( data.sun_phase.sunset.hour ) * 60 + parseInt( data.sun_phase.sunset.minute ),
-					maxTemp:	parseInt( data.history.dailysummary[ 0 ].maxtempi ),
-					minTemp:	parseInt( data.history.dailysummary[ 0 ].mintempi ),
-					temp:		parseInt( data.current_observation.temp_f ),
-					humidity:	( parseInt( data.history.dailysummary[ 0 ].maxhumidity ) + parseInt( data.history.dailysummary[ 0 ].minhumidity ) ) / 2,
-					precip:		( currentPrecip > 0 ? currentPrecip : 0) + ( yesterdayPrecip > 0 ? yesterdayPrecip : 0),
-					solar:		parseInt( data.current_observation.UV ),
-					wind:		parseInt( data.history.dailysummary[ 0 ].meanwindspdi ),
-					elevation:	parseInt( data.current_observation.observation_location.elevation )
-				};
-			callback( weather );
-
-		} catch ( err ) {
-
-			// Otherwise indicate the request failed
-			callback( false );
-			return;
-		}
-	} );
-}
-
 // Retrieve weather data from Open Weather Map
 function getOWMWeatherData( location, callback ) {
 
@@ -263,7 +224,6 @@ exports.getWeather = function( req, res ) {
 	var adjustmentMethod		= req.params[ 0 ] & ~( 1 << 7 ),
 		adjustmentOptions		= req.query.wto,
 		location				= req.query.loc,
-		weatherUndergroundKey	= req.query.key,
 		outputFormat			= req.query.format,
 		remoteAddress			= req.headers[ "x-forwarded-for" ] || req.connection.remoteAddress,
 
