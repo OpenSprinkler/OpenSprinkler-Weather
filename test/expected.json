@@ -1,11 +1,11 @@
 {
 	"WU": {
 		"01002": {
-			"scale": 61,
+			"scale": 0,
 			"rd": -1,
-			"tz": 32,
-			"sunrise": 324,
-			"sunset": 1228,
+			"tz": 28,
+			"sunrise": 387,
+			"sunset": 1060,
 			"eip": null
 		}
 	},
@@ -13,9 +13,9 @@
 		"01002": {
 			"scale": -1,
 			"rd": -1,
-			"tz": 32,
-			"sunrise": 334,
-			"sunset": 1220,
+			"tz": 28,
+			"sunrise": 387,
+			"sunset": 1060,
 			"eip": null
 		}
 	}

@@ -38,45 +38,6 @@ function resolveCoordinates( location, callback ) {
 	} );
 }
 
-// Retrieve weather data to complete the weather request using Weather Underground
-function getWeatherUndergroundData( location, weatherUndergroundKey, callback ) {
-
-	// Generate URL using Weather Underground yesterday conditions
-	var url = "http://api.wunderground.com/api/" + encodeURIComponent( weatherUndergroundKey ) +
-		"/yesterday/conditions/astronomy/q/" + encodeURIComponent( location ) + ".json";
-
-	// Perform the HTTP request to retrieve the weather data
-	httpRequest( url, function( data ) {
-		try {
-			data = JSON.parse( data );
-
-			var currentPrecip = parseFloat( data.current_observation.precip_today_in ),
-				yesterdayPrecip = parseFloat( data.history.dailysummary[ 0 ].precipi ),
-				weather = {
-					icon:		data.current_observation.icon,
-					timezone:	data.current_observation.local_tz_offset,
-					sunrise:	parseInt( data.sun_phase.sunrise.hour ) * 60 + parseInt( data.sun_phase.sunrise.minute ),
-					sunset:		parseInt( data.sun_phase.sunset.hour ) * 60 + parseInt( data.sun_phase.sunset.minute ),
-					maxTemp:	parseInt( data.history.dailysummary[ 0 ].maxtempi ),
-					minTemp:	parseInt( data.history.dailysummary[ 0 ].mintempi ),
-					temp:		parseInt( data.current_observation.temp_f ),
-					humidity:	( parseInt( data.history.dailysummary[ 0 ].maxhumidity ) + parseInt( data.history.dailysummary[ 0 ].minhumidity ) ) / 2,
-					precip:		( currentPrecip > 0 ? currentPrecip : 0) + ( yesterdayPrecip > 0 ? yesterdayPrecip : 0),
-					solar:		parseInt( data.current_observation.UV ),
-					wind:		parseInt( data.history.dailysummary[ 0 ].meanwindspdi ),
-					elevation:	parseInt( data.current_observation.observation_location.elevation )
-				};
-			callback( weather );
-
-		} catch ( err ) {
-
-			// Otherwise indicate the request failed
-			callback( false );
-			return;
-		}
-	} );
-}
-
 // Retrieve weather data from Open Weather Map
 function getOWMWeatherData( location, callback ) {
 
@@ -97,7 +58,7 @@ function getOWMWeatherData( location, callback ) {
 				return;
 			}
 
-			const maxCount = 10;
+			var maxCount = 10;
 			weather.temp = 0;
 			weather.humidity = 0;
 			weather.wind = 0;
@@ -114,7 +75,7 @@ function getOWMWeatherData( location, callback ) {
 			weather.humidity = weather.humidity / maxCount;
 			weather.wind = weather.wind / maxCount;
 			weather.precip = weather.precip / maxCount;
-
+			weather.icon = data.list[0].weather[0].icon;
 			
 			location = location.join( "," );
 
@@ -225,6 +186,33 @@ function checkRainStatus( weather ) {
 	return false;
 }
 
+exports.showWeatherData = function( req, res ) {
+	var location = req.query.loc;
+
+	if ( filters.gps.test( location ) ) {
+
+		// Handle GPS coordinates by storing each coordinate in an array
+		location = location.split( "," );
+		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
+
+		// Continue with the weather request
+		getOWMWeatherData( location, function( data ) { res.json( data ); } );
+	} else {
+
+		// Attempt to resolve provided location to GPS coordinates when it does not match
+		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
+		resolveCoordinates( location, function( result ) {
+			if ( result === false ) {
+				res.send( "Error: Unable to resolve location" );
+				return;
+			}
+
+			location = result;
+			getOWMWeatherData( location, function( data ) { res.json( data ); } );
+		} );
+    }
+};
+
 // API Handler when using the weatherX.py where X represents the
 // adjustment method which is encoded to also carry the watering
 // restriction and therefore must be decoded
@@ -236,7 +224,6 @@ exports.getWeather = function( req, res ) {
 	var adjustmentMethod		= req.params[ 0 ] & ~( 1 << 7 ),
 		adjustmentOptions		= req.query.wto,
 		location				= req.query.loc,
-		weatherUndergroundKey	= req.query.key,
 		outputFormat			= req.query.format,
 		remoteAddress			= req.headers[ "x-forwarded-for" ] || req.connection.remoteAddress,
 
@@ -324,17 +311,10 @@ exports.getWeather = function( req, res ) {
 	}
 
 	// Parse location string
-    if ( weatherUndergroundKey ) {
+	if ( filters.pws.test( location ) ) {
 
-		// The current weather script uses Weather Underground and during the transition period
-		// both will be supported and users who provide a Weather Underground API key will continue
-		// using Weather Underground until The Weather Service becomes the default API
-
-		getWeatherUndergroundData( location, weatherUndergroundKey, finishRequest );
-	} else if ( filters.pws.test( location ) ) {
-
-		// If no key is provided for Weather Underground then the PWS or ICAO cannot be resolved
-		res.send( "Error: Weather Underground key required when using PWS or ICAO location." );
+		// Weather Underground is discontinued and PWS or ICAO cannot be resolved
+		res.send( "Error: Weather Underground is discontinued." );
 		return;
 	} else if ( filters.gps.test( location ) ) {
 

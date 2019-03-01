@@ -16,6 +16,9 @@ if ( !process.env.HOST || !process.env.PORT ) {
 app.get( /weather(\d+)\.py/, weather.getWeather );
 app.get( /(\d+)/, weather.getWeather );
 
+// Handle requests matching /weatherData
+app.get( /weatherData/, weather.showWeatherData );
+
 app.get( "/", function( req, res ) {
 	res.send( "OpenSprinkler Weather Service" );
 } );
