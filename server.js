@@ -1,5 +1,6 @@
 var express		= require( "express" ),
-    weather		= require( "./routes/weather.js" ),
+	weather		= require( "./routes/weather.js" ),
+	cors		= require( "cors" ),
 	host		= process.env.HOST || "127.0.0.1",
 	port		= process.env.PORT || 3000,
 	app			= express();
@@ -17,7 +18,7 @@ app.get( /weather(\d+)\.py/, weather.getWeather );
 app.get( /(\d+)/, weather.getWeather );
 
 // Handle requests matching /weatherData
-app.get( /weatherData/, weather.showWeatherData );
+app.get( /weatherData/, cors(), weather.showWeatherData );
 
 app.get( "/", function( req, res ) {
 	res.send( "OpenSprinkler Weather Service" );

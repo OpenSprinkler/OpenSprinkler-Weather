@@ -76,6 +76,9 @@ function getOWMWeatherData( location, callback ) {
 			weather.wind = weather.wind / maxCount;
 			weather.precip = weather.precip / maxCount;
 			weather.icon = data.list[0].weather[0].icon;
+			weather.region = data.city.country;
+			weather.city = data.city.name;
+			weather.description = data.list[0].weather[0].description;
 			
 			location = location.join( "," );
 
@@ -196,7 +199,10 @@ exports.showWeatherData = function( req, res ) {
 		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
 
 		// Continue with the weather request
-		getOWMWeatherData( location, function( data ) { res.json( data ); } );
+		getOWMWeatherData( location, function( data ) {
+			data.location = location;
+			res.json( data );
+		} );
 	} else {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
@@ -208,7 +214,10 @@ exports.showWeatherData = function( req, res ) {
 			}
 
 			location = result;
-			getOWMWeatherData( location, function( data ) { res.json( data ); } );
+			getOWMWeatherData( location, function( data ) {
+				data.location = location;
+				res.json( data );
+			} );
 		} );
     }
 };

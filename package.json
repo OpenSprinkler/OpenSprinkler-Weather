@@ -8,6 +8,7 @@
     "start": "node server"
   },
   "dependencies": {
+    "cors": "^2.8.5",
     "dotenv": "^6.0.0",
     "express": "^4.16.3",
     "geo-tz": "^4.0.1",
