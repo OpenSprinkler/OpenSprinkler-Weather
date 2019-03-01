@@ -63,12 +63,25 @@ function getOWMWeatherData( location, callback ) {
 			weather.humidity = 0;
 			weather.wind = 0;
 			weather.precip = 0;
+			weather.forecast = [];
 
-			for ( var index = 0; index < maxCount; index++ ) {
-				weather.temp += parseInt( data.list[ index ].main.temp );
-				weather.humidity += parseInt( data.list[ index ].main.humidity );
-				weather.wind += parseInt( data.list[ index ].wind.speed );
-				weather.precip += data.list[ index ].rain ? parseFloat( data.list[ index ].rain[ "3h" ] || 0 ) : 0;
+			for ( var index = 0; index < data.list.length; index++ ) {
+				if ( index < maxCount ) {
+					weather.temp += parseInt( data.list[ index ].main.temp );
+					weather.humidity += parseInt( data.list[ index ].main.humidity );
+					weather.wind += parseInt( data.list[ index ].wind.speed );
+					weather.precip += data.list[ index ].rain ? parseFloat( data.list[ index ].rain[ "3h" ] || 0 ) : 0;	
+				}
+
+				if ( index % 8 === 0 ) {
+					weather.forecast.push( {
+						temp_min: parseInt( data.list[ index ].main.temp_min ),
+						temp_max: parseInt( data.list[ index ].main.temp_max ),
+						date: parseInt( data.list[ index ].dt ),
+						icon: data.list[ index ].weather[ 0 ].icon,
+						description: data.list[0].weather[ 0 ].description
+					} );
+				}
 			}
 
 			weather.temp = weather.temp / maxCount;
