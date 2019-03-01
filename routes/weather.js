@@ -58,7 +58,7 @@ function getOWMWeatherData( location, callback ) {
 				return;
 			}
 
-			const maxCount = 10;
+			var maxCount = 10;
 			weather.temp = 0;
 			weather.humidity = 0;
 			weather.wind = 0;
@@ -187,7 +187,7 @@ function checkRainStatus( weather ) {
 }
 
 exports.showWeatherData = function( req, res ) {
-	let location = req.query.loc;
+	var location = req.query.loc;
 
 	if ( filters.gps.test( location ) ) {
 
@@ -196,7 +196,7 @@ exports.showWeatherData = function( req, res ) {
 		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
 
 		// Continue with the weather request
-		getOWMWeatherData( location, ( data ) => res.json( data ) );
+		getOWMWeatherData( location, function( data ) { res.json( data ); } );
 	} else {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
@@ -208,10 +208,10 @@ exports.showWeatherData = function( req, res ) {
 			}
 
 			location = result;
-			getOWMWeatherData( location, ( data ) => res.json( data ) );
+			getOWMWeatherData( location, function( data ) { res.json( data ); } );
 		} );
     }
-}
+};
 
 // API Handler when using the weatherX.py where X represents the
 // adjustment method which is encoded to also carry the watering
