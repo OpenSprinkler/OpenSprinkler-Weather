@@ -18,6 +18,7 @@ app.get( /weather(\d+)\.py/, weather.getWeather );
 app.get( /(\d+)/, weather.getWeather );
 
 // Handle requests matching /weatherData
+app.options( /weatherData/, cors() );
 app.get( /weatherData/, cors(), weather.showWeatherData );
 
 app.get( "/", function( req, res ) {
