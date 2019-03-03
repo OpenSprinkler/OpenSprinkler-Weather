@@ -58,7 +58,7 @@ function getOWMWeatherData( location, callback ) {
 				return;
 			}
 
-			if ( !weather.list ) {
+			if ( !data.list ) {
 				callback(weather);
 				return;
 			}
