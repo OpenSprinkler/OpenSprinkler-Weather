@@ -58,6 +58,11 @@ function getOWMWeatherData( location, callback ) {
 				return;
 			}
 
+			if ( !weather.list ) {
+				callback(weather);
+				return;
+			}
+
 			var maxCount = 10;
 			weather.temp = 0;
 			weather.humidity = 0;
