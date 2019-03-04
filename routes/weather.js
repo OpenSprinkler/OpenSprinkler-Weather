@@ -75,7 +75,7 @@ function getOWMWeatherData( location, callback ) {
 			weather.icon = data.list[ 0 ].weather[ 0 ].icon;
 			weather.forecast = [];
 
-			for ( var index = 1; index < data.list.length; index++ ) {
+			for ( var index = 0; index < data.list.length; index++ ) {
 				weather.forecast.push( {
 					temp_min: parseInt( data.list[ index ].temp.min ),
 					temp_max: parseInt( data.list[ index ].temp.max ),
