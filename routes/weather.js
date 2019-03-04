@@ -81,7 +81,7 @@ function getOWMWeatherData( location, callback ) {
 					temp_max: parseInt( data.list[ index ].temp.max ),
 					date: parseInt( data.list[ index ].dt ),
 					icon: data.list[ index ].weather[ 0 ].icon,
-					description: data.list[0].weather[ 0 ].description
+					description: data.list[ index ].weather[ 0 ].description
 				} );
 			}
 
