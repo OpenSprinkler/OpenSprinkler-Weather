@@ -43,7 +43,7 @@ function getOWMWeatherData( location, callback ) {
 
 	// Generate URL using OpenWeatherMap in Imperial units
 	var OWM_API_KEY = process.env.OWM_API_KEY,
-		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
+		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
 
 	getTimeData( location, function( weather ) {
 
@@ -63,42 +63,27 @@ function getOWMWeatherData( location, callback ) {
 				return;
 			}
 
-			var maxCount = 10;
-			weather.temp = 0;
-			weather.humidity = 0;
-			weather.wind = 0;
-			weather.precip = 0;
-			weather.forecast = [];
-
-			for ( var index = 0; index < data.list.length; index++ ) {
-				if ( index < maxCount ) {
-					weather.temp += parseInt( data.list[ index ].main.temp );
-					weather.humidity += parseInt( data.list[ index ].main.humidity );
-					weather.wind += parseInt( data.list[ index ].wind.speed );
-					weather.precip += data.list[ index ].rain ? parseFloat( data.list[ index ].rain[ "3h" ] || 0 ) : 0;	
-				}
-
-				if ( index % 8 === 0 ) {
-					weather.forecast.push( {
-						temp_min: parseInt( data.list[ index ].main.temp_min ),
-						temp_max: parseInt( data.list[ index ].main.temp_max ),
-						date: parseInt( data.list[ index ].dt ),
-						icon: data.list[ index ].weather[ 0 ].icon,
-						description: data.list[0].weather[ 0 ].description
-					} );
-				}
-			}
-
-			weather.temp = weather.temp / maxCount;
-			weather.humidity = weather.humidity / maxCount;
-			weather.wind = weather.wind / maxCount;
-			weather.precip = weather.precip / maxCount;
-			weather.icon = data.list[0].weather[0].icon;
 			weather.region = data.city.country;
 			weather.city = data.city.name;
-			weather.description = data.list[0].weather[0].description;
-			
-			location = location.join( "," );
+			weather.temp = parseInt( data.list[ 0 ].temp.day );
+			weather.minTemp = parseInt( data.list[ 0 ].temp.min );
+			weather.maxTemp = parseInt( data.list[ 0 ].temp.max );
+			weather.humidity = parseInt( data.list[ 0 ].humidity );
+			weather.wind = parseInt( data.list[ 0 ].speed );
+			weather.precip = data.list[ 0 ].rain ? parseFloat( data.list[ 0 ].rain || 0 ) : 0;
+			weather.description = data.list[ 0 ].weather[ 0 ].description;
+			weather.icon = data.list[ 0 ].weather[ 0 ].icon;
+			weather.forecast = [];
+
+			for ( var index = 1; index < data.list.length; index++ ) {
+				weather.forecast.push( {
+					temp_min: parseInt( data.list[ index ].temp.min ),
+					temp_max: parseInt( data.list[ index ].temp.max ),
+					date: parseInt( data.list[ index ].dt ),
+					icon: data.list[ index ].weather[ 0 ].icon,
+					description: data.list[0].weather[ 0 ].description
+				} );
+			}
 
 			callback( weather );
 		} );
