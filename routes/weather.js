@@ -65,9 +65,9 @@ function getOWMWeatherData( location, callback ) {
 
 			weather.region = data.city.country;
 			weather.city = data.city.name;
-			weather.temp = parseInt( data.list[ 0 ].temp.day );
 			weather.minTemp = parseInt( data.list[ 0 ].temp.min );
 			weather.maxTemp = parseInt( data.list[ 0 ].temp.max );
+			weather.temp = ( weather.minTemp + weather.maxTemp ) / 2;
 			weather.humidity = parseInt( data.list[ 0 ].humidity );
 			weather.wind = parseInt( data.list[ 0 ].speed );
 			weather.precip = ( data.list[ 0 ].rain ? parseFloat( data.list[ 0 ].rain || 0 ) : 0 ) / 25.4;
