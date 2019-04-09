@@ -70,7 +70,7 @@ function getOWMWeatherData( location, callback ) {
 			weather.maxTemp = parseInt( data.list[ 0 ].temp.max );
 			weather.humidity = parseInt( data.list[ 0 ].humidity );
 			weather.wind = parseInt( data.list[ 0 ].speed );
-			weather.precip = data.list[ 0 ].rain ? parseFloat( data.list[ 0 ].rain || 0 ) : 0;
+			weather.precip = ( data.list[ 0 ].rain ? parseFloat( data.list[ 0 ].rain || 0 ) : 0 ) / 25.4;
 			weather.description = data.list[ 0 ].weather[ 0 ].description;
 			weather.icon = data.list[ 0 ].weather[ 0 ].icon;
 			weather.forecast = [];
