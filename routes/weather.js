@@ -87,7 +87,7 @@ function getOWMWeatherData( location, callback ) {
 
 			callback( weather );
 		} );
-	} );	
+	} );
 }
 
 // Calculate timezone and sun rise/set information
@@ -166,8 +166,8 @@ function checkWeatherRestriction( adjustmentValue, weather ) {
 	if ( californiaRestriction ) {
 
 		// If the California watering restriction is in use then prevent watering
-		// if more then 0.01" of rain has accumulated in the past 48 hours
-		if ( weather.precip > 0.01 ) {
+		// if more then 0.1" of rain has accumulated in the past 48 hours
+		if ( weather.precip > 0.1 ) {
 			return true;
 		}
 	}
