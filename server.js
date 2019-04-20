@@ -14,12 +14,12 @@ if ( !process.env.HOST || !process.env.PORT ) {
 // Handle requests matching /weatherID.py where ID corresponds to the
 // weather adjustment method selector.
 // This endpoint is considered deprecated and supported for prior firmware
-app.get( /weather(\d+)\.py/, weather.getWeather );
-app.get( /(\d+)/, weather.getWeather );
+app.get( /weather(\d+)\.py/, weather.getWateringData );
+app.get( /(\d+)/, weather.getWateringData );
 
 // Handle requests matching /weatherData
 app.options( /weatherData/, cors() );
-app.get( /weatherData/, cors(), weather.showWeatherData );
+app.get( /weatherData/, cors(), weather.getWeatherData );
 
 app.get( "/", function( req, res ) {
 	res.send( "OpenSprinkler Weather Service" );

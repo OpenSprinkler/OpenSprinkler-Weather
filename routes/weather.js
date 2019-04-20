@@ -11,7 +11,7 @@ var http		= require( "http" ),
 		time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
 		timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
 	};
-
+	
 // If location does not match GPS or PWS/ICAO, then attempt to resolve
 // location using Weather Underground autocomplete API
 function resolveCoordinates( location, callback ) {
@@ -38,54 +38,98 @@ function resolveCoordinates( location, callback ) {
 	} );
 }
 
-// Retrieve weather data from Open Weather Map
-function getOWMWeatherData( location, callback ) {
+function getData( url, callback ) {
 
-	// Generate URL using OpenWeatherMap in Imperial units
+	httpRequest( url, function( data ) {
+		try {
+			data = JSON.parse( data );
+		} catch (err) {
+			callback( {} );
+			return;
+		}
+		callback( data );
+		return;
+	} );
+}
+
+// Retrieve data from Open Weather Map for water level calculations
+function getOWMWateringData( location, callback ) {
 	var OWM_API_KEY = process.env.OWM_API_KEY,
-		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
+		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
 
 	getTimeData( location, function( weather ) {
 
 		// Perform the HTTP request to retrieve the weather data
-		httpRequest( forecastUrl, function( data ) {
-			try {
-				data = JSON.parse( data );
-			} catch ( err ) {
+		getData( forecastUrl, function( forecast ) {
 
-				// Otherwise indicate the request failed
+			if ( !forecast || !forecast.list ) {
 				callback( weather );
 				return;
 			}
 
-			if ( !data.list ) {
-				callback(weather);
-				return;
+			weather.temp = 0;
+			weather.humidity = 0;
+			weather.precip = 0;
+
+			var periods = Math.min(forecast.list.length, 10);
+			for ( var index = 0; index < periods; index++ ) {
+				weather.temp += parseFloat( forecast.list[ index ].main.temp );
+				weather.humidity += parseInt( forecast.list[ index ].main.humidity );
+				weather.precip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
 			}
 
-			weather.region = data.city.country;
-			weather.city = data.city.name;
-			weather.minTemp = parseInt( data.list[ 0 ].temp.min );
-			weather.maxTemp = parseInt( data.list[ 0 ].temp.max );
-			weather.temp = ( weather.minTemp + weather.maxTemp ) / 2;
-			weather.humidity = parseInt( data.list[ 0 ].humidity );
-			weather.wind = parseInt( data.list[ 0 ].speed );
-			weather.precip = ( data.list[ 0 ].rain ? parseFloat( data.list[ 0 ].rain || 0 ) : 0 ) / 25.4;
-			weather.description = data.list[ 0 ].weather[ 0 ].description;
-			weather.icon = data.list[ 0 ].weather[ 0 ].icon;
-			weather.forecast = [];
-
-			for ( var index = 0; index < data.list.length; index++ ) {
-				weather.forecast.push( {
-					temp_min: parseInt( data.list[ index ].temp.min ),
-					temp_max: parseInt( data.list[ index ].temp.max ),
-					date: parseInt( data.list[ index ].dt ),
-					icon: data.list[ index ].weather[ 0 ].icon,
-					description: data.list[ index ].weather[ 0 ].description
-				} );
-			}
+			weather.temp = weather.temp / periods;
+			weather.humidity = weather.humidity / periods;
+			weather.precip = weather.precip / 25.4;
+			weather.raining = ( forecast.list[ 0 ].rain ? ( parseFloat( forecast.list[ 0 ].rain[ "3h" ] || 0 ) > 0 ) : false );
 
 			callback( weather );
+		} );
+	} );	
+}
+
+// Retrieve weather data from Open Weather Map for App
+function getOWMWeatherData( location, callback ) {
+	var OWM_API_KEY = process.env.OWM_API_KEY,
+		currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ],
+		forecastDailyUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
+
+	getTimeData( location, function( weather ) {
+
+		getData( currentUrl, function( current ) {
+
+			getData( forecastDailyUrl, function( forecast ) {
+
+				if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
+					callback( weather );
+					return;
+				}
+
+				weather.temp = parseInt( current.main.temp );
+				weather.humidity = parseInt( current.main.humidity );
+				weather.wind = parseInt( current.wind.speed );
+				weather.description = current.weather[0].description;
+				weather.icon = current.weather[0].icon;
+
+				weather.region = forecast.city.country;
+				weather.city = forecast.city.name;
+				weather.minTemp = parseInt( forecast.list[ 0 ].temp.min );
+				weather.maxTemp = parseInt( forecast.list[ 0 ].temp.max );
+				weather.precip = ( forecast.list[ 0 ].rain ? parseFloat( forecast.list[ 0 ].rain || 0 ) : 0 ) / 25.4;
+				weather.forecast = [];
+
+				for ( var index = 0; index < forecast.list.length; index++ ) {
+					weather.forecast.push( {
+						temp_min: parseInt( forecast.list[ index ].temp.min ),
+						temp_max: parseInt( forecast.list[ index ].temp.max ),
+						date: parseInt( forecast.list[ index ].dt ),
+						icon: forecast.list[ index ].weather[ 0 ].icon,
+						description: forecast.list[ index ].weather[ 0 ].description
+					} );
+				}
+
+				callback( weather );
+			} );
 		} );
 	} );	
 }
@@ -175,24 +219,7 @@ function checkWeatherRestriction( adjustmentValue, weather ) {
 	return false;
 }
 
-// Checks if the weather indicates it is raining and returns a boolean representation
-function checkRainStatus( weather ) {
-
-	// Define all the weather codes that indicate rain
-	var adverseCodes = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47 ],
-		adverseWords = [ "flurries", "sleet", "rain", "sleet", "snow", "tstorms" ];
-
-	if ( ( weather.iconCode && adverseCodes.indexOf( weather.iconCode ) !== -1 ) || ( weather.icon && adverseWords.indexOf( weather.icon ) !== -1 ) ) {
-
-		// If the current weather indicates rain, add a rain delay flag to the weather script indicating
-		// the controller should not water.
-		return true;
-	}
-
-	return false;
-}
-
-exports.showWeatherData = function( req, res ) {
+exports.getWeatherData = function( req, res ) {
 	var location = req.query.loc;
 
 	if ( filters.gps.test( location ) ) {
@@ -228,7 +255,7 @@ exports.showWeatherData = function( req, res ) {
 // API Handler when using the weatherX.py where X represents the
 // adjustment method which is encoded to also carry the watering
 // restriction and therefore must be decoded
-exports.getWeather = function( req, res ) {
+exports.getWateringData = function( req, res ) {
 
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
@@ -262,7 +289,7 @@ exports.getWeather = function( req, res ) {
 			}
 
 			// If any weather adjustment is being used, check the rain status
-			if ( adjustmentMethod > 0 && checkRainStatus( weather ) ) {
+			if ( adjustmentMethod > 0 && weather.hasOwnProperty( "raining" ) && weather.raining ) {
 
 				// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
 				if ( adjustmentMethod === 2 ) {
@@ -335,7 +362,7 @@ exports.getWeather = function( req, res ) {
 		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
 
 		// Continue with the weather request
-		getOWMWeatherData( location, finishRequest );
+		getOWMWateringData( location, finishRequest );
 	} else {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
@@ -347,7 +374,7 @@ exports.getWeather = function( req, res ) {
 			}
 
 			location = result;
-			getOWMWeatherData( location, finishRequest );
+			getOWMWateringData( location, finishRequest );
 		} );
     }
 };
