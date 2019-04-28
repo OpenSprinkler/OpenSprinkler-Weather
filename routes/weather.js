@@ -85,7 +85,7 @@ function getOWMWateringData( location, callback ) {
 
 			callback( weather );
 		} );
-	} );	
+	} );
 }
 
 // Retrieve weather data from Open Weather Map for App
@@ -210,8 +210,8 @@ function checkWeatherRestriction( adjustmentValue, weather ) {
 	if ( californiaRestriction ) {
 
 		// If the California watering restriction is in use then prevent watering
-		// if more then 0.01" of rain has accumulated in the past 48 hours
-		if ( weather.precip > 0.01 ) {
+		// if more then 0.1" of rain has accumulated in the past 48 hours
+		if ( weather.precip > 0.1 ) {
 			return true;
 		}
 	}
