@@ -11,7 +11,7 @@ var http		= require( "http" ),
 		time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
 		timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
 	};
-	
+
 // If location does not match GPS or PWS/ICAO, then attempt to resolve
 // location using Weather Underground autocomplete API
 function resolveCoordinates( location, callback ) {
@@ -131,7 +131,7 @@ function getOWMWeatherData( location, callback ) {
 				callback( weather );
 			} );
 		} );
-	} );	
+	} );
 }
 
 // Calculate timezone and sun rise/set information
@@ -308,7 +308,8 @@ exports.getWateringData = function( req, res ) {
 					tz:			getTimezone( weather.timezone ),
 					sunrise:	weather.sunrise,
 					sunset:		weather.sunset,
-					eip:		ipToInt( remoteAddress )
+					eip:		ipToInt( remoteAddress ),
+					rawData:    { h: weather.humidity, p: weather.precip, t: weather.temp }
 				};
 
 			// Return the response to the client in the requested format
@@ -320,7 +321,8 @@ exports.getWateringData = function( req, res ) {
 							"&tz="			+	data.tz +
 							"&sunrise="		+	data.sunrise +
 							"&sunset="		+	data.sunset +
-							"&eip="			+	data.eip
+							"&eip="			+	data.eip +
+							"&rawData="     +   JSON.stringify( data.rawData )
 				);
 			}
 		};
