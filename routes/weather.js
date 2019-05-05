@@ -1,4 +1,5 @@
 var http		= require( "http" ),
+	local		= require( "../routes/local.js" ),
 	SunCalc		= require( "suncalc" ),
 	moment		= require( "moment-timezone" ),
 	geoTZ	 	= require( "geo-tz" ),
@@ -24,10 +25,10 @@ function resolveCoordinates( location, callback ) {
 
 		// Parse the reply for JSON data
 		data = JSON.parse( data );
-
+		
 		// Check if the data is valid
 		if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
-
+		
 			// If it is, reply with an array containing the GPS coordinates
 			callback( [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ], moment().tz( data.RESULTS[ 0 ].tz ).utcOffset() );
 		} else {
@@ -134,6 +135,17 @@ function getOWMWeatherData( location, callback ) {
 	} );
 }
 
+// Retrieve weather data from Local record
+function getLocalWateringData( location, callback ) {
+
+	getTimeData( location, function( weather ) {
+		Object.assign( weather, local.getLocalWeather() );
+		location = location.join( "," );
+
+		callback( weather );
+	} );
+}
+
 // Calculate timezone and sun rise/set information
 function getTimeData( location, callback ) {
 	var timezone = moment().tz( geoTZ( location[ 0 ], location[ 1 ] ) ).utcOffset();
@@ -234,7 +246,6 @@ exports.getWeatherData = function( req, res ) {
 			res.json( data );
 		} );
 	} else {
-
 		// Attempt to resolve provided location to GPS coordinates when it does not match
 		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
 		resolveCoordinates( location, function( result ) {
@@ -249,7 +260,7 @@ exports.getWeatherData = function( req, res ) {
 				res.json( data );
 			} );
 		} );
-    }
+	}
 };
 
 // API Handler when using the weatherX.py where X represents the
@@ -310,12 +321,14 @@ exports.getWateringData = function( req, res ) {
 					sunset:		weather.sunset,
 					eip:		ipToInt( remoteAddress ),
 					rawData:    {
-						h: weather.humidity,
+						h: Math.round( weather.humidity ),
 						p: Math.round( weather.precip * 100 ) / 100,
 						t: Math.round( weather.temp * 10 ) / 10,
 						raining: weather.raining ? 1 : 0
 					}
 				};
+
+			console.log( "OpenSprinkler Weather Response: %s", JSON.stringify( data ) );
 
 			// Return the response to the client in the requested format
 			if ( outputFormat === "json" ) {
@@ -331,6 +344,8 @@ exports.getWateringData = function( req, res ) {
 				);
 			}
 		};
+
+	console.log( "OpenSprinkler Weather Query: %s", JSON.stringify( req.query ) );
 
 	// Exit if no location is provided
 	if ( !location ) {
@@ -371,7 +386,6 @@ exports.getWateringData = function( req, res ) {
 		// Continue with the weather request
 		getOWMWateringData( location, finishRequest );
 	} else {
-
 		// Attempt to resolve provided location to GPS coordinates when it does not match
 		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
 		resolveCoordinates( location, function( result ) {
@@ -383,7 +397,7 @@ exports.getWateringData = function( req, res ) {
 			location = result;
 			getOWMWateringData( location, finishRequest );
 		} );
-    }
+	}
 };
 
 // Generic HTTP request handler that parses the URL and uses the
