@@ -168,9 +168,8 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 			precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
 		}
 
-		var temp = ( ( weather.maxTemp + weather.minTemp ) / 2 ) || weather.temp,
-			humidityFactor = ( humidityBase - weather.humidity ),
-			tempFactor = ( ( temp - tempBase ) * 4 ),
+		var humidityFactor = ( humidityBase - weather.humidity ),
+			tempFactor = ( ( weather.temp - tempBase ) * 4 ),
 			precipFactor = ( ( precipBase - weather.precip ) * 200 );
 
 		// Apply adjustment options, if provided, by multiplying the percentage against the factor

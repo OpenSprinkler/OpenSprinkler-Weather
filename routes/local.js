@@ -1,9 +1,9 @@
-var CronJob = require( "cron" ).CronJob;
-var server = require( "../server.js" );
-var today = {}, yesterday = {};
-var count = { temp: 0, humidity: 0 };
-var current_date = new Date();
-var last_rain = new Date().setTime(0);
+var CronJob = require( "cron" ).CronJob,
+	server = require( "../server.js" ),
+	today = {}, yesterday = {},
+	count = { temp: 0, humidity: 0 },
+	current_date = new Date(),
+	last_bucket;
 
 function sameDay(d1, d2) {
 	return d1.getFullYear() === d2.getFullYear() &&
@@ -31,14 +31,16 @@ exports.captureWUStream = function( req, res ) {
 		today.precip = curr;
 	}
 	if ( ( "rainin" in req.query ) && !isNaN( curr = parseFloat( req.query.rainin ) ) && curr > 0 ) {
-		last_rain = new Date();
+		last_bucket = new Date();
 	}
+
+	console.log( "OpenSprinkler Weather Observation: %s", JSON.stringify( req.query ) );
 
 	res.send( "success\n" );
 };
 
 exports.useLocalWeather = function() {
-	return ( server.pws !== "false" ? true : false );
+	return server.pws !== "none" ? true : false;
 };
 
 exports.getLocalWeather = function() {
@@ -46,9 +48,15 @@ exports.getLocalWeather = function() {
 
 	// Use today's weather if we dont have information for yesterday yet (i.e. on startup)
 	Object.assign( result, today, yesterday);
-	Object.assign( result, ( yesterday.precip && today.precip ) ? { precip: yesterday.precip + today.precip } : {} );
 
-	result.raining = ( ( Date.now() - last_rain ) / 1000 / 60 / 60 < 1 );
+	if ( "precip" in yesterday && "precip" in today ) {
+		result.precip = yesterday.precip + today.precip;
+	}
+
+	// PWS report "buckets" so consider it still raining if last bucket was less than an hour ago
+	if ( last_bucket !== undefined ) {
+		result.raining = ( ( Date.now() - last_bucket ) / 1000 / 60 / 60 < 1 );
+	}
 
 	return result;
 };
