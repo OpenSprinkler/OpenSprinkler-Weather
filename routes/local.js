@@ -37,7 +37,7 @@ exports.captureWUStream = function( req, res ) {
 	res.send( "success\n" );
 };
 
-exports.hasLocalWeather = function() {
+exports.useLocalWeather = function() {
 	return ( server.pws !== "false" ? true : false );
 };
 

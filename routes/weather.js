@@ -17,40 +17,25 @@ var http		= require( "http" ),
 // location using Weather Underground autocomplete API
 function resolveCoordinates( location, callback ) {
 
-	// Generate URL for autocomplete request
-	var url = "http://autocomplete.wunderground.com/aq?h=0&query=" +
-		encodeURIComponent( location );
+	if ( filters.pws.test( location ) ) {
+		callback( false );
+	} else if ( filters.gps.test( location ) ) {
+		location = location.split( "," );
+		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
+		callback( location );
+	} else {
+		// Generate URL for autocomplete request
+		var url = "http://autocomplete.wunderground.com/aq?h=0&query=" +
+			encodeURIComponent( location );
 
-	httpRequest( url, function( data ) {
-
-		// Parse the reply for JSON data
-		data = JSON.parse( data );
-		
-		// Check if the data is valid
-		if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
-		
-			// If it is, reply with an array containing the GPS coordinates
-			callback( [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ], moment().tz( data.RESULTS[ 0 ].tz ).utcOffset() );
-		} else {
-
-			// Otherwise, indicate no data was found
-			callback( false );
-		}
-	} );
-}
-
-function getData( url, callback ) {
-
-	httpRequest( url, function( data ) {
-		try {
-			data = JSON.parse( data );
-		} catch (err) {
-			callback( {} );
-			return;
-		}
-		callback( data );
-		return;
-	} );
+		httpJSONRequest( url, function( data ) {
+			if ( typeof data.RESULTS === "object" && data.RESULTS.length ) {
+				callback( [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ] );
+			} else {
+				callback( false );
+			}
+		} );
+	}
 }
 
 // Retrieve data from Open Weather Map for water level calculations
@@ -61,7 +46,7 @@ function getOWMWateringData( location, callback ) {
 	getTimeData( location, function( weather ) {
 
 		// Perform the HTTP request to retrieve the weather data
-		getData( forecastUrl, function( forecast ) {
+		httpJSONRequest( forecastUrl, function( forecast ) {
 
 			if ( !forecast || !forecast.list ) {
 				callback( weather );
@@ -97,9 +82,9 @@ function getOWMWeatherData( location, callback ) {
 
 	getTimeData( location, function( weather ) {
 
-		getData( currentUrl, function( current ) {
+		httpJSONRequest( currentUrl, function( current ) {
 
-			getData( forecastDailyUrl, function( forecast ) {
+			httpJSONRequest( forecastDailyUrl, function( forecast ) {
 
 				if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
 					callback( weather );
@@ -234,33 +219,20 @@ function checkWeatherRestriction( adjustmentValue, weather ) {
 exports.getWeatherData = function( req, res ) {
 	var location = req.query.loc;
 
-	if ( filters.gps.test( location ) ) {
+	// Attempt to resolve provided location to GPS coordinates when it does not match
+	// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
+	resolveCoordinates( location, function( result ) {
+		if ( result === false ) {
+			res.send( "Error: Unable to resolve location" );
+			return;
+		}
 
-		// Handle GPS coordinates by storing each coordinate in an array
-		location = location.split( "," );
-		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
-
-		// Continue with the weather request
+		location = result;
 		getOWMWeatherData( location, function( data ) {
 			data.location = location;
 			res.json( data );
 		} );
-	} else {
-		// Attempt to resolve provided location to GPS coordinates when it does not match
-		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
-		resolveCoordinates( location, function( result ) {
-			if ( result === false ) {
-				res.send( "Error: Unable to resolve location" );
-				return;
-			}
-
-			location = result;
-			getOWMWeatherData( location, function( data ) {
-				data.location = location;
-				res.json( data );
-			} );
-		} );
-	}
+	} );
 };
 
 // API Handler when using the weatherX.py where X represents the
@@ -328,7 +300,9 @@ exports.getWateringData = function( req, res ) {
 					}
 				};
 
-			console.log( "OpenSprinkler Weather Response: %s", JSON.stringify( data ) );
+				if ( local.useLocalWeather() ) {
+					console.log( "OpenSprinkler Weather Response: %s", JSON.stringify( data ) );
+				}
 
 			// Return the response to the client in the requested format
 			if ( outputFormat === "json" ) {
@@ -345,7 +319,9 @@ exports.getWateringData = function( req, res ) {
 			}
 		};
 
-	console.log( "OpenSprinkler Weather Query: %s", JSON.stringify( req.query ) );
+		if ( local.useLocalWeather() ) {
+			console.log( "OpenSprinkler Weather Query: %s", JSON.stringify( req.query ) );
+		}
 
 	// Exit if no location is provided
 	if ( !location ) {
@@ -371,38 +347,26 @@ exports.getWateringData = function( req, res ) {
 		adjustmentOptions = false;
 	}
 
-	// Parse location string
-	if ( filters.pws.test( location ) ) {
+	// Attempt to resolve provided location to GPS coordinates when it does not match
+	// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
+	resolveCoordinates( location, function( result ) {
+		if ( result === false ) {
+			res.send( "Error: Unable to resolve location" );
+			return;
+		}
 
-		// Weather Underground is discontinued and PWS or ICAO cannot be resolved
-		res.send( "Error: Weather Underground is discontinued." );
-		return;
-	} else if ( filters.gps.test( location ) ) {
-
-		// Handle GPS coordinates by storing each coordinate in an array
-		location = location.split( "," );
-		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
-
-		// Continue with the weather request
-		getOWMWateringData( location, finishRequest );
-	} else {
-		// Attempt to resolve provided location to GPS coordinates when it does not match
-		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
-		resolveCoordinates( location, function( result ) {
-			if ( result === false ) {
-				res.send( "Error: Unable to resolve location" );
-				return;
-			}
-
-			location = result;
+		location = result;
+		if ( local.useLocalWeather() ) {
+			getLocalWateringData( location, finishRequest );
+		} else {
 			getOWMWateringData( location, finishRequest );
-		} );
-	}
+		}
+	} );
 };
 
 // Generic HTTP request handler that parses the URL and uses the
-// native Node.js http module to perform the request
-function httpRequest( url, callback ) {
+// native Node.js http module to perform the request. Returns a Json object
+function httpJSONRequest( url, callback ) {
 	url = url.match( filters.url );
 
 	var options = {
@@ -421,6 +385,7 @@ function httpRequest( url, callback ) {
 
         // Once the data is completely received, return it to the callback
         response.on( "end", function() {
+			data = JSON.parse( data );
             callback( data );
         } );
 	} ).on( "error", function() {

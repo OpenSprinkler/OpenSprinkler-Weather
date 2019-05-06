@@ -1,4 +1,5 @@
-var express		= require( "express" ),
+var package		= require( "./package.json" ),
+	express		= require( "express" ),
 	weather		= require( "./routes/weather.js" ),
 	local		= require( "./routes/local.js" ),
 	cors		= require( "cors" ),
@@ -30,7 +31,7 @@ if ( pws === "WU" ) {
 }
 
 app.get( "/", function( req, res ) {
-	res.send( "OpenSprinkler Weather Service" );
+	res.send( package.description + " v" + package.version );
 } );
 
 // Handle 404 error
@@ -41,10 +42,10 @@ app.use( function( req, res ) {
 
 // Start listening on the service port
 app.listen( port, host, function() {
-	console.log( "OpenSprinkler Weather Service now listening on %s:%s", host, port );
+	console.log( "%s now listening on %s:%s", package.description, host, port );
 
 	if (pws !== "none" ) {
-		console.log( "OpenSprinkler Weather Service now listening for local weather stream" );
+		console.log( "%s now listening for local weather stream", package.description );
 	}
 } );
 
