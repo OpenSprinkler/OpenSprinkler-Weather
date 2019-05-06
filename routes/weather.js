@@ -309,7 +309,12 @@ exports.getWateringData = function( req, res ) {
 					sunrise:	weather.sunrise,
 					sunset:		weather.sunset,
 					eip:		ipToInt( remoteAddress ),
-					rawData:    { h: weather.humidity, p: weather.precip, t: weather.temp }
+					rawData:    {
+						h: weather.humidity,
+						p: Math.round( weather.precip * 100 ) / 100,
+						t: Math.round( weather.temp * 10 ) / 10,
+						raining: weather.raining ? 1 : 0
+					}
 				};
 
 			// Return the response to the client in the requested format
