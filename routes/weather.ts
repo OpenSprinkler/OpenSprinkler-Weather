@@ -61,13 +61,17 @@ async function getData( url: string ): Promise< any > {
 	}
 }
 
-// Retrieve data from Open Weather Map for water level calculations
-async function getOWMWateringData( location, callback ) {
-	var OWM_API_KEY = process.env.OWM_API_KEY,
-		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
+/**
+ * Retrieves weather data necessary for watering level calculations from the OWM API.
+ * @param coordinates The coordinates to retrieve the watering data for.
+ * @return A Promise that will be resolved with OWMWateringData if the API calls succeed, or just the TimeData if an
+ * error occurs while retrieving the weather data.
+ */
+async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< OWMWateringData | TimeData > {
+	const OWM_API_KEY = process.env.OWM_API_KEY,
+		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
 
-	// TODO change the type of this after defining the appropriate type
-	const weather: any = getTimeData( location );
+	const timeData: TimeData = getTimeData( coordinates );
 
 	// Perform the HTTP request to retrieve the weather data
 	let forecast;
@@ -75,33 +79,32 @@ async function getOWMWateringData( location, callback ) {
 		forecast = await getData( forecastUrl );
 	} catch (err) {
 		// Return just the time data if retrieving the forecast fails.
-		callback( weather );
-		return;
+		return timeData;
 	}
 
 	// Return just the time data if the forecast data is incomplete.
 	if ( !forecast || !forecast.list ) {
-		callback( weather );
-		return;
+		return timeData;
 	}
 
-	weather.temp = 0;
-	weather.humidity = 0;
-	weather.precip = 0;
+	let totalTemp = 0,
+		totalHumidity = 0,
+		totalPrecip = 0;
 
-	var periods = Math.min(forecast.list.length, 10);
-	for ( var index = 0; index < periods; index++ ) {
-		weather.temp += parseFloat( forecast.list[ index ].main.temp );
-		weather.humidity += parseInt( forecast.list[ index ].main.humidity );
-		weather.precip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
+	const periods = Math.min(forecast.list.length, 10);
+	for ( let index = 0; index < periods; index++ ) {
+		totalTemp += parseFloat( forecast.list[ index ].main.temp );
+		totalHumidity += parseInt( forecast.list[ index ].main.humidity );
+		totalPrecip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
 	}
 
-	weather.temp = weather.temp / periods;
-	weather.humidity = weather.humidity / periods;
-	weather.precip = weather.precip / 25.4;
-	weather.raining = ( forecast.list[ 0 ].rain ? ( parseFloat( forecast.list[ 0 ].rain[ "3h" ] || 0 ) > 0 ) : false );
-
-	callback( weather );
+	return {
+		...timeData,
+		temp: totalTemp / periods,
+		humidity: totalHumidity / periods,
+		precip: totalPrecip / 25.4,
+		raining: ( forecast.list[ 0 ].rain ? ( parseFloat( forecast.list[ 0 ].rain[ "3h" ] || 0 ) > 0 ) : false )
+	};
 }
 
 /**
@@ -390,6 +393,7 @@ exports.getWateringData = async function( req, res ) {
 		adjustmentOptions = false;
 	}
 
+	let coordinates: GeoCoordinates;
 	// Parse location string
 	if ( filters.pws.test( location ) ) {
 
@@ -400,15 +404,13 @@ exports.getWateringData = async function( req, res ) {
 
 		// Handle GPS coordinates by storing each coordinate in an array
 		location = location.split( "," );
-		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
+		coordinates = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
+		location = coordinates;
 
-		// Continue with the weather request
-		getOWMWateringData( location, finishRequest );
 	} else {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
 		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
-		let coordinates: GeoCoordinates;
 		try {
 			coordinates = await resolveCoordinates( location );
 		} catch (err) {
@@ -417,8 +419,11 @@ exports.getWateringData = async function( req, res ) {
 		}
 
 		location = coordinates;
-		getOWMWateringData( location, finishRequest );
     }
+
+	// Continue with the weather request
+	const wateringData: OWMWateringData | TimeData = await getOWMWateringData( coordinates );
+	finishRequest(wateringData);
 };
 
 /**
@@ -554,4 +559,15 @@ interface OWMWeatherDataForecast {
 	date: number;
 	icon: string;
 	description: string;
+}
+
+interface OWMWateringData extends TimeData {
+	/** The average forecasted temperature over the next 30 hours (in Fahrenheit). */
+	temp: number;
+	/** The average forecasted humidity over the next 30 hours (as a percentage). */
+	humidity: number;
+	/** The forecasted total precipitation over the next 30 hours (in inches). */
+	precip: number;
+	/** A boolean indicating if it is currently raining. */
+	raining: boolean;
 }
