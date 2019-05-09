@@ -14,42 +14,46 @@ var http		= require( "http" ),
 
 // If location does not match GPS or PWS/ICAO, then attempt to resolve
 // location using Weather Underground autocomplete API
-function resolveCoordinates( location, callback ) {
+async function resolveCoordinates( location, callback ) {
 
 	// Generate URL for autocomplete request
 	var url = "http://autocomplete.wunderground.com/aq?h=0&query=" +
 		encodeURIComponent( location );
 
-	httpRequest( url, function( data ) {
+	let data;
+	try {
+		data = await getData( url );
+	} catch (err) {
+		// If the request fails, indicate no data was found.
+		callback( false );
+	}
 
-		// Parse the reply for JSON data
-		data = JSON.parse( data );
+	// Check if the data is valid
+	if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
 
-		// Check if the data is valid
-		if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
+		// If it is, reply with an array containing the GPS coordinates
+		callback( [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ], moment().tz( data.RESULTS[ 0 ].tz ).utcOffset() );
+	} else {
 
-			// If it is, reply with an array containing the GPS coordinates
-			callback( [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ], moment().tz( data.RESULTS[ 0 ].tz ).utcOffset() );
-		} else {
-
-			// Otherwise, indicate no data was found
-			callback( false );
-		}
-	} );
+		// Otherwise, indicate no data was found
+		callback( false );
+	}
 }
 
-function getData( url, callback ) {
-
-	httpRequest( url, function( data ) {
-		try {
-			data = JSON.parse( data );
-		} catch (err) {
-			callback( {} );
-			return;
-		}
-		callback( data );
-		return;
-	} );
+/**
+ * Makes an HTTP GET request to the specified URL and parses the JSON response body.
+ * @param url The URL to fetch.
+ * @return A Promise that will be resolved the with parsed response body if the request succeeds, or will be rejected
+ * with an Error if the request or JSON parsing fails.
+ */
+async function getData( url: string ): Promise< any > {
+	try {
+		const data: string = await httpRequest(url);
+		return JSON.parse(data);
+	} catch (err) {
+		// Reject the promise if there was an error making the request or parsing the JSON.
+		throw err;
+	}
 }
 
 // Retrieve data from Open Weather Map for water level calculations
@@ -57,34 +61,41 @@ function getOWMWateringData( location, callback ) {
 	var OWM_API_KEY = process.env.OWM_API_KEY,
 		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
 
-	getTimeData( location, function( weather ) {
+	getTimeData( location, async function( weather ) {
 
 		// Perform the HTTP request to retrieve the weather data
-		getData( forecastUrl, function( forecast ) {
-
-			if ( !forecast || !forecast.list ) {
-				callback( weather );
-				return;
-			}
-
-			weather.temp = 0;
-			weather.humidity = 0;
-			weather.precip = 0;
-
-			var periods = Math.min(forecast.list.length, 10);
-			for ( var index = 0; index < periods; index++ ) {
-				weather.temp += parseFloat( forecast.list[ index ].main.temp );
-				weather.humidity += parseInt( forecast.list[ index ].main.humidity );
-				weather.precip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
-			}
-
-			weather.temp = weather.temp / periods;
-			weather.humidity = weather.humidity / periods;
-			weather.precip = weather.precip / 25.4;
-			weather.raining = ( forecast.list[ 0 ].rain ? ( parseFloat( forecast.list[ 0 ].rain[ "3h" ] || 0 ) > 0 ) : false );
-
+		let forecast;
+		try {
+			forecast = await getData( forecastUrl );
+		} catch (err) {
+			// Return just the time data if retrieving the forecast fails.
 			callback( weather );
-		} );
+			return;
+		}
+
+		// Return just the time data if the forecast data is incomplete.
+		if ( !forecast || !forecast.list ) {
+			callback( weather );
+			return;
+		}
+
+		weather.temp = 0;
+		weather.humidity = 0;
+		weather.precip = 0;
+
+		var periods = Math.min(forecast.list.length, 10);
+		for ( var index = 0; index < periods; index++ ) {
+			weather.temp += parseFloat( forecast.list[ index ].main.temp );
+			weather.humidity += parseInt( forecast.list[ index ].main.humidity );
+			weather.precip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
+		}
+
+		weather.temp = weather.temp / periods;
+		weather.humidity = weather.humidity / periods;
+		weather.precip = weather.precip / 25.4;
+		weather.raining = ( forecast.list[ 0 ].rain ? ( parseFloat( forecast.list[ 0 ].rain[ "3h" ] || 0 ) > 0 ) : false );
+
+		callback( weather );
 	} );
 }
 
@@ -94,43 +105,48 @@ function getOWMWeatherData( location, callback ) {
 		currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ],
 		forecastDailyUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
 
-	getTimeData( location, function( weather ) {
+	getTimeData( location, async function( weather ) {
 
-		getData( currentUrl, function( current ) {
+		let current, forecast;
+		try {
+			current = await getData( currentUrl );
+			forecast = await getData( forecastDailyUrl );
+		} catch (err) {
+			// Return just the time data if retrieving weather data fails.
+			callback( weather );
+			return;
+		}
 
-			getData( forecastDailyUrl, function( forecast ) {
+		// Return just the time data if the weather data is incomplete.
+		if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
+			callback( weather );
+			return;
+		}
 
-				if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
-					callback( weather );
-					return;
-				}
+		weather.temp = parseInt( current.main.temp );
+		weather.humidity = parseInt( current.main.humidity );
+		weather.wind = parseInt( current.wind.speed );
+		weather.description = current.weather[0].description;
+		weather.icon = current.weather[0].icon;
 
-				weather.temp = parseInt( current.main.temp );
-				weather.humidity = parseInt( current.main.humidity );
-				weather.wind = parseInt( current.wind.speed );
-				weather.description = current.weather[0].description;
-				weather.icon = current.weather[0].icon;
+		weather.region = forecast.city.country;
+		weather.city = forecast.city.name;
+		weather.minTemp = parseInt( forecast.list[ 0 ].temp.min );
+		weather.maxTemp = parseInt( forecast.list[ 0 ].temp.max );
+		weather.precip = ( forecast.list[ 0 ].rain ? parseFloat( forecast.list[ 0 ].rain || 0 ) : 0 ) / 25.4;
+		weather.forecast = [];
 
-				weather.region = forecast.city.country;
-				weather.city = forecast.city.name;
-				weather.minTemp = parseInt( forecast.list[ 0 ].temp.min );
-				weather.maxTemp = parseInt( forecast.list[ 0 ].temp.max );
-				weather.precip = ( forecast.list[ 0 ].rain ? parseFloat( forecast.list[ 0 ].rain || 0 ) : 0 ) / 25.4;
-				weather.forecast = [];
-
-				for ( var index = 0; index < forecast.list.length; index++ ) {
-					weather.forecast.push( {
-						temp_min: parseInt( forecast.list[ index ].temp.min ),
-						temp_max: parseInt( forecast.list[ index ].temp.max ),
-						date: parseInt( forecast.list[ index ].dt ),
-						icon: forecast.list[ index ].weather[ 0 ].icon,
-						description: forecast.list[ index ].weather[ 0 ].description
-					} );
-				}
-
-				callback( weather );
+		for ( var index = 0; index < forecast.list.length; index++ ) {
+			weather.forecast.push( {
+				temp_min: parseInt( forecast.list[ index ].temp.min ),
+				temp_max: parseInt( forecast.list[ index ].temp.max ),
+				date: parseInt( forecast.list[ index ].dt ),
+				icon: forecast.list[ index ].weather[ 0 ].icon,
+				description: forecast.list[ index ].weather[ 0 ].description
 			} );
-		} );
+		}
+
+		callback( weather );
 	} );
 }
 
@@ -386,33 +402,40 @@ exports.getWateringData = function( req, res ) {
     }
 };
 
-// Generic HTTP request handler that parses the URL and uses the
-// native Node.js http module to perform the request
-function httpRequest( url, callback ) {
-	url = url.match( filters.url );
+/**
+ * Makes an HTTP GET request to the specified URL and returns the response body.
+ * @param url The URL to fetch.
+ * @return A Promise that will be resolved the with response body if the request succeeds, or will be rejected with an
+ * Error if the request fails.
+ */
+async function httpRequest( url: string ): Promise< string > {
+	return new Promise< any >( ( resolve, reject ) => {
 
-	var options = {
-		host: url[ 1 ],
-		port: url[ 2 ] || 80,
-		path: url[ 3 ]
-	};
+		const splitUrl: string[] = url.match( filters.url );
 
-	http.get( options, function( response ) {
-        var data = "";
+		const options = {
+			host: splitUrl[ 1 ],
+			port: splitUrl[ 2 ] || 80,
+			path: splitUrl[ 3 ]
+		};
 
-        // Reassemble the data as it comes in
-        response.on( "data", function( chunk ) {
-            data += chunk;
-        } );
+		http.get( options, ( response ) => {
+			let data = "";
 
-        // Once the data is completely received, return it to the callback
-        response.on( "end", function() {
-            callback( data );
-        } );
-	} ).on( "error", function() {
+			// Reassemble the data as it comes in
+			response.on( "data", ( chunk ) => {
+				data += chunk;
+			} );
 
-		// If the HTTP request fails, return false
-		callback( false );
+			// Once the data is completely received, resolve the promise
+			response.on( "end", () => {
+				resolve( data );
+			} );
+		} ).on( "error", ( err ) => {
+
+			// If the HTTP request fails, reject the promise
+			reject( err );
+		} );
 	} );
 }
 
