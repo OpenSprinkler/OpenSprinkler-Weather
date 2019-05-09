@@ -62,115 +62,119 @@ async function getData( url: string ): Promise< any > {
 }
 
 // Retrieve data from Open Weather Map for water level calculations
-function getOWMWateringData( location, callback ) {
+async function getOWMWateringData( location, callback ) {
 	var OWM_API_KEY = process.env.OWM_API_KEY,
 		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
 
-	getTimeData( location, async function( weather ) {
+	// TODO change the type of this after defining the appropriate type
+	const weather: any = getTimeData( location );
 
-		// Perform the HTTP request to retrieve the weather data
-		let forecast;
-		try {
-			forecast = await getData( forecastUrl );
-		} catch (err) {
-			// Return just the time data if retrieving the forecast fails.
-			callback( weather );
-			return;
-		}
-
-		// Return just the time data if the forecast data is incomplete.
-		if ( !forecast || !forecast.list ) {
-			callback( weather );
-			return;
-		}
-
-		weather.temp = 0;
-		weather.humidity = 0;
-		weather.precip = 0;
-
-		var periods = Math.min(forecast.list.length, 10);
-		for ( var index = 0; index < periods; index++ ) {
-			weather.temp += parseFloat( forecast.list[ index ].main.temp );
-			weather.humidity += parseInt( forecast.list[ index ].main.humidity );
-			weather.precip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
-		}
-
-		weather.temp = weather.temp / periods;
-		weather.humidity = weather.humidity / periods;
-		weather.precip = weather.precip / 25.4;
-		weather.raining = ( forecast.list[ 0 ].rain ? ( parseFloat( forecast.list[ 0 ].rain[ "3h" ] || 0 ) > 0 ) : false );
-
+	// Perform the HTTP request to retrieve the weather data
+	let forecast;
+	try {
+		forecast = await getData( forecastUrl );
+	} catch (err) {
+		// Return just the time data if retrieving the forecast fails.
 		callback( weather );
-	} );
+		return;
+	}
+
+	// Return just the time data if the forecast data is incomplete.
+	if ( !forecast || !forecast.list ) {
+		callback( weather );
+		return;
+	}
+
+	weather.temp = 0;
+	weather.humidity = 0;
+	weather.precip = 0;
+
+	var periods = Math.min(forecast.list.length, 10);
+	for ( var index = 0; index < periods; index++ ) {
+		weather.temp += parseFloat( forecast.list[ index ].main.temp );
+		weather.humidity += parseInt( forecast.list[ index ].main.humidity );
+		weather.precip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
+	}
+
+	weather.temp = weather.temp / periods;
+	weather.humidity = weather.humidity / periods;
+	weather.precip = weather.precip / 25.4;
+	weather.raining = ( forecast.list[ 0 ].rain ? ( parseFloat( forecast.list[ 0 ].rain[ "3h" ] || 0 ) > 0 ) : false );
+
+	callback( weather );
 }
 
 // Retrieve weather data from Open Weather Map for App
-function getOWMWeatherData( location, callback ) {
+async function getOWMWeatherData( location, callback ) {
 	var OWM_API_KEY = process.env.OWM_API_KEY,
 		currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ],
 		forecastDailyUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
 
-	getTimeData( location, async function( weather ) {
+	// TODO change the type of this after defining the appropriate type
+	const weather: any = getTimeData( location );
 
-		let current, forecast;
-		try {
-			current = await getData( currentUrl );
-			forecast = await getData( forecastDailyUrl );
-		} catch (err) {
-			// Return just the time data if retrieving weather data fails.
-			callback( weather );
-			return;
-		}
-
-		// Return just the time data if the weather data is incomplete.
-		if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
-			callback( weather );
-			return;
-		}
-
-		weather.temp = parseInt( current.main.temp );
-		weather.humidity = parseInt( current.main.humidity );
-		weather.wind = parseInt( current.wind.speed );
-		weather.description = current.weather[0].description;
-		weather.icon = current.weather[0].icon;
-
-		weather.region = forecast.city.country;
-		weather.city = forecast.city.name;
-		weather.minTemp = parseInt( forecast.list[ 0 ].temp.min );
-		weather.maxTemp = parseInt( forecast.list[ 0 ].temp.max );
-		weather.precip = ( forecast.list[ 0 ].rain ? parseFloat( forecast.list[ 0 ].rain || 0 ) : 0 ) / 25.4;
-		weather.forecast = [];
-
-		for ( var index = 0; index < forecast.list.length; index++ ) {
-			weather.forecast.push( {
-				temp_min: parseInt( forecast.list[ index ].temp.min ),
-				temp_max: parseInt( forecast.list[ index ].temp.max ),
-				date: parseInt( forecast.list[ index ].dt ),
-				icon: forecast.list[ index ].weather[ 0 ].icon,
-				description: forecast.list[ index ].weather[ 0 ].description
-			} );
-		}
-
+	let current, forecast;
+	try {
+		current = await getData( currentUrl );
+		forecast = await getData( forecastDailyUrl );
+	} catch (err) {
+		// Return just the time data if retrieving weather data fails.
 		callback( weather );
-	} );
+		return;
+	}
+
+	// Return just the time data if the weather data is incomplete.
+	if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
+		callback( weather );
+		return;
+	}
+
+	weather.temp = parseInt( current.main.temp );
+	weather.humidity = parseInt( current.main.humidity );
+	weather.wind = parseInt( current.wind.speed );
+	weather.description = current.weather[0].description;
+	weather.icon = current.weather[0].icon;
+
+	weather.region = forecast.city.country;
+	weather.city = forecast.city.name;
+	weather.minTemp = parseInt( forecast.list[ 0 ].temp.min );
+	weather.maxTemp = parseInt( forecast.list[ 0 ].temp.max );
+	weather.precip = ( forecast.list[ 0 ].rain ? parseFloat( forecast.list[ 0 ].rain || 0 ) : 0 ) / 25.4;
+	weather.forecast = [];
+
+	for ( var index = 0; index < forecast.list.length; index++ ) {
+		weather.forecast.push( {
+			temp_min: parseInt( forecast.list[ index ].temp.min ),
+			temp_max: parseInt( forecast.list[ index ].temp.max ),
+			date: parseInt( forecast.list[ index ].dt ),
+			icon: forecast.list[ index ].weather[ 0 ].icon,
+			description: forecast.list[ index ].weather[ 0 ].description
+		} );
+	}
+
+	callback( weather );
 }
 
-// Calculate timezone and sun rise/set information
-function getTimeData( location, callback ) {
-	var timezone = moment().tz( geoTZ( location[ 0 ], location[ 1 ] ) ).utcOffset();
-	var tzOffset = getTimezone( timezone, "minutes" );
+/**
+ * Calculates timezone and sunrise/sunset for the specified coordinates.
+ * @param coordinates The coordinates to use to calculate time data.
+ * @return The TimeData for the specified coordinates.
+ */
+function getTimeData( coordinates: GeoCoordinates ): TimeData {
+	const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] ) ).utcOffset();
+	const tzOffset: number = getTimezone( timezone, true );
 
 	// Calculate sunrise and sunset since Weather Underground does not provide it
-	var sunData = SunCalc.getTimes( new Date(), location[ 0 ], location[ 1 ] );
+	const sunData = SunCalc.getTimes( new Date(), coordinates[ 0 ], coordinates[ 1 ] );
 
 	sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
 	sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
 
-	callback( {
+	return {
 		timezone:	timezone,
 		sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
 		sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() )
-	} );
+	};
 }
 
 // Calculates the resulting water scale using the provided weather data, adjustment method and options
@@ -294,7 +298,8 @@ exports.getWateringData = async function( req, res ) {
 		finishRequest = function( weather ) {
 			if ( !weather ) {
 				if ( typeof location[ 0 ] === "number" && typeof location[ 1 ] === "number" ) {
-					getTimeData( location, finishRequest );
+					const timeData: TimeData = getTimeData( location );
+					finishRequest( timeData );
 				} else {
 					res.send( "Error: No weather data found." );
 				}
@@ -465,12 +470,16 @@ function validateValues( keys, array ) {
 	return true;
 }
 
-// Accepts a time string formatted in ISO-8601 or just the timezone
-// offset and returns the timezone.
-// The timezone output is formatted for OpenSprinkler Unified firmware.
-function getTimezone( time, format ) {
+/**
+ * Converts a timezone to an offset in minutes or OpenSprinkler encoded format.
+ * @param time A time string formatted in ISO-8601 or just the timezone.
+ * @param useMinutes Indicates if the returned value should be in minutes of the OpenSprinkler encoded format.
+ * @return The offset of the specified timezone in either minutes or OpenSprinkler encoded format (depending on the
+ * value of useMinutes).
+ */
+function getTimezone( time: number | string, useMinutes: boolean = false ): number {
 
-	var hour, minute, tz;
+	let hour, minute;
 
 	if ( typeof time === "number" ) {
 		hour = Math.floor( time / 60 );
@@ -478,24 +487,22 @@ function getTimezone( time, format ) {
 	} else {
 
 		// Match the provided time string against a regex for parsing
-		time = time.match( filters.time ) || time.match( filters.timezone );
+		let splitTime = time.match( filters.time ) || time.match( filters.timezone );
 
-		hour = parseInt( time[ 7 ] + time[ 8 ] );
-		minute = parseInt( time[ 9 ] );
+		hour = parseInt( splitTime[ 7 ] + splitTime[ 8 ] );
+		minute = parseInt( splitTime[ 9 ] );
 	}
 
-	if ( format === "minutes" ) {
-		tz = ( hour * 60 ) + minute;
+	if ( useMinutes ) {
+		return ( hour * 60 ) + minute;
 	} else {
 
 		// Convert the timezone into the OpenSprinkler encoded format
 		minute = ( minute / 15 >> 0 ) / 4;
 		hour = hour + ( hour >= 0 ? minute : -minute );
 
-		tz = ( ( hour + 12 ) * 4 ) >> 0;
+		return ( ( hour + 12 ) * 4 ) >> 0;
 	}
-
-	return tz;
 }
 
 // Converts IP string to integer
@@ -506,3 +513,14 @@ function ipToInt( ip ) {
 
 /** Geographic coordinates. The 1st element is the latitude, and the 2nd element is the longitude. */
 type GeoCoordinates = [number, number];
+
+interface TimeData {
+	/** The UTC offset, in minutes. This uses POSIX offsets, which are the negation of typically used offsets
+	 * (https://github.com/eggert/tz/blob/2017b/etcetera#L36-L42).
+	 */
+	timezone: number;
+	/** The time of sunrise, in minutes from UTC midnight. */
+	sunrise: number;
+	/** The time of sunset, in minutes from UTC midnight. */
+	sunset: number;
+}
