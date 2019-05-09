@@ -104,14 +104,18 @@ async function getOWMWateringData( location, callback ) {
 	callback( weather );
 }
 
-// Retrieve weather data from Open Weather Map for App
-async function getOWMWeatherData( location, callback ) {
-	var OWM_API_KEY = process.env.OWM_API_KEY,
-		currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ],
-		forecastDailyUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + location[ 0 ] + "&lon=" + location[ 1 ];
+/**
+ * Retrieves the current weather data from OWM for usage in the mobile app.
+ * @param coordinates The coordinates to retrieve the weather for
+ * @return A Promise that will be resolved with the OWMWeatherData if the API calls succeed, or just the TimeData if
+ * an error occurs while retrieving the weather data.
+ */
+async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< OWMWeatherData | TimeData > {
+	const OWM_API_KEY = process.env.OWM_API_KEY,
+		currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ],
+		forecastDailyUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
 
-	// TODO change the type of this after defining the appropriate type
-	const weather: any = getTimeData( location );
+	const timeData: TimeData = getTimeData( coordinates );
 
 	let current, forecast;
 	try {
@@ -119,30 +123,31 @@ async function getOWMWeatherData( location, callback ) {
 		forecast = await getData( forecastDailyUrl );
 	} catch (err) {
 		// Return just the time data if retrieving weather data fails.
-		callback( weather );
-		return;
+		return timeData;
 	}
 
 	// Return just the time data if the weather data is incomplete.
 	if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
-		callback( weather );
-		return;
+		return timeData;
 	}
 
-	weather.temp = parseInt( current.main.temp );
-	weather.humidity = parseInt( current.main.humidity );
-	weather.wind = parseInt( current.wind.speed );
-	weather.description = current.weather[0].description;
-	weather.icon = current.weather[0].icon;
+	const weather: OWMWeatherData = {
+		...timeData,
+		temp:  parseInt( current.main.temp ),
+		humidity: parseInt( current.main.humidity ),
+		wind: parseInt( current.wind.speed ),
+		description: current.weather[0].description,
+		icon: current.weather[0].icon,
 
-	weather.region = forecast.city.country;
-	weather.city = forecast.city.name;
-	weather.minTemp = parseInt( forecast.list[ 0 ].temp.min );
-	weather.maxTemp = parseInt( forecast.list[ 0 ].temp.max );
-	weather.precip = ( forecast.list[ 0 ].rain ? parseFloat( forecast.list[ 0 ].rain || 0 ) : 0 ) / 25.4;
-	weather.forecast = [];
+		region: forecast.city.country,
+		city: forecast.city.name,
+		minTemp: parseInt( forecast.list[ 0 ].temp.min ),
+		maxTemp: parseInt( forecast.list[ 0 ].temp.max ),
+		precip: ( forecast.list[ 0 ].rain ? parseFloat( forecast.list[ 0 ].rain || 0 ) : 0 ) / 25.4,
+		forecast: []
+	};
 
-	for ( var index = 0; index < forecast.list.length; index++ ) {
+	for ( let index = 0; index < forecast.list.length; index++ ) {
 		weather.forecast.push( {
 			temp_min: parseInt( forecast.list[ index ].temp.min ),
 			temp_max: parseInt( forecast.list[ index ].temp.max ),
@@ -152,7 +157,7 @@ async function getOWMWeatherData( location, callback ) {
 		} );
 	}
 
-	callback( weather );
+	return weather;
 }
 
 /**
@@ -254,9 +259,10 @@ exports.getWeatherData = async function( req, res ) {
 		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
 
 		// Continue with the weather request
-		getOWMWeatherData( location, function( data ) {
-			data.location = location;
-			res.json( data );
+		const weatherData: OWMWeatherData | TimeData = await getOWMWeatherData( location );
+		res.json( {
+			...weatherData,
+			location: location
 		} );
 	} else {
 
@@ -271,9 +277,10 @@ exports.getWeatherData = async function( req, res ) {
 		}
 
 		location = coordinates;
-		getOWMWeatherData( location, function( data ) {
-			data.location = location;
-			res.json( data );
+		const weatherData: OWMWeatherData | TimeData = await getOWMWeatherData( location );
+		res.json( {
+			...weatherData,
+			location: location
 		} );
     }
 };
@@ -523,4 +530,28 @@ interface TimeData {
 	sunrise: number;
 	/** The time of sunset, in minutes from UTC midnight. */
 	sunset: number;
+}
+
+interface OWMWeatherData extends TimeData {
+	/** The current temperature (in Fahrenheit). */
+	temp: number;
+	/** The current humidity (as a percentage). */
+	humidity: number;
+	wind: number;
+	description: string;
+	icon: string;
+	region: string;
+	city: string;
+	minTemp: number;
+	maxTemp: number;
+	precip: number;
+	forecast: OWMWeatherDataForecast[]
+}
+
+interface OWMWeatherDataForecast {
+	temp_min: number;
+	temp_max: number;
+	date: number;
+	icon: string;
+	description: string;
 }
