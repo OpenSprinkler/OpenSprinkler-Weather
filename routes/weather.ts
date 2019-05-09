@@ -12,12 +12,17 @@ var http		= require( "http" ),
 		timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
 	};
 
-// If location does not match GPS or PWS/ICAO, then attempt to resolve
-// location using Weather Underground autocomplete API
-async function resolveCoordinates( location, callback ) {
+/**
+ * Uses the Weather Underground API to resolve a location name (ZIP code, city name, country name, etc.) to geographic
+ * coordinates.
+ * @param location A zip code or partial city/country name.
+ * @return A promise that will be resolved with the coordinates of the best match for the specified location, or
+ * rejected with an error message if unable to resolve the location.
+ */
+async function resolveCoordinates( location: string ): Promise< GeoCoordinates > {
 
 	// Generate URL for autocomplete request
-	var url = "http://autocomplete.wunderground.com/aq?h=0&query=" +
+	const url = "http://autocomplete.wunderground.com/aq?h=0&query=" +
 		encodeURIComponent( location );
 
 	let data;
@@ -25,18 +30,18 @@ async function resolveCoordinates( location, callback ) {
 		data = await getData( url );
 	} catch (err) {
 		// If the request fails, indicate no data was found.
-		callback( false );
+		throw "An API error occurred while attempting to resolve location";
 	}
 
 	// Check if the data is valid
 	if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
 
 		// If it is, reply with an array containing the GPS coordinates
-		callback( [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ], moment().tz( data.RESULTS[ 0 ].tz ).utcOffset() );
+		return [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ];
 	} else {
 
 		// Otherwise, indicate no data was found
-		callback( false );
+		throw "Unable to resolve location";
 	}
 }
 
@@ -235,7 +240,7 @@ function checkWeatherRestriction( adjustmentValue, weather ) {
 	return false;
 }
 
-exports.getWeatherData = function( req, res ) {
+exports.getWeatherData = async function( req, res ) {
 	var location = req.query.loc;
 
 	if ( filters.gps.test( location ) ) {
@@ -253,17 +258,18 @@ exports.getWeatherData = function( req, res ) {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
 		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
-		resolveCoordinates( location, function( result ) {
-			if ( result === false ) {
-				res.send( "Error: Unable to resolve location" );
-				return;
-			}
+		let coordinates: GeoCoordinates;
+		try {
+			coordinates = await resolveCoordinates( location );
+		} catch (err) {
+			res.send( "Error: Unable to resolve location" );
+			return;
+		}
 
-			location = result;
-			getOWMWeatherData( location, function( data ) {
-				data.location = location;
-				res.json( data );
-			} );
+		location = coordinates;
+		getOWMWeatherData( location, function( data ) {
+			data.location = location;
+			res.json( data );
 		} );
     }
 };
@@ -271,7 +277,7 @@ exports.getWeatherData = function( req, res ) {
 // API Handler when using the weatherX.py where X represents the
 // adjustment method which is encoded to also carry the watering
 // restriction and therefore must be decoded
-exports.getWateringData = function( req, res ) {
+exports.getWateringData = async function( req, res ) {
 
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
@@ -390,15 +396,16 @@ exports.getWateringData = function( req, res ) {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
 		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
-		resolveCoordinates( location, function( result ) {
-			if ( result === false ) {
-				res.send( "Error: Unable to resolve location" );
-				return;
-			}
+		let coordinates: GeoCoordinates;
+		try {
+			coordinates = await resolveCoordinates( location );
+		} catch (err) {
+			res.send("Error: Unable to resolve location");
+			return;
+		}
 
-			location = result;
-			getOWMWateringData( location, finishRequest );
-		} );
+		location = coordinates;
+		getOWMWateringData( location, finishRequest );
     }
 };
 
@@ -496,3 +503,6 @@ function ipToInt( ip ) {
     ip = ip.split( "." );
     return ( ( ( ( ( ( +ip[ 0 ] ) * 256 ) + ( +ip[ 1 ] ) ) * 256 ) + ( +ip[ 2 ] ) ) * 256 ) + ( +ip[ 3 ] );
 }
+
+/** Geographic coordinates. The 1st element is the latitude, and the 2nd element is the longitude. */
+type GeoCoordinates = [number, number];
