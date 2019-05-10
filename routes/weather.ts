@@ -66,27 +66,25 @@ async function getData( url: string ): Promise< any > {
 /**
  * Retrieves weather data necessary for watering level calculations from the OWM API.
  * @param coordinates The coordinates to retrieve the watering data for.
- * @return A Promise that will be resolved with OWMWateringData if the API calls succeed, or just the TimeData if an
+ * @return A Promise that will be resolved with OWMWateringData if the API calls succeed, or undefined if an
  * error occurs while retrieving the weather data.
  */
-async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< OWMWateringData | TimeData > {
+async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< OWMWateringData > {
 	const OWM_API_KEY = process.env.OWM_API_KEY,
 		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
-
-	const timeData: TimeData = getTimeData( coordinates );
 
 	// Perform the HTTP request to retrieve the weather data
 	let forecast;
 	try {
 		forecast = await getData( forecastUrl );
 	} catch (err) {
-		// Return just the time data if retrieving the forecast fails.
-		return timeData;
+		// Indicate watering data could not be retrieved if an API error occurs.
+		return undefined;
 	}
 
-	// Return just the time data if the forecast data is incomplete.
+	// Indicate watering data could not be retrieved if the forecast data is incomplete.
 	if ( !forecast || !forecast.list ) {
-		return timeData;
+		return undefined;
 	}
 
 	let totalTemp = 0,
@@ -101,7 +99,6 @@ async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< OWMWa
 	}
 
 	return {
-		...timeData,
 		temp: totalTemp / periods,
 		humidity: totalHumidity / periods,
 		precip: totalPrecip / 25.4,
@@ -112,32 +109,29 @@ async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< OWMWa
 /**
  * Retrieves the current weather data from OWM for usage in the mobile app.
  * @param coordinates The coordinates to retrieve the weather for
- * @return A Promise that will be resolved with the OWMWeatherData if the API calls succeed, or just the TimeData if
+ * @return A Promise that will be resolved with the OWMWeatherData if the API calls succeed, or undefined if
  * an error occurs while retrieving the weather data.
  */
-async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< OWMWeatherData | TimeData > {
+async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< OWMWeatherData > {
 	const OWM_API_KEY = process.env.OWM_API_KEY,
 		currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ],
 		forecastDailyUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
-
-	const timeData: TimeData = getTimeData( coordinates );
 
 	let current, forecast;
 	try {
 		current = await getData( currentUrl );
 		forecast = await getData( forecastDailyUrl );
 	} catch (err) {
-		// Return just the time data if retrieving weather data fails.
-		return timeData;
+		// Indicate watering data could not be retrieved if an API error occurs.
+		return undefined;
 	}
 
-	// Return just the time data if the weather data is incomplete.
+	// Indicate watering data could not be retrieved if the forecast data is incomplete.
 	if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
-		return timeData;
+		return undefined;
 	}
 
 	const weather: OWMWeatherData = {
-		...timeData,
 		temp:  parseInt( current.main.temp ),
 		humidity: parseInt( current.main.humidity ),
 		wind: parseInt( current.wind.speed ),
@@ -192,21 +186,19 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  * @param adjustmentMethod The method to use to calculate the watering percentage. The only supported method is 1, which
  * corresponds to the Zimmerman method. If an invalid adjustmentMethod is used, this method will return -1.
  * @param adjustmentOptions Options to tweak the calculation, or undefined/null if no custom values are to be used.
- * @param data The weather to use to calculate watering percentage.
+ * @param wateringData The weather to use to calculate watering percentage.
  * @return The percentage that watering should be scaled by, or -1 if an invalid adjustmentMethod was provided.
  */
-function calculateWeatherScale( adjustmentMethod: number, adjustmentOptions: AdjustmentOptions, data: OWMWateringData | TimeData ): number {
+function calculateWeatherScale( adjustmentMethod: number, adjustmentOptions: AdjustmentOptions, wateringData: OWMWateringData ): number {
 
 	// Zimmerman method
 	if ( adjustmentMethod === 1 ) {
 		let humidityBase = 30, tempBase = 70, precipBase = 0;
 
 		// Check to make sure valid data exists for all factors
-		if ( !validateValues( [ "temp", "humidity", "precip" ], data ) ) {
+		if ( !validateValues( [ "temp", "humidity", "precip" ], wateringData ) ) {
 			return 100;
 		}
-
-		const wateringData: OWMWateringData = data as OWMWateringData;
 
 		// Get baseline conditions for 100% water level, if provided
 		if ( adjustmentOptions ) {
@@ -291,9 +283,11 @@ exports.getWeatherData = async function( req: express.Request, res: express.Resp
     }
 
 	// Continue with the weather request
-	const weatherData: OWMWeatherData | TimeData = await getOWMWeatherData( coordinates );
+	const timeData: TimeData = getTimeData( coordinates );
+	const weatherData: OWMWeatherData = await getOWMWeatherData( coordinates );
 
 	res.json( {
+		...timeData,
 		...weatherData,
 		location: coordinates
 	} );
@@ -312,81 +306,8 @@ exports.getWateringData = async function( req: express.Request, res: express.Res
 		location: string | GeoCoordinates	= getParameter(req.query.loc),
 		outputFormat: string				= getParameter(req.query.format),
 		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
-		adjustmentOptions: AdjustmentOptions,
+		adjustmentOptions: AdjustmentOptions;
 
-		// Function that will accept the weather after it is received from the API
-		// Data will be processed to retrieve the resulting scale, sunrise/sunset, timezone,
-		// and also calculate if a restriction is met to prevent watering.
-		finishRequest = function( weather: OWMWateringData | TimeData ) {
-			if ( !weather ) {
-				if ( typeof location[ 0 ] === "number" && typeof location[ 1 ] === "number" ) {
-					const timeData: TimeData = getTimeData( location as GeoCoordinates );
-					finishRequest( timeData );
-				} else {
-					res.send( "Error: No weather data found." );
-				}
-
-				return;
-			}
-
-			// The OWMWateringData if it exists, or undefined if only TimeData is available
-			const wateringData: OWMWateringData = validateValues( [ "temp", "humidity", "precip" ], weather ) ? weather as OWMWateringData: undefined;
-
-
-			let scale: number = calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ),
-				rainDelay: number = -1;
-
-			if (wateringData) {
-				// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-				if (checkWeatherRestriction(req.params[0], wateringData)) {
-					scale = 0;
-				}
-			}
-
-			// If any weather adjustment is being used, check the rain status
-			if ( adjustmentMethod > 0 && wateringData && wateringData.raining ) {
-
-				// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
-				if ( adjustmentMethod === 2 ) {
-
-					rainDelay = ( adjustmentOptions && adjustmentOptions.hasOwnProperty( "d" ) ) ? adjustmentOptions.d : 24;
-				} else {
-
-					// For any other adjustment method, apply a scale of 0 (as the scale will revert when the rain stops)
-					scale = 0;
-				}
-			}
-
-			const data = {
-				scale:		scale,
-				rd:			rainDelay,
-				tz:			getTimezone( weather.timezone, undefined ),
-				sunrise:	weather.sunrise,
-				sunset:		weather.sunset,
-				eip:		ipToInt( remoteAddress ),
-				// TODO this may need to be changed (https://github.com/OpenSprinkler/OpenSprinkler-Weather/pull/11#issuecomment-491037948)
-				rawData:    {
-					h: wateringData ? wateringData.humidity : null,
-					p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
-					t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
-					raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
-				}
-			};
-
-			// Return the response to the client in the requested format
-			if ( outputFormat === "json" ) {
-				res.json( data );
-			} else {
-				res.send(	"&scale="		+	data.scale +
-							"&rd="			+	data.rd +
-							"&tz="			+	data.tz +
-							"&sunrise="		+	data.sunrise +
-							"&sunset="		+	data.sunset +
-							"&eip="			+	data.eip +
-							"&rawData="     +   JSON.stringify( data.rawData )
-				);
-			}
-		};
 
 	// Exit if no location is provided
 	if ( !location ) {
@@ -441,8 +362,78 @@ exports.getWateringData = async function( req: express.Request, res: express.Res
     }
 
 	// Continue with the weather request
-	const wateringData: OWMWateringData | TimeData = await getOWMWateringData( coordinates );
-	finishRequest( wateringData );
+	let timeData: TimeData = getTimeData( coordinates );
+	const wateringData: OWMWateringData = await getOWMWateringData( coordinates );
+
+
+	// Process data to retrieve the resulting scale, sunrise/sunset, timezone,
+	// and also calculate if a restriction is met to prevent watering.
+
+	// Use getTimeData as fallback if a PWS is used but time data is not provided.
+	// This will never occur, but it might become possible in the future when PWS support is re-added.
+	if ( !timeData ) {
+		if ( typeof location[ 0 ] === "number" && typeof location[ 1 ] === "number" ) {
+			timeData = getTimeData( location as GeoCoordinates );
+		} else {
+			res.send( "Error: No weather data found." );
+			return;
+		}
+	}
+
+	let scale: number = calculateWeatherScale( adjustmentMethod, adjustmentOptions, wateringData ),
+		rainDelay: number = -1;
+
+	if (wateringData) {
+		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
+		if (checkWeatherRestriction(req.params[0], wateringData)) {
+			scale = 0;
+		}
+	}
+
+	// If any weather adjustment is being used, check the rain status
+	if ( adjustmentMethod > 0 && wateringData && wateringData.raining ) {
+
+		// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
+		if ( adjustmentMethod === 2 ) {
+
+			rainDelay = ( adjustmentOptions && adjustmentOptions.hasOwnProperty( "d" ) ) ? adjustmentOptions.d : 24;
+		} else {
+
+			// For any other adjustment method, apply a scale of 0 (as the scale will revert when the rain stops)
+			scale = 0;
+		}
+	}
+
+	const data = {
+		scale:		scale,
+		rd:			rainDelay,
+		tz:			getTimezone( timeData.timezone, undefined ),
+		sunrise:	timeData.sunrise,
+		sunset:		timeData.sunset,
+		eip:		ipToInt( remoteAddress ),
+		// TODO this may need to be changed (https://github.com/OpenSprinkler/OpenSprinkler-Weather/pull/11#issuecomment-491037948)
+		rawData:    {
+			h: wateringData ? wateringData.humidity : null,
+			p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
+			t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
+			raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
+		}
+	};
+
+	// Return the response to the client in the requested format
+	if ( outputFormat === "json" ) {
+		res.json( data );
+	} else {
+		res.send(	"&scale="		+	data.scale +
+			"&rd="			+	data.rd +
+			"&tz="			+	data.tz +
+			"&sunrise="		+	data.sunrise +
+			"&sunset="		+	data.sunset +
+			"&eip="			+	data.eip +
+			"&rawData="     +   JSON.stringify( data.rawData )
+		);
+	}
+
 };
 
 /**
@@ -582,7 +573,7 @@ interface TimeData {
 	sunset: number;
 }
 
-interface OWMWeatherData extends TimeData {
+interface OWMWeatherData {
 	/** The current temperature (in Fahrenheit). */
 	temp: number;
 	/** The current humidity (as a percentage). */
@@ -606,7 +597,7 @@ interface OWMWeatherDataForecast {
 	description: string;
 }
 
-interface OWMWateringData extends TimeData {
+interface OWMWateringData {
 	/** The average forecasted temperature over the next 30 hours (in Fahrenheit). */
 	temp: number;
 	/** The average forecasted humidity over the next 30 hours (as a percentage). */
