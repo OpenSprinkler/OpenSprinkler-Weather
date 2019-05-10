@@ -1,6 +1,6 @@
 import * as express	from "express";
 
-var http		= require( "http" ),
+const http		= require( "http" ),
 	SunCalc		= require( "suncalc" ),
 	moment		= require( "moment-timezone" ),
 	geoTZ	 	= require( "geo-tz" ),
@@ -187,17 +187,26 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
 	};
 }
 
-// Calculates the resulting water scale using the provided weather data, adjustment method and options
-function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
+/**
+ * Calculates how much watering should be scaled based on weather and adjustment options.
+ * @param adjustmentMethod The method to use to calculate the watering percentage. The only supported method is 1, which
+ * corresponds to the Zimmerman method. If an invalid adjustmentMethod is used, this method will return -1.
+ * @param adjustmentOptions Options to tweak the calculation, or undefined/null if no custom values are to be used.
+ * @param data The weather to use to calculate watering percentage.
+ * @return The percentage that watering should be scaled by, or -1 if an invalid adjustmentMethod was provided.
+ */
+function calculateWeatherScale( adjustmentMethod: number, adjustmentOptions: AdjustmentOptions, data: OWMWateringData | TimeData ): number {
 
 	// Zimmerman method
 	if ( adjustmentMethod === 1 ) {
-		var humidityBase = 30, tempBase = 70, precipBase = 0;
+		let humidityBase = 30, tempBase = 70, precipBase = 0;
 
 		// Check to make sure valid data exists for all factors
-		if ( !validateValues( [ "temp", "humidity", "precip" ], weather ) ) {
+		if ( !validateValues( [ "temp", "humidity", "precip" ], data ) ) {
 			return 100;
 		}
+
+		const wateringData: OWMWateringData = data as OWMWateringData;
 
 		// Get baseline conditions for 100% water level, if provided
 		if ( adjustmentOptions ) {
@@ -206,10 +215,10 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 			precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
 		}
 
-		var temp = ( ( weather.maxTemp + weather.minTemp ) / 2 ) || weather.temp,
-			humidityFactor = ( humidityBase - weather.humidity ),
+		let temp = wateringData.temp,
+			humidityFactor = ( humidityBase - wateringData.humidity ),
 			tempFactor = ( ( temp - tempBase ) * 4 ),
-			precipFactor = ( ( precipBase - weather.precip ) * 200 );
+			precipFactor = ( ( precipBase - wateringData.precip ) * 200 );
 
 		// Apply adjustment options, if provided, by multiplying the percentage against the factor
 		if ( adjustmentOptions ) {
@@ -233,17 +242,23 @@ function calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ) {
 	return -1;
 }
 
-// Checks if the weather data meets any of the restrictions set by OpenSprinkler.
-// Restrictions prevent any watering from occurring and are similar to 0% watering level.
-//
-// California watering restriction prevents watering if precipitation over two days is greater
-// than 0.01" over the past 48 hours.
-function checkWeatherRestriction( adjustmentValue, weather ) {
+/**
+ * Checks if the weather data meets any of the restrictions set by OpenSprinkler. Restrictions prevent any watering
+ * from occurring and are similar to 0% watering level. Known restrictions are:
+ *
+ * - California watering restriction prevents watering if precipitation over two days is greater than 0.1" over the past
+ * 48 hours.
+ * @param adjustmentValue The adjustment value, which indicates which restrictions should be checked.
+ * @param weather Watering data to use to determine if any restrictions apply.
+ * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
+ */
+function checkWeatherRestriction( adjustmentValue: number, weather: OWMWateringData ): boolean {
 
-	var californiaRestriction = ( adjustmentValue >> 7 ) & 1;
+	const californiaRestriction = ( adjustmentValue >> 7 ) & 1;
 
 	if ( californiaRestriction ) {
 
+		// TODO this is currently checking if the forecasted precipitation over the next 30 hours is >0.1 inches
 		// If the California watering restriction is in use then prevent watering
 		// if more then 0.1" of rain has accumulated in the past 48 hours
 		if ( weather.precip > 0.1 ) {
@@ -287,24 +302,25 @@ exports.getWeatherData = async function( req: express.Request, res: express.Resp
 // API Handler when using the weatherX.py where X represents the
 // adjustment method which is encoded to also carry the watering
 // restriction and therefore must be decoded
-exports.getWateringData = async function( req, res ) {
+exports.getWateringData = async function( req: express.Request, res: express.Response ) {
 
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
-	var adjustmentMethod		= req.params[ 0 ] & ~( 1 << 7 ),
-		adjustmentOptions		= req.query.wto,
-		location				= req.query.loc,
-		outputFormat			= req.query.format,
-		remoteAddress			= req.headers[ "x-forwarded-for" ] || req.connection.remoteAddress,
+	let adjustmentMethod: number			= req.params[ 0 ] & ~( 1 << 7 ),
+		adjustmentOptionsString: string		= getParameter(req.query.wto),
+		location: string | GeoCoordinates	= getParameter(req.query.loc),
+		outputFormat: string				= getParameter(req.query.format),
+		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
+		adjustmentOptions: AdjustmentOptions,
 
 		// Function that will accept the weather after it is received from the API
 		// Data will be processed to retrieve the resulting scale, sunrise/sunset, timezone,
 		// and also calculate if a restriction is met to prevent watering.
-		finishRequest = function( weather ) {
+		finishRequest = function( weather: OWMWateringData | TimeData ) {
 			if ( !weather ) {
 				if ( typeof location[ 0 ] === "number" && typeof location[ 1 ] === "number" ) {
-					const timeData: TimeData = getTimeData( location );
+					const timeData: TimeData = getTimeData( location as GeoCoordinates );
 					finishRequest( timeData );
 				} else {
 					res.send( "Error: No weather data found." );
@@ -313,16 +329,22 @@ exports.getWateringData = async function( req, res ) {
 				return;
 			}
 
-			var scale = calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ),
-				rainDelay = -1;
+			// The OWMWateringData if it exists, or undefined if only TimeData is available
+			const wateringData: OWMWateringData = validateValues( [ "temp", "humidity", "precip" ], weather ) ? weather as OWMWateringData: undefined;
 
-			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-			if ( checkWeatherRestriction( req.params[ 0 ], weather ) ) {
-				scale = 0;
+
+			let scale: number = calculateWeatherScale( adjustmentMethod, adjustmentOptions, weather ),
+				rainDelay: number = -1;
+
+			if (wateringData) {
+				// Check for any user-set restrictions and change the scale to 0 if the criteria is met
+				if (checkWeatherRestriction(req.params[0], wateringData)) {
+					scale = 0;
+				}
 			}
 
 			// If any weather adjustment is being used, check the rain status
-			if ( adjustmentMethod > 0 && weather.hasOwnProperty( "raining" ) && weather.raining ) {
+			if ( adjustmentMethod > 0 && wateringData && wateringData.raining ) {
 
 				// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
 				if ( adjustmentMethod === 2 ) {
@@ -335,20 +357,21 @@ exports.getWateringData = async function( req, res ) {
 				}
 			}
 
-			var data = {
-					scale:		scale,
-					rd:			rainDelay,
-					tz:			getTimezone( weather.timezone, undefined ),
-					sunrise:	weather.sunrise,
-					sunset:		weather.sunset,
-					eip:		ipToInt( remoteAddress ),
-					rawData:    {
-						h: weather.humidity,
-						p: Math.round( weather.precip * 100 ) / 100,
-						t: Math.round( weather.temp * 10 ) / 10,
-						raining: weather.raining ? 1 : 0
-					}
-				};
+			const data = {
+				scale:		scale,
+				rd:			rainDelay,
+				tz:			getTimezone( weather.timezone, undefined ),
+				sunrise:	weather.sunrise,
+				sunset:		weather.sunset,
+				eip:		ipToInt( remoteAddress ),
+				// TODO this may need to be changed (https://github.com/OpenSprinkler/OpenSprinkler-Weather/pull/11#issuecomment-491037948)
+				rawData:    {
+					h: wateringData ? wateringData.humidity : null,
+					p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
+					t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
+					raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
+				}
+			};
 
 			// Return the response to the client in the requested format
 			if ( outputFormat === "json" ) {
@@ -379,14 +402,14 @@ exports.getWateringData = async function( req, res ) {
 	try {
 
 		// Parse data that may be encoded
-		adjustmentOptions = decodeURIComponent( adjustmentOptions.replace( /\\x/g, "%" ) );
+		adjustmentOptionsString = decodeURIComponent( adjustmentOptionsString.replace( /\\x/g, "%" ) );
 
 		// Reconstruct JSON string from deformed controller output
-		adjustmentOptions = JSON.parse( "{" + adjustmentOptions + "}" );
+		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
 	} catch ( err ) {
 
 		// If the JSON is not valid, do not incorporate weather adjustment options
-		adjustmentOptions = false;
+		adjustmentOptions = undefined;
 	}
 
 	let coordinates: GeoCoordinates;
@@ -399,8 +422,8 @@ exports.getWateringData = async function( req, res ) {
 	} else if ( filters.gps.test( location ) ) {
 
 		// Handle GPS coordinates by storing each coordinate in an array
-		location = location.split( "," );
-		coordinates = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
+		const splitLocation: string[] = location.split( "," );
+		coordinates = [ parseFloat( splitLocation[ 0 ] ), parseFloat( splitLocation[ 1 ] ) ];
 		location = coordinates;
 
 	} else {
@@ -419,7 +442,7 @@ exports.getWateringData = async function( req, res ) {
 
 	// Continue with the weather request
 	const wateringData: OWMWateringData | TimeData = await getOWMWateringData( coordinates );
-	finishRequest(wateringData);
+	finishRequest( wateringData );
 };
 
 /**
@@ -459,9 +482,14 @@ async function httpRequest( url: string ): Promise< string > {
 	} );
 }
 
-// Checks to make sure an array contains the keys provided and returns true or false
-function validateValues( keys, array ) {
-	var key;
+/**
+ * Checks if the specified object contains numeric values for each of the specified keys.
+ * @param keys A list of keys to validate exist on the specified object.
+ * @param obj The object to check.
+ * @return A boolean indicating if the object has numeric values for all of the specified keys.
+ */
+function validateValues( keys: string[], obj: object ): boolean {
+	let key: string;
 
 	for ( key in keys ) {
 		if ( !keys.hasOwnProperty( key ) ) {
@@ -470,7 +498,7 @@ function validateValues( keys, array ) {
 
 		key = keys[ key ];
 
-		if ( !array.hasOwnProperty( key ) || typeof array[ key ] !== "number" || isNaN( array[ key ] ) || array[ key ] === null || array[ key ] === -999 ) {
+		if ( !obj.hasOwnProperty( key ) || typeof obj[ key ] !== "number" || isNaN( obj[ key ] ) || obj[ key ] === null || obj[ key ] === -999 ) {
 			return false;
 		}
 	}
@@ -513,10 +541,14 @@ function getTimezone( time: number | string, useMinutes: boolean = false ): numb
 	}
 }
 
-// Converts IP string to integer
-function ipToInt( ip ) {
-    ip = ip.split( "." );
-    return ( ( ( ( ( ( +ip[ 0 ] ) * 256 ) + ( +ip[ 1 ] ) ) * 256 ) + ( +ip[ 2 ] ) ) * 256 ) + ( +ip[ 3 ] );
+/**
+ * Converts an IP address string to an integer.
+ * @param ip The string representation of the IP address.
+ * @return The integer representation of the IP address.
+ */
+function ipToInt( ip: string ): number {
+    const split = ip.split( "." );
+    return ( ( ( ( ( ( +split[ 0 ] ) * 256 ) + ( +split[ 1 ] ) ) * 256 ) + ( +split[ 2 ] ) ) * 256 ) + ( +split[ 3 ] );
 }
 
 /**
@@ -583,4 +615,21 @@ interface OWMWateringData extends TimeData {
 	precip: number;
 	/** A boolean indicating if it is currently raining. */
 	raining: boolean;
+}
+
+interface AdjustmentOptions {
+	/** Base humidity (as a percentage). */
+	bh?: number;
+	/** Base temperature (in Fahrenheit). */
+	bt?: number;
+	/** Base precipitation (in inches). */
+	br?: number;
+	/** The percentage to weight the humidity factor by. */
+	h?: number;
+	/** The percentage to weight the temperature factor by. */
+	t?: number;
+	/** The percentage to weight the precipitation factor by. */
+	r?: number;
+	/** The rain delay to use (in hours). */
+	d?: number;
 }
