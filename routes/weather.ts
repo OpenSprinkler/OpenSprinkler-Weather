@@ -1,3 +1,5 @@
+import * as express	from "express";
+
 var http		= require( "http" ),
 	SunCalc		= require( "suncalc" ),
 	moment		= require( "moment-timezone" ),
@@ -252,40 +254,34 @@ function checkWeatherRestriction( adjustmentValue, weather ) {
 	return false;
 }
 
-exports.getWeatherData = async function( req, res ) {
-	var location = req.query.loc;
+exports.getWeatherData = async function( req: express.Request, res: express.Response ) {
+	const location: string = getParameter(req.query.loc);
+	let coordinates: GeoCoordinates;
 
 	if ( filters.gps.test( location ) ) {
 
 		// Handle GPS coordinates by storing each coordinate in an array
-		location = location.split( "," );
-		location = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
-
-		// Continue with the weather request
-		const weatherData: OWMWeatherData | TimeData = await getOWMWeatherData( location );
-		res.json( {
-			...weatherData,
-			location: location
-		} );
+		const split: string[] = location.split( "," );
+		coordinates = [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
 	} else {
 
 		// Attempt to resolve provided location to GPS coordinates when it does not match
 		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
-		let coordinates: GeoCoordinates;
 		try {
 			coordinates = await resolveCoordinates( location );
 		} catch (err) {
 			res.send( "Error: Unable to resolve location" );
 			return;
 		}
-
-		location = coordinates;
-		const weatherData: OWMWeatherData | TimeData = await getOWMWeatherData( location );
-		res.json( {
-			...weatherData,
-			location: location
-		} );
     }
+
+	// Continue with the weather request
+	const weatherData: OWMWeatherData | TimeData = await getOWMWeatherData( coordinates );
+
+	res.json( {
+		...weatherData,
+		location: coordinates
+	} );
 };
 
 // API Handler when using the weatherX.py where X represents the
@@ -522,6 +518,23 @@ function ipToInt( ip ) {
     ip = ip.split( "." );
     return ( ( ( ( ( ( +ip[ 0 ] ) * 256 ) + ( +ip[ 1 ] ) ) * 256 ) + ( +ip[ 2 ] ) ) * 256 ) + ( +ip[ 3 ] );
 }
+
+/**
+ * Returns a single value for a header/query parameter. If passed a single string, the same string will be returned. If
+ * an array of strings is passed, the first value will be returned. If this value is null/undefined, an empty string
+ * will be returned instead.
+ * @param parameter An array of parameters or a single parameter value.
+ * @return The first element in the array of parameter or the single parameter provided.
+ */
+function getParameter( parameter: string | string[] ): string {
+	if ( Array.isArray( parameter ) ) {
+		parameter = parameter[0];
+	}
+
+	// Return an empty string if the parameter is undefined.
+	return parameter || "";
+}
+
 
 /** Geographic coordinates. The 1st element is the latitude, and the 2nd element is the longitude. */
 type GeoCoordinates = [number, number];
