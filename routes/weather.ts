@@ -1,6 +1,8 @@
 import * as express	from "express";
+import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData } from "../types";
 
 const http		= require( "http" ),
+	local		= require( "./local"),
 	SunCalc		= require( "suncalc" ),
 	moment		= require( "moment-timezone" ),
 	geoTZ	 	= require( "geo-tz" ),
@@ -15,45 +17,51 @@ const http		= require( "http" ),
 	};
 
 /**
- * Uses the Weather Underground API to resolve a location name (ZIP code, city name, country name, etc.) to geographic
- * coordinates.
- * @param location A zip code or partial city/country name.
+ * Resolves a location description to geographic coordinates.
+ * @param location A partial zip/city/country or a coordinate pair.
  * @return A promise that will be resolved with the coordinates of the best match for the specified location, or
  * rejected with an error message if unable to resolve the location.
  */
 async function resolveCoordinates( location: string ): Promise< GeoCoordinates > {
 
-	// Generate URL for autocomplete request
-	const url = "http://autocomplete.wunderground.com/aq?h=0&query=" +
-		encodeURIComponent( location );
-
-	let data;
-	try {
-		data = await getData( url );
-	} catch (err) {
-		// If the request fails, indicate no data was found.
-		throw "An API error occurred while attempting to resolve location";
-	}
-
-	// Check if the data is valid
-	if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
-
-		// If it is, reply with an array containing the GPS coordinates
-		return [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ];
-	} else {
-
-		// Otherwise, indicate no data was found
+	if ( filters.pws.test( location ) ) {
 		throw "Unable to resolve location";
+	} else if ( filters.gps.test( location ) ) {
+		const split: string[] = location.split( "," );
+		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
+	} else {
+		// Generate URL for autocomplete request
+		const url = "http://autocomplete.wunderground.com/aq?h=0&query=" +
+			encodeURIComponent( location );
+
+		let data;
+		try {
+			data = await httpJSONRequest( url );
+		} catch (err) {
+			// If the request fails, indicate no data was found.
+			throw "An API error occurred while attempting to resolve location";
+		}
+
+		// Check if the data is valid
+		if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
+
+			// If it is, reply with an array containing the GPS coordinates
+			return [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ];
+		} else {
+
+			// Otherwise, indicate no data was found
+			throw "Unable to resolve location";
+		}
 	}
 }
 
 /**
- * Makes an HTTP GET request to the specified URL and parses the JSON response body.
+ * Makes an HTTP/HTTPS GET request to the specified URL and parses the JSON response body.
  * @param url The URL to fetch.
  * @return A Promise that will be resolved the with parsed response body if the request succeeds, or will be rejected
  * with an Error if the request or JSON parsing fails.
  */
-async function getData( url: string ): Promise< any > {
+async function httpJSONRequest(url: string ): Promise< any > {
 	try {
 		const data: string = await httpRequest(url);
 		return JSON.parse(data);
@@ -66,17 +74,17 @@ async function getData( url: string ): Promise< any > {
 /**
  * Retrieves weather data necessary for watering level calculations from the OWM API.
  * @param coordinates The coordinates to retrieve the watering data for.
- * @return A Promise that will be resolved with OWMWateringData if the API calls succeed, or undefined if an
- * error occurs while retrieving the weather data.
+ * @return A Promise that will be resolved with WateringData if the API calls succeed, or resolved with undefined
+ * if an error occurs while retrieving the weather data.
  */
-async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< OWMWateringData > {
+async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
 	const OWM_API_KEY = process.env.OWM_API_KEY,
 		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
 
 	// Perform the HTTP request to retrieve the weather data
 	let forecast;
 	try {
-		forecast = await getData( forecastUrl );
+		forecast = await httpJSONRequest( forecastUrl );
 	} catch (err) {
 		// Indicate watering data could not be retrieved if an API error occurs.
 		return undefined;
@@ -109,18 +117,18 @@ async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< OWMWa
 /**
  * Retrieves the current weather data from OWM for usage in the mobile app.
  * @param coordinates The coordinates to retrieve the weather for
- * @return A Promise that will be resolved with the OWMWeatherData if the API calls succeed, or undefined if
- * an error occurs while retrieving the weather data.
+ * @return A Promise that will be resolved with the WeatherData if the API calls succeed, or resolved with undefined
+ * if an error occurs while retrieving the weather data.
  */
-async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< OWMWeatherData > {
+async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 	const OWM_API_KEY = process.env.OWM_API_KEY,
 		currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ],
 		forecastDailyUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
 
 	let current, forecast;
 	try {
-		current = await getData( currentUrl );
-		forecast = await getData( forecastDailyUrl );
+		current = await httpJSONRequest( currentUrl );
+		forecast = await httpJSONRequest( forecastDailyUrl );
 	} catch (err) {
 		// Indicate watering data could not be retrieved if an API error occurs.
 		return undefined;
@@ -131,7 +139,7 @@ async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< OWMWea
 		return undefined;
 	}
 
-	const weather: OWMWeatherData = {
+	const weather: WeatherData = {
 		temp:  parseInt( current.main.temp ),
 		humidity: parseInt( current.main.humidity ),
 		wind: parseInt( current.wind.speed ),
@@ -157,6 +165,15 @@ async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< OWMWea
 	}
 
 	return weather;
+}
+
+/**
+ * Retrieves weather data necessary for watering level calculations from the a local record.
+ * @param coordinates The coordinates to retrieve the watering data for.
+ * @return A Promise that will be resolved with WateringData.
+ */
+async function getLocalWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
+	return local.getLocalWeather();
 }
 
 /**
@@ -189,7 +206,7 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  * @param wateringData The weather to use to calculate watering percentage.
  * @return The percentage that watering should be scaled by, or -1 if an invalid adjustmentMethod was provided.
  */
-function calculateWeatherScale( adjustmentMethod: number, adjustmentOptions: AdjustmentOptions, wateringData: OWMWateringData ): number {
+function calculateWeatherScale( adjustmentMethod: number, adjustmentOptions: AdjustmentOptions, wateringData: WateringData ): number {
 
 	// Zimmerman method
 	if ( adjustmentMethod === 1 ) {
@@ -244,7 +261,7 @@ function calculateWeatherScale( adjustmentMethod: number, adjustmentOptions: Adj
  * @param weather Watering data to use to determine if any restrictions apply.
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
-function checkWeatherRestriction( adjustmentValue: number, weather: OWMWateringData ): boolean {
+function checkWeatherRestriction( adjustmentValue: number, weather: WateringData ): boolean {
 
 	const californiaRestriction = ( adjustmentValue >> 7 ) & 1;
 
@@ -263,28 +280,23 @@ function checkWeatherRestriction( adjustmentValue: number, weather: OWMWateringD
 
 exports.getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
+
+	if ( !location ) {
+		res.send( "Error: Unable to resolve location" );
+		return;
+	}
+
 	let coordinates: GeoCoordinates;
-
-	if ( filters.gps.test( location ) ) {
-
-		// Handle GPS coordinates by storing each coordinate in an array
-		const split: string[] = location.split( "," );
-		coordinates = [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
-	} else {
-
-		// Attempt to resolve provided location to GPS coordinates when it does not match
-		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
-		try {
-			coordinates = await resolveCoordinates( location );
-		} catch (err) {
-			res.send( "Error: Unable to resolve location" );
-			return;
-		}
-    }
+	try {
+		coordinates = await resolveCoordinates( location );
+	} catch (err) {
+		res.send( "Error: Unable to resolve location" );
+		return;
+	}
 
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
-	const weatherData: OWMWeatherData = await getOWMWeatherData( coordinates );
+	const weatherData: WeatherData = await getOWMWeatherData( coordinates );
 
 	res.json( {
 		...timeData,
@@ -359,11 +371,16 @@ exports.getWateringData = async function( req: express.Request, res: express.Res
 		}
 
 		location = coordinates;
-    }
+	}
 
 	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
-	const wateringData: OWMWateringData = await getOWMWateringData( coordinates );
+	let wateringData: WateringData;
+	if ( local.useLocalWeather() ) {
+		wateringData = await getLocalWateringData( coordinates );
+	} else {
+		wateringData = await getOWMWateringData(coordinates);
+	}
 
 
 	// Process data to retrieve the resulting scale, sunrise/sunset, timezone,
@@ -419,6 +436,10 @@ exports.getWateringData = async function( req: express.Request, res: express.Res
 			raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
 		}
 	};
+
+	if ( local.useLocalWeather() ) {
+		console.log( "OpenSprinkler Weather Response: %s", JSON.stringify( data ) );
+	}
 
 	// Return the response to the client in the requested format
 	if ( outputFormat === "json" ) {
@@ -556,71 +577,4 @@ function getParameter( parameter: string | string[] ): string {
 
 	// Return an empty string if the parameter is undefined.
 	return parameter || "";
-}
-
-
-/** Geographic coordinates. The 1st element is the latitude, and the 2nd element is the longitude. */
-type GeoCoordinates = [number, number];
-
-interface TimeData {
-	/** The UTC offset, in minutes. This uses POSIX offsets, which are the negation of typically used offsets
-	 * (https://github.com/eggert/tz/blob/2017b/etcetera#L36-L42).
-	 */
-	timezone: number;
-	/** The time of sunrise, in minutes from UTC midnight. */
-	sunrise: number;
-	/** The time of sunset, in minutes from UTC midnight. */
-	sunset: number;
-}
-
-interface OWMWeatherData {
-	/** The current temperature (in Fahrenheit). */
-	temp: number;
-	/** The current humidity (as a percentage). */
-	humidity: number;
-	wind: number;
-	description: string;
-	icon: string;
-	region: string;
-	city: string;
-	minTemp: number;
-	maxTemp: number;
-	precip: number;
-	forecast: OWMWeatherDataForecast[]
-}
-
-interface OWMWeatherDataForecast {
-	temp_min: number;
-	temp_max: number;
-	date: number;
-	icon: string;
-	description: string;
-}
-
-interface OWMWateringData {
-	/** The average forecasted temperature over the next 30 hours (in Fahrenheit). */
-	temp: number;
-	/** The average forecasted humidity over the next 30 hours (as a percentage). */
-	humidity: number;
-	/** The forecasted total precipitation over the next 30 hours (in inches). */
-	precip: number;
-	/** A boolean indicating if it is currently raining. */
-	raining: boolean;
-}
-
-interface AdjustmentOptions {
-	/** Base humidity (as a percentage). */
-	bh?: number;
-	/** Base temperature (in Fahrenheit). */
-	bt?: number;
-	/** Base precipitation (in inches). */
-	br?: number;
-	/** The percentage to weight the humidity factor by. */
-	h?: number;
-	/** The percentage to weight the temperature factor by. */
-	t?: number;
-	/** The percentage to weight the precipitation factor by. */
-	r?: number;
-	/** The rain delay to use (in hours). */
-	d?: number;
 }
