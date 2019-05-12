@@ -6,7 +6,8 @@ import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
 import * as local from "./local";
-import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData } from "../types";
+import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData, WeatherProvider } from "../types";
+const weatherProvider: WeatherProvider = require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default;
 
 // Define regex filters to match against location
 const filters = {
@@ -62,7 +63,7 @@ async function resolveCoordinates( location: string ): Promise< GeoCoordinates >
  * @return A Promise that will be resolved the with parsed response body if the request succeeds, or will be rejected
  * with an Error if the request or JSON parsing fails.
  */
-async function httpJSONRequest(url: string ): Promise< any > {
+export async function httpJSONRequest(url: string ): Promise< any > {
 	try {
 		const data: string = await httpRequest(url);
 		return JSON.parse(data);
@@ -70,102 +71,6 @@ async function httpJSONRequest(url: string ): Promise< any > {
 		// Reject the promise if there was an error making the request or parsing the JSON.
 		throw err;
 	}
-}
-
-/**
- * Retrieves weather data necessary for watering level calculations from the OWM API.
- * @param coordinates The coordinates to retrieve the watering data for.
- * @return A Promise that will be resolved with WateringData if the API calls succeed, or resolved with undefined
- * if an error occurs while retrieving the weather data.
- */
-async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-	const OWM_API_KEY = process.env.OWM_API_KEY,
-		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
-
-	// Perform the HTTP request to retrieve the weather data
-	let forecast;
-	try {
-		forecast = await httpJSONRequest( forecastUrl );
-	} catch (err) {
-		// Indicate watering data could not be retrieved if an API error occurs.
-		return undefined;
-	}
-
-	// Indicate watering data could not be retrieved if the forecast data is incomplete.
-	if ( !forecast || !forecast.list ) {
-		return undefined;
-	}
-
-	let totalTemp = 0,
-		totalHumidity = 0,
-		totalPrecip = 0;
-
-	const periods = Math.min(forecast.list.length, 10);
-	for ( let index = 0; index < periods; index++ ) {
-		totalTemp += parseFloat( forecast.list[ index ].main.temp );
-		totalHumidity += parseInt( forecast.list[ index ].main.humidity );
-		totalPrecip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
-	}
-
-	return {
-		temp: totalTemp / periods,
-		humidity: totalHumidity / periods,
-		precip: totalPrecip / 25.4,
-		raining: ( forecast.list[ 0 ].rain ? ( parseFloat( forecast.list[ 0 ].rain[ "3h" ] || 0 ) > 0 ) : false )
-	};
-}
-
-/**
- * Retrieves the current weather data from OWM for usage in the mobile app.
- * @param coordinates The coordinates to retrieve the weather for
- * @return A Promise that will be resolved with the WeatherData if the API calls succeed, or resolved with undefined
- * if an error occurs while retrieving the weather data.
- */
-async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
-	const OWM_API_KEY = process.env.OWM_API_KEY,
-		currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ],
-		forecastDailyUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
-
-	let current, forecast;
-	try {
-		current = await httpJSONRequest( currentUrl );
-		forecast = await httpJSONRequest( forecastDailyUrl );
-	} catch (err) {
-		// Indicate watering data could not be retrieved if an API error occurs.
-		return undefined;
-	}
-
-	// Indicate watering data could not be retrieved if the forecast data is incomplete.
-	if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
-		return undefined;
-	}
-
-	const weather: WeatherData = {
-		temp:  parseInt( current.main.temp ),
-		humidity: parseInt( current.main.humidity ),
-		wind: parseInt( current.wind.speed ),
-		description: current.weather[0].description,
-		icon: current.weather[0].icon,
-
-		region: forecast.city.country,
-		city: forecast.city.name,
-		minTemp: parseInt( forecast.list[ 0 ].temp.min ),
-		maxTemp: parseInt( forecast.list[ 0 ].temp.max ),
-		precip: ( forecast.list[ 0 ].rain ? parseFloat( forecast.list[ 0 ].rain || 0 ) : 0 ) / 25.4,
-		forecast: []
-	};
-
-	for ( let index = 0; index < forecast.list.length; index++ ) {
-		weather.forecast.push( {
-			temp_min: parseInt( forecast.list[ index ].temp.min ),
-			temp_max: parseInt( forecast.list[ index ].temp.max ),
-			date: parseInt( forecast.list[ index ].dt ),
-			icon: forecast.list[ index ].weather[ 0 ].icon,
-			description: forecast.list[ index ].weather[ 0 ].description
-		} );
-	}
-
-	return weather;
 }
 
 /**
@@ -298,7 +203,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
-	const weatherData: WeatherData = await getOWMWeatherData( coordinates );
+	const weatherData: WeatherData = await weatherProvider.getWeatherData( coordinates );
 
 	res.json( {
 		...timeData,
@@ -381,7 +286,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	if ( local.useLocalWeather() ) {
 		wateringData = await getLocalWateringData( coordinates );
 	} else {
-		wateringData = await getOWMWateringData(coordinates);
+		wateringData = await weatherProvider.getWateringData(coordinates);
 	}
 
 
