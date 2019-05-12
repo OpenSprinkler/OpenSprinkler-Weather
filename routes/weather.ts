@@ -1,21 +1,21 @@
-import * as express	from "express";
+import * as express from "express";
+import * as http from "http";
+import * as https from "https";
+import * as SunCalc from "suncalc";
+import * as moment from "moment-timezone";
+import * as geoTZ from "geo-tz";
+
+import * as local from "./local";
 import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData } from "../types";
 
-const http		= require( "http" ),
-	https		= require ( "https" ),
-	local		= require( "./local"),
-	SunCalc		= require( "suncalc" ),
-	moment		= require( "moment-timezone" ),
-	geoTZ	 	= require( "geo-tz" ),
-
-	// Define regex filters to match against location
-	filters		= {
-		gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
-		pws: /^(?:pws|icao|zmw):/,
-		url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
-		time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
-		timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
-	};
+// Define regex filters to match against location
+const filters = {
+	gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
+	pws: /^(?:pws|icao|zmw):/,
+	url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
+	time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
+	timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
+};
 
 /**
  * Resolves a location description to geographic coordinates.
@@ -174,7 +174,8 @@ async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< Weathe
  * @return A Promise that will be resolved with WateringData.
  */
 async function getLocalWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-	return local.getLocalWeather();
+	// TODO is this type assertion safe?
+	return local.getLocalWeather() as WateringData;
 }
 
 /**
@@ -279,7 +280,7 @@ function checkWeatherRestriction( adjustmentValue: number, weather: WateringData
 	return false;
 }
 
-exports.getWeatherData = async function( req: express.Request, res: express.Response ) {
+export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
 
 	if ( !location ) {
@@ -309,7 +310,7 @@ exports.getWeatherData = async function( req: express.Request, res: express.Resp
 // API Handler when using the weatherX.py where X represents the
 // adjustment method which is encoded to also carry the watering
 // restriction and therefore must be decoded
-exports.getWateringData = async function( req: express.Request, res: express.Response ) {
+export const getWateringData = async function( req: express.Request, res: express.Response ) {
 
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
