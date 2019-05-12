@@ -2,6 +2,7 @@ import * as express	from "express";
 import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData } from "../types";
 
 const http		= require( "http" ),
+	https		= require ( "https" ),
 	local		= require( "./local"),
 	SunCalc		= require( "suncalc" ),
 	moment		= require( "moment-timezone" ),
@@ -458,7 +459,7 @@ exports.getWateringData = async function( req: express.Request, res: express.Res
 };
 
 /**
- * Makes an HTTP GET request to the specified URL and returns the response body.
+ * Makes an HTTP/HTTPS GET request to the specified URL and returns the response body.
  * @param url The URL to fetch.
  * @return A Promise that will be resolved the with response body if the request succeeds, or will be rejected with an
  * Error if the request fails.
@@ -467,14 +468,15 @@ async function httpRequest( url: string ): Promise< string > {
 	return new Promise< any >( ( resolve, reject ) => {
 
 		const splitUrl: string[] = url.match( filters.url );
+		const isHttps = url.startsWith("https");
 
 		const options = {
 			host: splitUrl[ 1 ],
-			port: splitUrl[ 2 ] || 80,
+			port: splitUrl[ 2 ] || ( isHttps ? 443 : 80 ),
 			path: splitUrl[ 3 ]
 		};
 
-		http.get( options, ( response ) => {
+		( isHttps ? https : http ).get( options, ( response ) => {
 			let data = "";
 
 			// Reassemble the data as it comes in
