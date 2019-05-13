@@ -8,7 +8,7 @@ import * as local from "./routes/local";
 const packageJson = require( "../package.json" );
 
 let	host	= process.env.HOST || "127.0.0.1",
-	port	= process.env.PORT || 3000;
+	port	= parseInt( process.env.PORT ) || 3000;
 
 export let pws = process.env.PWS || "none";
 export const app = express();
@@ -16,7 +16,7 @@ export const app = express();
 if ( !process.env.HOST || !process.env.PORT || !process.env.LOCAL_PWS ) {
 	dotenv.load();
 	host = process.env.HOST || host;
-	port = process.env.PORT || port;
+	port = parseInt( process.env.PORT ) || port;
 	pws = process.env.PWS || pws;
 }
 
@@ -46,8 +46,8 @@ app.use( function( req, res ) {
 } );
 
 // Start listening on the service port
-app.listen( +port, host, function() {
-	console.log( "%s now listening on %s:%s", packageJson.description, host, port );
+app.listen( port, host, function() {
+	console.log( "%s now listening on %s:%d", packageJson.description, host, port );
 
 	if (pws !== "none" ) {
 		console.log( "%s now listening for local weather stream", packageJson.description );
