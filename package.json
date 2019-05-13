@@ -32,8 +32,9 @@
     "hippie": "^0.5.2",
     "istanbul": "^0.4.5",
     "mocha": "^5.2.0",
-    "node-watch": "^0.6.2",
     "nock": "^9.6.1",
+    "node-watch": "^0.6.2",
+    "nodemon": "^1.19.0",
     "typescript": "^3.4.5"
   }
 }
