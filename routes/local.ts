@@ -1,18 +1,22 @@
-var CronJob = require( "cron" ).CronJob,
-	server = require( "../server.js" ),
-	today = {}, yesterday = {},
-	count = { temp: 0, humidity: 0 },
-	current_date = new Date(),
-	last_bucket;
+import * as express	from "express";
 
-function sameDay(d1, d2) {
+const CronJob = require( "cron" ).CronJob,
+	server = require( "../server.js" ),
+	count = { temp: 0, humidity: 0 };
+
+let	today: PWSStatus = {},
+	yesterday: PWSStatus = {},
+	last_bucket: Date,
+	current_date: Date = new Date();
+
+function sameDay(d1: Date, d2: Date): boolean {
 	return d1.getFullYear() === d2.getFullYear() &&
 			d1.getMonth() === d2.getMonth() &&
 			d1.getDate() === d2.getDate();
 }
 
-exports.captureWUStream = function( req, res ) {
-	var prev, curr;
+exports.captureWUStream = function( req: express.Request, res: express.Response ) {
+	let prev: number, curr: number;
 
 	if ( !( "dateutc" in req.query ) || !sameDay( current_date, new Date( req.query.dateutc + "Z") )) {
 		res.send( "Error: Bad date range\n" );
@@ -39,12 +43,12 @@ exports.captureWUStream = function( req, res ) {
 	res.send( "success\n" );
 };
 
-exports.useLocalWeather = function() {
+exports.useLocalWeather = function(): boolean {
 	return server.pws !== "none" ? true : false;
 };
 
-exports.getLocalWeather = function() {
-	var result = {};
+exports.getLocalWeather = function(): LocalWeather {
+	const result: LocalWeather = {};
 
 	// Use today's weather if we dont have information for yesterday yet (i.e. on startup)
 	Object.assign( result, today, yesterday);
@@ -55,7 +59,7 @@ exports.getLocalWeather = function() {
 
 	// PWS report "buckets" so consider it still raining if last bucket was less than an hour ago
 	if ( last_bucket !== undefined ) {
-		result.raining = ( ( Date.now() - last_bucket ) / 1000 / 60 / 60 < 1 );
+		result.raining = ( ( Date.now() - +last_bucket ) / 1000 / 60 / 60 < 1 );
 	}
 
 	return result;
@@ -68,3 +72,14 @@ new CronJob( "0 0 0 * * *", function() {
 	count.temp = 0; count.humidity = 0;
 	current_date = new Date();
 }, null, true );
+
+
+interface PWSStatus {
+	temp?: number;
+	humidity?: number;
+	precip?: number;
+}
+
+export interface LocalWeather extends PWSStatus {
+	raining?: boolean;
+}

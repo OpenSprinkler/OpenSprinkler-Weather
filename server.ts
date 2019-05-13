@@ -1,12 +1,13 @@
-var package		= require( "./package.json" ),
-	express		= require( "express" ),
-	weather		= require( "./routes/weather.js" ),
-	local		= require( "./routes/local.js" ),
-	cors		= require( "cors" ),
-	host		= process.env.HOST || "127.0.0.1",
-	port		= process.env.PORT || 3000,
-	pws			= process.env.PWS || "none",
-	app			= express();
+const packageJson	= require( "../package.json" ),
+	express			= require( "express" ),
+	weather			= require( "./routes/weather.js" ),
+	local			= require( "./routes/local.js" ),
+	cors			= require( "cors" );
+
+let	host	= process.env.HOST || "127.0.0.1",
+	port	= process.env.PORT || 3000,
+	pws		= process.env.PWS || "none",
+	app		= express();
 
 if ( !process.env.HOST || !process.env.PORT || !process.env.LOCAL_PWS ) {
 	require( "dotenv" ).load();
@@ -31,7 +32,7 @@ if ( pws === "WU" ) {
 }
 
 app.get( "/", function( req, res ) {
-	res.send( package.description + " v" + package.version );
+	res.send( packageJson.description + " v" + packageJson.version );
 } );
 
 // Handle 404 error
@@ -42,10 +43,10 @@ app.use( function( req, res ) {
 
 // Start listening on the service port
 app.listen( port, host, function() {
-	console.log( "%s now listening on %s:%s", package.description, host, port );
+	console.log( "%s now listening on %s:%s", packageJson.description, host, port );
 
 	if (pws !== "none" ) {
-		console.log( "%s now listening for local weather stream", package.description );
+		console.log( "%s now listening for local weather stream", packageJson.description );
 	}
 } );
 

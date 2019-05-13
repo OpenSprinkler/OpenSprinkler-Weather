@@ -4,6 +4,8 @@ node_modules
 coverage/*
 npm-debug.log
 .vscode
+.idea
+js
 
 # Elastic Beanstalk Files
 .elasticbeanstalk/*

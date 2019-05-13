@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "noImplicitReturns": true,
+    "noEmitOnError": true,
+    "outDir": "js/",
+    "sourceMap": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "server.ts",
+    "types.ts",
+    "routes/**/*"
+  ]
+}
