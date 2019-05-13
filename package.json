@@ -16,7 +16,6 @@
     "dotenv": "^6.2.0",
     "express": "^4.16.4",
     "geo-tz": "^4.0.2",
-    "grunt": "^1.0.4",
     "moment-timezone": "^0.5.25",
     "suncalc": "^1.8.0"
   },
@@ -29,7 +28,6 @@
     "@types/node": "^10.14.6",
     "@types/suncalc": "^1.8.0",
     "chai": "^4.2.0",
-    "grunt-contrib-jshint": "^1.1.0",
     "hippie": "^0.5.2",
     "istanbul": "^0.4.5",
     "mocha": "^5.2.0",
