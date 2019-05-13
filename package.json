@@ -6,15 +6,16 @@
   "scripts": {
     "test": "mocha --exit test",
     "start": "node js/server",
+    "dev": "node scripts/serve",
+    "bundle": "npm run compile && zip weather.zip -r js package.json package-lock.json",
     "compile": "tsc"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "cron": "^1.3.0",
-    "dotenv": "^6.2.0",
+    "dotenv": "^8.0.0",
     "express": "^4.16.4",
-    "geo-tz": "^4.0.2",
-    "grunt": "^1.0.4",
+    "geo-tz": "^5.0.4",
     "moment-timezone": "^0.5.25",
     "suncalc": "^1.8.0"
   },
@@ -27,11 +28,12 @@
     "@types/node": "^10.14.6",
     "@types/suncalc": "^1.8.0",
     "chai": "^4.2.0",
-    "grunt-contrib-jshint": "^1.1.0",
     "hippie": "^0.5.2",
     "istanbul": "^0.4.5",
     "mocha": "^5.2.0",
     "nock": "^9.6.1",
+    "node-watch": "^0.6.2",
+    "nodemon": "^1.19.0",
     "typescript": "^3.4.5"
   }
 }
