@@ -5,7 +5,8 @@
   "repository": "https://github.com/OpenSprinkler/Weather-Weather",
   "scripts": {
     "test": "mocha --exit test",
-    "start": "node js/server",
+    "start": "npm run compile && node js/server",
+    "dev": "node scripts/serve",
     "compile": "tsc"
   },
   "dependencies": {
@@ -31,6 +32,7 @@
     "hippie": "^0.5.2",
     "istanbul": "^0.4.5",
     "mocha": "^5.2.0",
+    "node-watch": "^0.6.2",
     "nock": "^9.6.1",
     "typescript": "^3.4.5"
   }
