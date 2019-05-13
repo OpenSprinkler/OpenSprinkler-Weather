@@ -48,14 +48,19 @@ export interface WeatherDataForecast {
     description: string;
 }
 
+/**
+ * Data from a 24 hour window that is used to calculate how watering levels should be scaled. This should ideally use
+ * historic data from the past day, but may also use forecasted data for the next day if historical data is not
+ * available.
+ */
 export interface WateringData {
-    /** The average forecasted temperature over the next 30 hours (in Fahrenheit). */
+    /** The average temperature over the window (in Fahrenheit). */
     temp: number;
-    /** The average forecasted humidity over the next 30 hours (as a percentage). */
+    /** The average humidity over the window (as a percentage). */
     humidity: number;
-    /** The forecasted total precipitation over the next 30 hours (in inches). */
+    /** The total precipitation over the window (in inches). */
     precip: number;
-    /** A boolean indicating if it is currently raining. */
+    /** A boolean indicating if it is raining at the time that this data was retrieved. */
     raining: boolean;
 }
 
