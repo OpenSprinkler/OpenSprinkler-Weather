@@ -14,7 +14,7 @@ export let pws = process.env.PWS || "none";
 export const app = express();
 
 if ( !process.env.HOST || !process.env.PORT || !process.env.LOCAL_PWS ) {
-	dotenv.load();
+	dotenv.config();
 	host = process.env.HOST || host;
 	port = parseInt( process.env.PORT ) || port;
 	pws = process.env.PWS || pws;
