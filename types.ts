@@ -17,22 +17,34 @@ export interface WeatherData {
     temp: number;
     /** The current humidity (as a percentage). */
     humidity: number;
+    /** The current wind speed (in miles per hour). */
     wind: number;
+    /** A human-readable description of the weather. */
     description: string;
+    /** An icon ID that represents the current weather. This will be used in http://openweathermap.org/img/w/<ICON_ID>.png */
     icon: string;
     region: string;
     city: string;
+    /** The forecasted minimum temperature for the current day (in Fahrenheit). */
     minTemp: number;
+    /** The forecasted minimum temperature for the current day (in Fahrenheit). */
     maxTemp: number;
+    /** The forecasted total precipitation for the current day (in inches). */
     precip: number;
     forecast: WeatherDataForecast[]
 }
 
+/** The forecasted weather for a specific day in the future. */
 export interface WeatherDataForecast {
+    /** The forecasted minimum temperature for this day (in Fahrenheit). */
     temp_min: number;
+    /** The forecasted maximum temperature for this day (in Fahrenheit). */
     temp_max: number;
+    /** The timestamp of the day this forecast is for (in Unix epoch seconds). */
     date: number;
+    /** An icon ID that represents the weather at this forecast window. This will be used in http://openweathermap.org/img/w/<ICON_ID>.png */
     icon: string;
+    /** A human-readable description of the weather. */
     description: string;
 }
 

@@ -337,7 +337,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		eip:		ipToInt( remoteAddress ),
 		// TODO this may need to be changed (https://github.com/OpenSprinkler/OpenSprinkler-Weather/pull/11#issuecomment-491037948)
 		rawData:    {
-			h: wateringData ? wateringData.humidity : null,
+			h: wateringData ? Math.round( wateringData.humidity * 100) / 100 : null,
 			p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
 			t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
 			raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
