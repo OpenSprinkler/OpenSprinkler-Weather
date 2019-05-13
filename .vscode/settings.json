@@ -1,0 +1,19 @@
+{
+    "editor.insertSpaces": true,
+    "git.promptToSaveFilesBeforeCommit": true,
+    "files.trimTrailingWhitespace": true,
+    "files.exclude": {
+        ".git": true,
+        "node_modules": true,
+        "package-lock.json": true,
+        "js": true,
+        "weather.zip": true
+    },
+    "search.exclude": {
+        ".git": true,
+        "node_modules": true,
+        "package-lock.json": true,
+        "js": true,
+        "weather.zip": true
+    }
+}
