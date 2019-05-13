@@ -17,22 +17,34 @@ export interface WeatherData {
     temp: number;
     /** The current humidity (as a percentage). */
     humidity: number;
+    /** The current wind speed (in miles per hour). */
     wind: number;
+    /** A human-readable description of the weather. */
     description: string;
+    /** An icon ID that represents the current weather. This will be used in http://openweathermap.org/img/w/<ICON_ID>.png */
     icon: string;
     region: string;
     city: string;
+    /** The forecasted minimum temperature for the current day (in Fahrenheit). */
     minTemp: number;
+    /** The forecasted minimum temperature for the current day (in Fahrenheit). */
     maxTemp: number;
+    /** The forecasted total precipitation for the current day (in inches). */
     precip: number;
     forecast: WeatherDataForecast[]
 }
 
+/** The forecasted weather for a specific day in the future. */
 export interface WeatherDataForecast {
+    /** The forecasted minimum temperature for this day (in Fahrenheit). */
     temp_min: number;
+    /** The forecasted maximum temperature for this day (in Fahrenheit). */
     temp_max: number;
+    /** The timestamp of the day this forecast is for (in Unix epoch seconds). */
     date: number;
+    /** An icon ID that represents the weather at this forecast window. This will be used in http://openweathermap.org/img/w/<ICON_ID>.png */
     icon: string;
+    /** A human-readable description of the weather. */
     description: string;
 }
 
@@ -62,4 +74,22 @@ export interface AdjustmentOptions {
     r?: number;
     /** The rain delay to use (in hours). */
     d?: number;
+}
+
+export interface WeatherProvider {
+    /**
+     * Retrieves weather data necessary for watering level calculations.
+     * @param coordinates The coordinates to retrieve the watering data for.
+     * @return A Promise that will be resolved with the WateringData if it is successfully retrieved,
+     * or resolved with undefined if an error occurs while retrieving the WateringData.
+     */
+    getWateringData( coordinates : GeoCoordinates ): Promise< WateringData >;
+
+    /**
+     * Retrieves the current weather data for usage in the mobile app.
+     * @param coordinates The coordinates to retrieve the weather for
+     * @return A Promise that will be resolved with the WeatherData if it is successfully retrieved,
+     * or resolved with undefined if an error occurs while retrieving the WeatherData.
+     */
+    getWeatherData( coordinates : GeoCoordinates ): Promise< WeatherData >;
 }

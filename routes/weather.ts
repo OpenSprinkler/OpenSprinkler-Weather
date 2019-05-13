@@ -1,20 +1,22 @@
-import * as express	from "express";
-import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData } from "../types";
+import * as express from "express";
+import * as http from "http";
+import * as https from "https";
+import * as SunCalc from "suncalc";
+import * as moment from "moment-timezone";
+import * as geoTZ from "geo-tz";
 
-const http		= require( "http" ),
-	local		= require( "./local"),
-	SunCalc		= require( "suncalc" ),
-	moment		= require( "moment-timezone" ),
-	geoTZ	 	= require( "geo-tz" ),
+import * as local from "./local";
+import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData, WeatherProvider } from "../types";
+const weatherProvider: WeatherProvider = require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default;
 
-	// Define regex filters to match against location
-	filters		= {
-		gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
-		pws: /^(?:pws|icao|zmw):/,
-		url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
-		time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
-		timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
-	};
+// Define regex filters to match against location
+const filters = {
+	gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
+	pws: /^(?:pws|icao|zmw):/,
+	url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
+	time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
+	timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
+};
 
 /**
  * Resolves a location description to geographic coordinates.
@@ -61,7 +63,7 @@ async function resolveCoordinates( location: string ): Promise< GeoCoordinates >
  * @return A Promise that will be resolved the with parsed response body if the request succeeds, or will be rejected
  * with an Error if the request or JSON parsing fails.
  */
-async function httpJSONRequest(url: string ): Promise< any > {
+export async function httpJSONRequest(url: string ): Promise< any > {
 	try {
 		const data: string = await httpRequest(url);
 		return JSON.parse(data);
@@ -72,108 +74,13 @@ async function httpJSONRequest(url: string ): Promise< any > {
 }
 
 /**
- * Retrieves weather data necessary for watering level calculations from the OWM API.
- * @param coordinates The coordinates to retrieve the watering data for.
- * @return A Promise that will be resolved with WateringData if the API calls succeed, or resolved with undefined
- * if an error occurs while retrieving the weather data.
- */
-async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-	const OWM_API_KEY = process.env.OWM_API_KEY,
-		forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
-
-	// Perform the HTTP request to retrieve the weather data
-	let forecast;
-	try {
-		forecast = await httpJSONRequest( forecastUrl );
-	} catch (err) {
-		// Indicate watering data could not be retrieved if an API error occurs.
-		return undefined;
-	}
-
-	// Indicate watering data could not be retrieved if the forecast data is incomplete.
-	if ( !forecast || !forecast.list ) {
-		return undefined;
-	}
-
-	let totalTemp = 0,
-		totalHumidity = 0,
-		totalPrecip = 0;
-
-	const periods = Math.min(forecast.list.length, 10);
-	for ( let index = 0; index < periods; index++ ) {
-		totalTemp += parseFloat( forecast.list[ index ].main.temp );
-		totalHumidity += parseInt( forecast.list[ index ].main.humidity );
-		totalPrecip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
-	}
-
-	return {
-		temp: totalTemp / periods,
-		humidity: totalHumidity / periods,
-		precip: totalPrecip / 25.4,
-		raining: ( forecast.list[ 0 ].rain ? ( parseFloat( forecast.list[ 0 ].rain[ "3h" ] || 0 ) > 0 ) : false )
-	};
-}
-
-/**
- * Retrieves the current weather data from OWM for usage in the mobile app.
- * @param coordinates The coordinates to retrieve the weather for
- * @return A Promise that will be resolved with the WeatherData if the API calls succeed, or resolved with undefined
- * if an error occurs while retrieving the weather data.
- */
-async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
-	const OWM_API_KEY = process.env.OWM_API_KEY,
-		currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ],
-		forecastDailyUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
-
-	let current, forecast;
-	try {
-		current = await httpJSONRequest( currentUrl );
-		forecast = await httpJSONRequest( forecastDailyUrl );
-	} catch (err) {
-		// Indicate watering data could not be retrieved if an API error occurs.
-		return undefined;
-	}
-
-	// Indicate watering data could not be retrieved if the forecast data is incomplete.
-	if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
-		return undefined;
-	}
-
-	const weather: WeatherData = {
-		temp:  parseInt( current.main.temp ),
-		humidity: parseInt( current.main.humidity ),
-		wind: parseInt( current.wind.speed ),
-		description: current.weather[0].description,
-		icon: current.weather[0].icon,
-
-		region: forecast.city.country,
-		city: forecast.city.name,
-		minTemp: parseInt( forecast.list[ 0 ].temp.min ),
-		maxTemp: parseInt( forecast.list[ 0 ].temp.max ),
-		precip: ( forecast.list[ 0 ].rain ? parseFloat( forecast.list[ 0 ].rain || 0 ) : 0 ) / 25.4,
-		forecast: []
-	};
-
-	for ( let index = 0; index < forecast.list.length; index++ ) {
-		weather.forecast.push( {
-			temp_min: parseInt( forecast.list[ index ].temp.min ),
-			temp_max: parseInt( forecast.list[ index ].temp.max ),
-			date: parseInt( forecast.list[ index ].dt ),
-			icon: forecast.list[ index ].weather[ 0 ].icon,
-			description: forecast.list[ index ].weather[ 0 ].description
-		} );
-	}
-
-	return weather;
-}
-
-/**
  * Retrieves weather data necessary for watering level calculations from the a local record.
  * @param coordinates The coordinates to retrieve the watering data for.
  * @return A Promise that will be resolved with WateringData.
  */
 async function getLocalWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-	return local.getLocalWeather();
+	// TODO is this type assertion safe?
+	return local.getLocalWeather() as WateringData;
 }
 
 /**
@@ -278,7 +185,7 @@ function checkWeatherRestriction( adjustmentValue: number, weather: WateringData
 	return false;
 }
 
-exports.getWeatherData = async function( req: express.Request, res: express.Response ) {
+export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
 
 	if ( !location ) {
@@ -296,7 +203,7 @@ exports.getWeatherData = async function( req: express.Request, res: express.Resp
 
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
-	const weatherData: WeatherData = await getOWMWeatherData( coordinates );
+	const weatherData: WeatherData = await weatherProvider.getWeatherData( coordinates );
 
 	res.json( {
 		...timeData,
@@ -308,7 +215,7 @@ exports.getWeatherData = async function( req: express.Request, res: express.Resp
 // API Handler when using the weatherX.py where X represents the
 // adjustment method which is encoded to also carry the watering
 // restriction and therefore must be decoded
-exports.getWateringData = async function( req: express.Request, res: express.Response ) {
+export const getWateringData = async function( req: express.Request, res: express.Response ) {
 
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
@@ -379,7 +286,7 @@ exports.getWateringData = async function( req: express.Request, res: express.Res
 	if ( local.useLocalWeather() ) {
 		wateringData = await getLocalWateringData( coordinates );
 	} else {
-		wateringData = await getOWMWateringData(coordinates);
+		wateringData = await weatherProvider.getWateringData(coordinates);
 	}
 
 
@@ -430,7 +337,7 @@ exports.getWateringData = async function( req: express.Request, res: express.Res
 		eip:		ipToInt( remoteAddress ),
 		// TODO this may need to be changed (https://github.com/OpenSprinkler/OpenSprinkler-Weather/pull/11#issuecomment-491037948)
 		rawData:    {
-			h: wateringData ? wateringData.humidity : null,
+			h: wateringData ? Math.round( wateringData.humidity * 100) / 100 : null,
 			p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
 			t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
 			raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
@@ -458,7 +365,7 @@ exports.getWateringData = async function( req: express.Request, res: express.Res
 };
 
 /**
- * Makes an HTTP GET request to the specified URL and returns the response body.
+ * Makes an HTTP/HTTPS GET request to the specified URL and returns the response body.
  * @param url The URL to fetch.
  * @return A Promise that will be resolved the with response body if the request succeeds, or will be rejected with an
  * Error if the request fails.
@@ -467,14 +374,15 @@ async function httpRequest( url: string ): Promise< string > {
 	return new Promise< any >( ( resolve, reject ) => {
 
 		const splitUrl: string[] = url.match( filters.url );
+		const isHttps = url.startsWith("https");
 
 		const options = {
 			host: splitUrl[ 1 ],
-			port: splitUrl[ 2 ] || 80,
+			port: splitUrl[ 2 ] || ( isHttps ? 443 : 80 ),
 			path: splitUrl[ 3 ]
 		};
 
-		http.get( options, ( response ) => {
+		( isHttps ? https : http ).get( options, ( response ) => {
 			let data = "";
 
 			// Reassemble the data as it comes in

@@ -1,8 +1,9 @@
 import * as express	from "express";
+import { CronJob } from "cron";
 
-const CronJob = require( "cron" ).CronJob,
-	server = require( "../server.js" ),
-	count = { temp: 0, humidity: 0 };
+import * as server from "../server";
+
+const count = { temp: 0, humidity: 0 };
 
 let	today: PWSStatus = {},
 	yesterday: PWSStatus = {},
@@ -15,7 +16,7 @@ function sameDay(d1: Date, d2: Date): boolean {
 			d1.getDate() === d2.getDate();
 }
 
-exports.captureWUStream = function( req: express.Request, res: express.Response ) {
+export const captureWUStream = function( req: express.Request, res: express.Response ) {
 	let prev: number, curr: number;
 
 	if ( !( "dateutc" in req.query ) || !sameDay( current_date, new Date( req.query.dateutc + "Z") )) {
@@ -43,11 +44,11 @@ exports.captureWUStream = function( req: express.Request, res: express.Response 
 	res.send( "success\n" );
 };
 
-exports.useLocalWeather = function(): boolean {
+export const useLocalWeather = function(): boolean {
 	return server.pws !== "none" ? true : false;
 };
 
-exports.getLocalWeather = function(): LocalWeather {
+export const getLocalWeather = function(): LocalWeather {
 	const result: LocalWeather = {};
 
 	// Use today's weather if we dont have information for yesterday yet (i.e. on startup)

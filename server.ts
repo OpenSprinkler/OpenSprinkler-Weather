@@ -1,18 +1,22 @@
-const packageJson	= require( "../package.json" ),
-	express			= require( "express" ),
-	weather			= require( "./routes/weather.js" ),
-	local			= require( "./routes/local.js" ),
-	cors			= require( "cors" );
+import * as express from "express";
+import * as cors from "cors";
+import * as dotenv from "dotenv";
+
+import * as weather from "./routes/weather";
+import * as local from "./routes/local";
+
+const packageJson = require( "../package.json" );
 
 let	host	= process.env.HOST || "127.0.0.1",
-	port	= process.env.PORT || 3000,
-	pws		= process.env.PWS || "none",
-	app		= express();
+	port	= parseInt( process.env.PORT ) || 3000;
+
+export let pws = process.env.PWS || "none";
+export const app = express();
 
 if ( !process.env.HOST || !process.env.PORT || !process.env.LOCAL_PWS ) {
-	require( "dotenv" ).config();
+	dotenv.config();
 	host = process.env.HOST || host;
-	port = process.env.PORT || port;
+	port = parseInt( process.env.PORT ) || port;
 	pws = process.env.PWS || pws;
 }
 
@@ -43,12 +47,9 @@ app.use( function( req, res ) {
 
 // Start listening on the service port
 app.listen( port, host, function() {
-	console.log( "%s now listening on %s:%s", packageJson.description, host, port );
+	console.log( "%s now listening on %s:%d", packageJson.description, host, port );
 
 	if (pws !== "none" ) {
 		console.log( "%s now listening for local weather stream", packageJson.description );
 	}
 } );
-
-exports.app = app;
-exports.pws = pws;
