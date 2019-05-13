@@ -174,7 +174,8 @@ function checkWeatherRestriction( adjustmentValue: number, weather: WateringData
 
 	if ( californiaRestriction ) {
 
-		// TODO this is currently checking if the forecasted precipitation over the next 30 hours is >0.1 inches
+		// TODO depending on which WeatherProvider is used, this might be checking if rain is forecasted in th next 24
+		// 	hours rather than checking if it has rained in the past 48 hours.
 		// If the California watering restriction is in use then prevent watering
 		// if more then 0.1" of rain has accumulated in the past 48 hours
 		if ( weather.precip > 0.1 ) {
