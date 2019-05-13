@@ -23,7 +23,7 @@ async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< Water
 	  totalHumidity = 0,
 	  totalPrecip = 0;
 
-	const periods = Math.min(forecast.list.length, 10);
+	const periods = Math.min(forecast.list.length, 8);
 	for ( let index = 0; index < periods; index++ ) {
 		totalTemp += parseFloat( forecast.list[ index ].main.temp );
 		totalHumidity += parseInt( forecast.list[ index ].main.humidity );

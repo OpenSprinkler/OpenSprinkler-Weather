@@ -1,35 +1,29 @@
+import * as moment from "moment-timezone";
+
 import { GeoCoordinates, WateringData, WeatherData, WeatherProvider } from "../../types";
 import { httpJSONRequest } from "../weather";
 
 async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-	const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
-		forecastUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]}`;
+	// The Unix timestamp of 24 hours ago.
+	const timestamp: number = moment().subtract( 1, "day" ).unix();
 
-	let forecast;
+	const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
+		historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}`;
+
+	let historicData;
 	try {
-		forecast = await httpJSONRequest( forecastUrl );
+		historicData = await httpJSONRequest( historicUrl );
 	} catch (err) {
 		// Indicate watering data could not be retrieved if an API error occurs.
 		return undefined;
 	}
 
-
-	let totalTemp = 0,
-		totalHumidity = 0,
-		totalPrecip = 0;
-
-	const periods = Math.min( forecast.hourly.data.length, 30 );
-	for ( let index = 0; index < periods; index++ ) {
-		totalTemp += forecast.hourly.data[ index ].temperature;
-		totalHumidity += forecast.hourly.data[ index ].humidity * 100;
-		totalPrecip += forecast.hourly.data[ index ].precipIntensity;
-	}
-
 	return {
-		temp: totalTemp / periods,
-		humidity: totalHumidity / periods,
-		precip: totalPrecip,
-		raining: forecast.currently.precipType === "rain"
+		// Calculate average temperature for the day using hourly data.
+		temp : historicData.hourly.data.reduce( ( sum, hourlyData ) => sum + hourlyData.temperature, 0 ) / historicData.hourly.data.length,
+		humidity: historicData.daily.data[ 0 ].humidity * 100,
+		precip: historicData.daily.data[ 0 ].precipIntensity * 24,
+		raining: historicData.currently.precipType === "rain"
 	};
 }
 
