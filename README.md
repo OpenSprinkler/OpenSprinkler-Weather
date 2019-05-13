@@ -52,20 +52,36 @@ pi@OSPi:~ $ git clone https://github.com/OpenSprinkler/OpenSprinkler-Weather.git
 pi@OSPi:~ $ cd weather
 pi@OSPi:~/weather $ npm install
 ```
-**Step 4:** Go to `https://openweathermap.org/appid` to register with OpenWeatherMaps and obtain an API key that is needed to request weather information.
+**Step 4:** Configure the weather server to use either the OpenWeatherMap API or the Dark Sky API
+
+* **Step 4a:** If you want to use the Open Weather Map API, go to `https://openweathermap.org/appid` to register with OpenWeatherMaps and obtain an API key that is needed to request weather information.
+
+* **Step 4b:** If you want to use the Dark Sky API, go to `https://darksky.net/dev` to register with Dark Sky and obtain an API key that is needed to request weather information. 
 
 **Step 5:** The file .env is used by the weather server to specify the interface and port to listen on for OpenSprinkler Firmware weather requests. We need to create a new file, .env, and enter some configuration details.
 ```
 pi@OSPi:~/weather $ nano .env
 ```
 
-Add the following three lines to the .env file so that the weather server is configured to listen for weather requests and generate OWM calls. Using 0.0.0.0 as the host interfaces allows you to access the service from another machine to test. Alternatively, set HOST to “localhost” if you want to limit weather service access to only applications running on the local machine. Make sure to use the OWM API key that was provided during registration.
+Add the following two lines to the .env file so that the weather server is configured to listen for weather requests. Using 0.0.0.0 as the host interfaces allows you to access the service from another machine to test. Alternatively, set HOST to “localhost” if you want to limit weather service access to only applications running on the local machine.
 
 ```
 HOST=0.0.0.0
 PORT=3000
-OWM_API_KEY=<YOUR KEY>
 ```
+
+If you want to use the OWM API, also add the following two lines to the .env file:
+```
+WEATHER_PROVIDER=OWM 
+OWM_API_KEY=<YOUR OWM KEY>
+```
+
+If you want to use the Dark Sky API instead, add these two lines to the .env file:
+```
+WEATHER_PROVIDER=DarkSky
+DARKSKY_API_KEY=<YOUR DARK SKY KEY>
+```
+
 
 **Step 6:** Setup the Weather Server to start whenever the Raspberry Pi boots up using the built-in service manager:
 
