@@ -10,7 +10,7 @@ let	host	= process.env.HOST || "127.0.0.1",
 	app		= express();
 
 if ( !process.env.HOST || !process.env.PORT || !process.env.LOCAL_PWS ) {
-	require( "dotenv" ).load();
+	require( "dotenv" ).config();
 	host = process.env.HOST || host;
 	port = process.env.PORT || port;
 	pws = process.env.PWS || pws;
