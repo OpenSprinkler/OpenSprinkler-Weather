@@ -5,9 +5,9 @@
   "repository": "https://github.com/OpenSprinkler/Weather-Weather",
   "scripts": {
     "test": "mocha --exit test",
-    "start": "npm run compile && node js/server",
+    "start": "node js/server",
     "dev": "node scripts/serve",
-    "bundle": "zip weather.zip -r js package.json package-lock.json",
+    "bundle": "npm run compile && zip weather.zip -r js package.json package-lock.json",
     "compile": "tsc"
   },
   "dependencies": {
