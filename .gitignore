@@ -6,8 +6,3 @@ npm-debug.log
 .vscode
 .idea
 js
-
-# Elastic Beanstalk Files
-.elasticbeanstalk/*
-!.elasticbeanstalk/*.cfg.yml
-!.elasticbeanstalk/*.global.yml
