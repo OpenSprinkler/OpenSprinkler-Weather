@@ -1,8 +1,6 @@
 import * as express	from "express";
 import { CronJob } from "cron";
 
-import * as server from "../server";
-
 const count = { temp: 0, humidity: 0 };
 
 let	today: PWSStatus = {},
@@ -45,7 +43,7 @@ export const captureWUStream = function( req: express.Request, res: express.Resp
 };
 
 export const useLocalWeather = function(): boolean {
-	return server.pws !== "none" ? true : false;
+	return process.env.PWS ? true : false;
 };
 
 export const getLocalWeather = function(): LocalWeather {
