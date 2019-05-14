@@ -10,30 +10,29 @@ const replies = require( '../test/replies.json' );
 
 const location = '01002';
 
-describe('/:method endpoint', () => {
-    beforeEach(() => {
+describe('Watering Data', () => {
+    it('OpenWeatherMap Lookup (Adjustment Method 0, Location 01002)', async () => {
         nock( 'http://api.openweathermap.org' )
             .filteringPath( function() { return "/"; } )
             .get( "/" )
             .reply( 200, replies[location].OWMData );
-    });
 
-    it('Information lookup without weather lookup', async () => {
-        const expressMocks = createExpressMocks(location);
+
+        const expressMocks = createExpressMocks(0, location);
         await getWateringData(expressMocks.request, expressMocks.response);
         expect( expressMocks.response._getJSON() ).to.eql( expected.noWeather[location] );
     });
 });
 
-function createExpressMocks(location: string) {
+function createExpressMocks(method: number, location: string) {
     const request = new MockExpressRequest({
         method: 'GET',
-        url: '/0?loc=' + location,
+        url: `/${method}?loc=${location}`,
         query: {
             loc: location,
             format: 'json'
         },
-        params: [ 0 ],
+        params: [ method ],
         headers: {
             'x-forwarded-for': '127.0.0.1'
         }
