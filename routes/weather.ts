@@ -26,8 +26,12 @@ const filters = {
  */
 async function resolveCoordinates( location: string ): Promise< GeoCoordinates > {
 
+	if ( !location ) {
+		throw "No location specified";
+	}
+
 	if ( filters.pws.test( location ) ) {
-		throw "Unable to resolve location";
+		throw "Weather Underground is discontinued";
 	} else if ( filters.gps.test( location ) ) {
 		const split: string[] = location.split( "," );
 		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
@@ -52,7 +56,7 @@ async function resolveCoordinates( location: string ): Promise< GeoCoordinates >
 		} else {
 
 			// Otherwise, indicate no data was found
-			throw "Unable to resolve location";
+			throw "No match found for specified location";
 		}
 	}
 }
@@ -189,16 +193,11 @@ function checkWeatherRestriction( adjustmentValue: number, weather: WateringData
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
 
-	if ( !location ) {
-		res.send( "Error: Unable to resolve location" );
-		return;
-	}
-
 	let coordinates: GeoCoordinates;
 	try {
 		coordinates = await resolveCoordinates( location );
 	} catch (err) {
-		res.send( "Error: Unable to resolve location" );
+		res.send(`Error: Unable to resolve location (${err})`);
 		return;
 	}
 
@@ -229,12 +228,6 @@ export const getWateringData = async function( req: express.Request, res: expres
 		adjustmentOptions: AdjustmentOptions;
 
 
-	// Exit if no location is provided
-	if ( !location ) {
-		res.send( "Error: No location provided." );
-		return;
-	}
-
 	// X-Forwarded-For header may contain more than one IP address and therefore
 	// the string is split against a comma and the first value is selected
 	remoteAddress = remoteAddress.split( "," )[ 0 ];
@@ -253,33 +246,15 @@ export const getWateringData = async function( req: express.Request, res: expres
 		adjustmentOptions = undefined;
 	}
 
+	// Attempt to resolve provided location to GPS coordinates.
 	let coordinates: GeoCoordinates;
-	// Parse location string
-	if ( filters.pws.test( location ) ) {
-
-		// Weather Underground is discontinued and PWS or ICAO cannot be resolved
-		res.send( "Error: Weather Underground is discontinued." );
+	try {
+		coordinates = await resolveCoordinates( location );
+	} catch (err) {
+		res.send(`Error: Unable to resolve location (${err})`);
 		return;
-	} else if ( filters.gps.test( location ) ) {
-
-		// Handle GPS coordinates by storing each coordinate in an array
-		const splitLocation: string[] = location.split( "," );
-		coordinates = [ parseFloat( splitLocation[ 0 ] ), parseFloat( splitLocation[ 1 ] ) ];
-		location = coordinates;
-
-	} else {
-
-		// Attempt to resolve provided location to GPS coordinates when it does not match
-		// a GPS coordinate or Weather Underground location using Weather Underground autocomplete
-		try {
-			coordinates = await resolveCoordinates( location );
-		} catch (err) {
-			res.send("Error: Unable to resolve location");
-			return;
-		}
-
-		location = coordinates;
 	}
+	location = coordinates;
 
 	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
