@@ -1,6 +1,6 @@
+import { config } from "dotenv"
 import * as express from "express";
 import * as cors from "cors";
-import * as dotenv from "dotenv";
 
 import * as weather from "./routes/weather";
 import * as local from "./routes/local";
@@ -12,13 +12,6 @@ let	host	= process.env.HOST || "127.0.0.1",
 
 export let pws = process.env.PWS || "none";
 export const app = express();
-
-if ( !process.env.HOST || !process.env.PORT || !process.env.LOCAL_PWS ) {
-	dotenv.config();
-	host = process.env.HOST || host;
-	port = parseInt( process.env.PORT ) || port;
-	pws = process.env.PWS || pws;
-}
 
 // Handle requests matching /weatherID.py where ID corresponds to the
 // weather adjustment method selector.
