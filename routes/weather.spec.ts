@@ -12,11 +12,7 @@ const location = '01002';
 
 describe('Watering Data', () => {
     it('OpenWeatherMap Lookup (Adjustment Method 0, Location 01002)', async () => {
-        nock( 'http://api.openweathermap.org' )
-            .filteringPath( function() { return "/"; } )
-            .get( "/" )
-            .reply( 200, replies[location].OWMData );
-
+        mockOWM();
 
         const expressMocks = createExpressMocks(0, location);
         await getWateringData(expressMocks.request, expressMocks.response);
@@ -24,11 +20,7 @@ describe('Watering Data', () => {
     });
 
     it('OpenWeatherMap Lookup (Adjustment Method 1, Location 01002)', async () => {
-        nock( 'http://api.openweathermap.org' )
-            .filteringPath( function() { return "/"; } )
-            .get( "/" )
-            .reply( 200, replies[location].OWMData );
-
+        mockOWM();
 
         const expressMocks = createExpressMocks(1, location);
         await getWateringData(expressMocks.request, expressMocks.response);
@@ -56,4 +48,11 @@ function createExpressMocks(method: number, location: string) {
             request
         })
     }
+}
+
+function mockOWM() {
+    nock( 'http://api.openweathermap.org' )
+        .filteringPath( function() { return "/"; } )
+        .get( "/" )
+        .reply( 200, replies[location].OWMData );
 }
