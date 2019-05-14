@@ -22,6 +22,18 @@ describe('Watering Data', () => {
         await getWateringData(expressMocks.request, expressMocks.response);
         expect( expressMocks.response._getJSON() ).to.eql( expected.noWeather[location] );
     });
+
+    it('OpenWeatherMap Lookup (Adjustment Method 1, Location 01002)', async () => {
+        nock( 'http://api.openweathermap.org' )
+            .filteringPath( function() { return "/"; } )
+            .get( "/" )
+            .reply( 200, replies[location].OWMData );
+
+
+        const expressMocks = createExpressMocks(1, location);
+        await getWateringData(expressMocks.request, expressMocks.response);
+        expect( expressMocks.response._getJSON() ).to.eql( expected.adjustment1[location] );
+    });
 });
 
 function createExpressMocks(method: number, location: string) {
