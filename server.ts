@@ -1,4 +1,6 @@
-import { config } from "dotenv"
+import { config as dotenv_config } from "dotenv"
+dotenv_config();
+
 import * as express from "express";
 import * as cors from "cors";
 
