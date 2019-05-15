@@ -56,7 +56,7 @@ pi@OSPi:~/weather $ npm install
 
 * **Step 4a:** If you want to use the Open Weather Map API, go to `https://openweathermap.org/appid` to register with OpenWeatherMaps and obtain an API key that is needed to request weather information.
 
-* **Step 4b:** If you want to use the Dark Sky API, go to `https://darksky.net/dev` to register with Dark Sky and obtain an API key that is needed to request weather information. 
+* **Step 4b:** If you want to use the Dark Sky API, go to `https://darksky.net/dev` to register with Dark Sky and obtain an API key that is needed to request weather information.
 
 **Step 5:** The file .env is used by the weather server to specify the interface and port to listen on for OpenSprinkler Firmware weather requests. We need to create a new file, .env, and enter some configuration details.
 ```
@@ -72,7 +72,7 @@ PORT=3000
 
 If you want to use the OWM API, also add the following two lines to the .env file:
 ```
-WEATHER_PROVIDER=OWM 
+WEATHER_PROVIDER=OWM
 OWM_API_KEY=<YOUR OWM KEY>
 ```
 
@@ -96,7 +96,7 @@ Cut and paste the following lines into the weather.service file:
 Description=OpenSprinkler Weather Server
 
 [Service]
-ExecStart=/usr/bin/node /home/pi/weather/server.js
+ExecStart=/usr/bin/npm start
 WorkingDirectory=/home/pi/weather
 Restart=always
 RestartSec=10
@@ -222,7 +222,7 @@ The response text from the Weather Service server will be either "`success`" or 
 ---
 ## Setup a Raspberry Pi To Intercept PWS Information
 
-The following steps are based on a Raspberry Pi Zero W with an Ethernet/USB adapter to provide two network interfaces. The installation instructions below assume the PWS Internet Bridge has been connected into the Pi's ethernet port and that the Pi's WiFi interface is being used to connect with the Home Network. 
+The following steps are based on a Raspberry Pi Zero W with an Ethernet/USB adapter to provide two network interfaces. The installation instructions below assume the PWS Internet Bridge has been connected into the Pi's ethernet port and that the Pi's WiFi interface is being used to connect with the Home Network.
 
 **Step 1: Install Software and Basic Setup**
 
@@ -244,7 +244,7 @@ Uncomment the line "`# net.ipv4.ip_forward=1`" to look as follows and save the f
 ```
 net.ipv4.ip_forward=1
 ```
-We now have a pretty standard Raspberry Pi installation with the Pi connected to our Home Network via the WiFi interface. 
+We now have a pretty standard Raspberry Pi installation with the Pi connected to our Home Network via the WiFi interface.
 
 **Step 2: Configure the PWS Side of the Network**
 
