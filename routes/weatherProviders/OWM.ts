@@ -1,5 +1,6 @@
 import { GeoCoordinates, WateringData, WeatherData, WeatherProvider } from "../../types";
 import { httpJSONRequest } from "../weather";
+import * as moment from "moment-timezone";
 
 async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
 	const OWM_API_KEY = process.env.OWM_API_KEY,
@@ -19,12 +20,23 @@ async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< Water
 		return undefined;
 	}
 
+	// The Unix epoch seconds timestamp for the start of the next calendar day.
+	const tomorrowTimestamp: number = moment().add( 1, "day" ).startOf( "day" ).unix();
+	// The index where the forecast for the next calendar begins.
+	let startIndex: number;
+	for ( let index = 0; index < forecast.list.length; index++ ) {
+		if ( forecast.list[ index ].dt >= tomorrowTimestamp ){
+			startIndex = index;
+			break;
+		}
+	}
+
 	let totalTemp = 0,
 	  totalHumidity = 0,
 	  totalPrecip = 0;
 
-	const periods = Math.min(forecast.list.length, 8);
-	for ( let index = 0; index < periods; index++ ) {
+	const periods = Math.min(forecast.list.length - startIndex, 8);
+	for ( let index = startIndex; index < startIndex + periods; index++ ) {
 		totalTemp += parseFloat( forecast.list[ index ].main.temp );
 		totalHumidity += parseInt( forecast.list[ index ].main.humidity );
 		totalPrecip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
