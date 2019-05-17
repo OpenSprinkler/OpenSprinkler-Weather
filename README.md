@@ -47,10 +47,11 @@ pi@OSPi:~ $ rm node-v11.4.0-linux-armv6l.tar.gz
 pi@OSPi:~ $ git clone https://github.com/OpenSprinkler/OpenSprinkler-Weather.git weather
 ```
 
-**Step 3:** Install all of the dependencies using the Node Package Manager, npm, from within the weather project directory:
+**Step 3:** Install all of the dependencies using the Node Package Manager, npm, from within the weather project directory and transpile the TypeScript files to JavaScript:
 ```
 pi@OSPi:~ $ cd weather
 pi@OSPi:~/weather $ npm install
+pi@OSPi:~/weather $ npm run compile
 ```
 **Step 4:** Configure the weather server to use either the OpenWeatherMap API or the Dark Sky API
 
