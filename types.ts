@@ -97,4 +97,39 @@ export interface WeatherProvider {
      * or resolved with undefined if an error occurs while retrieving the WeatherData.
      */
     getWeatherData( coordinates : GeoCoordinates ): Promise< WeatherData >;
+
+    /**
+     * Retrieves the data necessary for calculating ETo.
+     * @param coordinates The coordinates to retrieve the data for.
+     * @param elevation The elevation above sea level of the watering site (in meters).
+     * @return A Promise that will be resolved with the EToData if it is successfully retrieved,
+     * or resolved with undefined if an error occurs while retrieving the EToData.
+     */
+    getEToData?( coordinates: GeoCoordinates, elevation: number ): Promise< EToData >;
+}
+
+/**
+ * Data used to calculate ETo. This data should be taken from a 24 hour time window.
+ */
+export interface EToData {
+    /** The minimum temperature over the time period (in Celsius). */
+    minTemp: number;
+    /** The maximum temperature over the time period (in Celsius). */
+    maxTemp: number;
+    /** The minimum relative humidity over the time period (as a percentage). */
+    minHumidity: number;
+    /** The maximum relative humidity over the time period (as a percentage). */
+    maxHumidity: number;
+    /** The number of hours that the sun was visible for throughout the day. */
+    sunshineHours: number;
+    /** The average wind speed over the time period (in meters per second). */
+    windSpeed: number;
+    /** The height the wind speed measurement was taken at (in meters). */
+    windSpeedMeasurementHeight: number;
+    /** The elevation above sea level of the watering site (in meters). */
+    elevation: number;
+    /** The day of the year between 1 (January 1) and 365/366 (December 31). */
+    dayOfYear: number;
+    /** The latitude of the watering site (in degrees). */
+    lat: number;
 }
