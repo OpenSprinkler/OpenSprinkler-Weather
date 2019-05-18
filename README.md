@@ -115,16 +115,14 @@ pi@OSPi:~/weather $ systemctl status weather.service
 
 The final line above checks that the service has been started and you should see the service marked as running.
 
-**Step 7:** You can now test that the service is running correctly from a Web Browser.
-
-Firstly, ensure that the Weather Service is up and running by navigating to the service (note: the default port was set to 3000 in the .env file):
+**Step 7:** You can now test that the service is running correctly from a Web Browser by navigating to the service (note: the default port was set to 3000 in the .env file):
 
 ```
 http://<Weather Service IP:PORT>/
 ```
 You should see "OpenSprinkler Weather Service" in response.
 
-Secondly, you can use the following request to see the watering level that the Weather Service calculates. Note: to be consistent, change the values of h, t and r to the % weightings and bh (as a %), bt (in F), bp (in inches) to the offsets from the Zimmerman config page in App.
+You can use the following request to see the watering level that the Weather Service calculates. Note: to be consistent, change the values of h, t and r to the % weightings and bh (as a %), bt (in F), bp (in inches) to the offsets from the Zimmerman config page in App.
 
 ```
 http://<Weather Service IP>:3000/weather1.py?loc=50,1&wto="\"h\":100,\"t\":100,\"r\":100,\"bh\":70,\"bt\":59,\"br\":0"
@@ -135,7 +133,13 @@ This will return a response similar to below with ```scale``` value equating to 
 &scale=20&rd=-1&tz=48&sunrise=268&sunset=1167&eip=3232235787&rawData={"h":47,"p":0,"t":54.4,"raining":0}
 ```
 
-**Step 8:** You will now need to configure your OpenSprinkler device to use the local version of the Weather Service rather than the Cloud version. On a web browser from your PC, go to `http://<your OSPi IP>:8080/su` and specify “localhost:3000” as the new location for the weather service.
+**Step 8:** You will now need to configure your OpenSprinkler device to use the local version of the Weather Service rather than the Cloud version.
+
+- For OS users, go to `http://<your OS IP>/su` on your web browser
+
+- For OSPi users, go to `http://<your OSPi IP>:8080/su` on your web browser
+
+In the **Weather** text field, specify the IP of your Weather Service server and Port, e.g. for OSPi users this might be “localhost:3000” if the Weather Service is running on the same Raspberry Pi.
 
 OpenSprinkler should now be connected to your local Weather Service for calculating rain delay and watering levels.
 
