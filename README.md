@@ -125,7 +125,7 @@ You should see "OpenSprinkler Weather Service" in response.
 You can use the following request to see the watering level that the Weather Service calculates. Note: to be consistent, change the values of h, t and r to the % weightings and bh (as a %), bt (in F), bp (in inches) to the offsets from the Zimmerman config page in App.
 
 ```
-http://<Weather Service IP>:3000/weather1.py?loc=50,1&wto="\"h\":100,\"t\":100,\"r\":100,\"bh\":70,\"bt\":59,\"br\":0"
+http://<Weather Service IP>:3000/weather1.py?loc=50,1&wto="h":100,"t":100,"r":100,"bh":70,"bt":59,"br":0
 ```
 
 This will return a response similar to below with ```scale``` value equating to the watering level and ```rawData``` reflecting the temp (F), humidity (%) and daily rainfall (inches) used in the zimmerman calc.
