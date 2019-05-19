@@ -242,8 +242,9 @@ export const getWateringData = async function( req: express.Request, res: expres
 		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
 	} catch ( err ) {
 
-		// If the JSON is not valid, do not incorporate weather adjustment options
-		adjustmentOptions = undefined;
+		// If the JSON is not valid then abort the claculation
+		res.send(`Error: Unable to parse options (${err})`);
+		return;
 	}
 
 	// Attempt to resolve provided location to GPS coordinates.
