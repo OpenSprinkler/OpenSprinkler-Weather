@@ -12,7 +12,9 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 		// Indicate watering data could not be retrieved if an API error occurs.
 		return undefined;
 	}
-
+if ( !historicData.currently || !historicData.hourly || !forecastData.hourly.data) {
+    return undefined;
+}
 	const periods = Math.min( 24, historicData.hourly.data.length );
 	const totals = { temp: 0, humidity: 0, precip: 0 };
 	for ( let index = 0; index < periods; index++ ) {
