@@ -56,13 +56,17 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 
 async function getDarkSkyWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 	const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
-		forecastUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]}`;
+		forecastUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]}?exclude=minutely,alerts,flags`;
 
 	let forecast;
 	try {
 		forecast = await httpJSONRequest( forecastUrl );
 	} catch (err) {
-		// Indicate watering data could not be retrieved if an API error occurs.
+		// Indicate weather data could not be retrieved if an API error occurs.
+		return undefined;
+	}
+
+	if ( !forecast.currently || !forecast.daily || !forecast.daily.data ) {
 		return undefined;
 	}
 
@@ -76,16 +80,16 @@ async function getDarkSkyWeatherData( coordinates: GeoCoordinates ): Promise< We
 
 		region: "",
 		city: "",
-		minTemp: Math.floor( forecast.daily.data[ 0 ].temperatureLow ),
-		maxTemp: Math.floor( forecast.daily.data[ 0 ].temperatureHigh ),
+		minTemp: Math.floor( forecast.daily.data[ 0 ].temperatureMin ),
+		maxTemp: Math.floor( forecast.daily.data[ 0 ].temperatureMax ),
 		precip: forecast.daily.data[ 0 ].precipIntensity * 24,
-		forecast: []
+		forecast: [ ]
 	};
 
 	for ( let index = 0; index < forecast.daily.data.length; index++ ) {
 		weather.forecast.push( {
-			temp_min: Math.floor( forecast.daily.data[ index ].temperatureLow ),
-			temp_max: Math.floor( forecast.daily.data[ index ].temperatureHigh ),
+			temp_min: Math.floor( forecast.daily.data[ index ].temperatureMin ),
+			temp_max: Math.floor( forecast.daily.data[ index ].temperatureMax ),
 			date: forecast.daily.data[ index ].time,
 			// TODO set this
 			icon: "",
