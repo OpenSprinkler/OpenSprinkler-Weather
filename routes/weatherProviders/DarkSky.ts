@@ -25,7 +25,7 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 		temp : totals.temp / periods,
 		humidity: totals.humidity / periods * 100,
 		precip: totals.precip,
-		raining: historicData.currently.precipType === "rain"
+		raining: historicData.hourly.data[0].precipIntensity > 0;
 	};
 }
 
