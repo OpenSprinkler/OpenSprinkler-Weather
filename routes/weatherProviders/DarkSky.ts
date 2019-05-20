@@ -5,25 +5,52 @@ import { httpJSONRequest } from "../weather";
 
 async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
 	// The Unix timestamp of 24 hours ago.
-	const timestamp: number = moment().subtract( 1, "day" ).unix();
+	const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
+	const todayTimestamp: number = moment().unix();
 
 	const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
-		historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}`;
+		yesterdayUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${yesterdayTimestamp}?exclude=currently,minutely,daily,alerts,flags`,
+		todayUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${todayTimestamp}?exclude=currently,minutely,daily,alerts,flags`;
 
-	let historicData;
+	let yesterdayData, todayData;
 	try {
-		historicData = await httpJSONRequest( historicUrl );
+		yesterdayData = await httpJSONRequest( yesterdayUrl );
+		todayData = await httpJSONRequest( todayUrl );
 	} catch (err) {
 		// Indicate watering data could not be retrieved if an API error occurs.
 		return undefined;
 	}
 
+	if ( !todayData.hourly || !todayData.hourly.data || !yesterdayData.hourly || !yesterdayData.hourly.data ) {
+		return undefined;
+	}
+
+	// Fail if not enough data is available.
+	if ( yesterdayData.hourly.data.length + todayData.hourly.data.length < 24 ) {
+		return undefined;
+	}
+
+	const totals = { temp: 0, humidity: 0, precip: 0 };
+	// Sum data from the current calendar day.
+	const todayPeriods =  Math.min( 24, todayData.hourly.data.length );
+	for ( let index = todayPeriods - 1; index >= 0; index-- ) {
+		totals.temp += todayData.hourly.data[ index ].temperature;
+		totals.humidity += todayData.hourly.data[ index ].humidity;
+		totals.precip += todayData.hourly.data[ index ].precipIntensity
+	}
+
+	// Sum data from yesterday.
+	for ( let index = 24 - todayPeriods - 1; index >= 0; index-- ) {
+		totals.temp += yesterdayData.hourly.data[ index ].temperature;
+		totals.humidity += yesterdayData.hourly.data[ index ].humidity;
+		totals.precip += yesterdayData.hourly.data[ index ].precipIntensity
+	}
+
 	return {
-		// Calculate average temperature for the day using hourly data.
-		temp : historicData.hourly.data.reduce( ( sum, hourlyData ) => sum + hourlyData.temperature, 0 ) / historicData.hourly.data.length,
-		humidity: historicData.daily.data[ 0 ].humidity * 100,
-		precip: historicData.daily.data[ 0 ].precipIntensity * 24,
-		raining: historicData.currently.precipType === "rain"
+		temp : totals.temp / 24,
+		humidity: totals.humidity / 24 * 100,
+		precip: totals.precip,
+		raining: todayData.hourly.data[ todayData.hourly.data.length - 1 ].precipIntensity > 0
 	};
 }
 
