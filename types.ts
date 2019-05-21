@@ -120,8 +120,8 @@ export interface EToData {
     minHumidity: number;
     /** The maximum relative humidity over the time period (as a percentage). */
     maxHumidity: number;
-    /** The number of hours that the sun was visible for throughout the day. */
-    sunshineHours: number;
+    /** The solar radiation, accounting for cloud coverage (in megajoules per square meter per day). */
+    solarRadiation: number;
     /** The average wind speed over the time period (in meters per second). */
     windSpeed: number;
     /** The height the wind speed measurement was taken at (in meters). */

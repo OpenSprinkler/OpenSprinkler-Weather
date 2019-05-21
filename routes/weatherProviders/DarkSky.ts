@@ -71,6 +71,7 @@ async function getDarkSkyWeatherData( coordinates: GeoCoordinates ): Promise< We
 }
 
 async function getDarkSkyEToData( coordinates: GeoCoordinates, elevation: number ): Promise< EToData > {
+	// TODO use a rolling 24 hour window instead of fixed calendar days?
 	// The Unix epoch seconds timestamp of 24 hours ago.
 	const timestamp: number = moment().subtract( 1, "day" ).unix();
 
@@ -85,30 +86,31 @@ async function getDarkSkyEToData( coordinates: GeoCoordinates, elevation: number
 		return undefined;
 	}
 
-	const sunData = SunCalc.getTimes( new Date(timestamp * 1000), coordinates[ 0 ], coordinates[ 1 ] );
-	// The Unix epoch seconds timestamp of sunrise.
-	const sunriseTimestamp = sunData.sunrise.valueOf() / 1000;
-	// The Unix epoch seconds timestamp of sunset.
-	const sunsetTimestamp = sunData.sunset.valueOf() / 1000;
-	const sunshineHours = historicData.hourly.data.reduce( ( total, hour ) => {
-		// Calculate how much of this hour was during the daytime.
-		const daytimeFraction = Math.min( Math.max(
-			// Subtract the time between the start of the forecast hour and sunrise.
-			1 - Math.min( Math.max( 60 * 60 / ( sunriseTimestamp -  hour.time ), 0 ), 1 )
-			// Subtract the time between sunset and the end of the forecast hour.
-			- Math.min( Math.max( 60 * 60 / ( hour.time + 60 * 60 - sunsetTimestamp ), 0 ), 1 )
-		, 0), 1 );
+	// Approximate solar radiation using a formula from http://www.shodor.org/os411/courses/_master/tools/calculators/solarrad/
+	const solarRadiation = historicData.hourly.data.reduce( ( total, hour ) => {
+		const currPosition = SunCalc.getPosition( new Date( hour.time * 1000 ), coordinates[ 0 ], coordinates[ 1 ] );
+		// The Sun's position 1 hour ago.
+		const lastPosition = SunCalc.getPosition( new Date( hour.time * 1000 - 60 * 60 * 1000 ), coordinates[ 0 ], coordinates[ 1 ] );
+		const solarElevationAngle = ( currPosition.altitude + lastPosition.altitude ) / 2;
 
-		// Multiply the daytime fraction of the hour and the fraction of sunshine that wasn't blocked by clouds.
-		return total + daytimeFraction * ( 1 - hour.cloudCover );
-	}, 0);
+		// Calculate radiation and convert from watts to megajoules.
+		const clearSkyIsolation = ( 990 * Math.sin( solarElevationAngle ) - 30 ) * 0.0036;
+
+		// TODO include the radiation from hours where the sun is partially above the horizon.
+		// Skip hours where the sun was below the horizon.
+		if ( clearSkyIsolation <= 0 ) {
+			return total;
+		}
+
+		return total + clearSkyIsolation * ( 1 - 0.75 * Math.pow( hour.cloudCover, 3.4 ) );
+	}, 0 );
 
 	return {
 		minTemp: historicData.daily.data[ 0 ].temperatureMin,
 		maxTemp: historicData.daily.data[ 0 ].temperatureMax,
 		minHumidity: historicData.hourly.data.reduce( ( min, hour ) => Math.min( min, hour.humidity ), 1) * 100,
 		maxHumidity: historicData.hourly.data.reduce( ( max, hour ) => Math.max( max, hour.humidity ), 0) * 100,
-		sunshineHours: sunshineHours,
+		solarRadiation: solarRadiation,
 		windSpeed: historicData.daily.data[ 0 ].windSpeed,
 		// TODO find out what height wind speed measurements are actually taken at.
 		windSpeedMeasurementHeight: 2,

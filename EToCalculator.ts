@@ -45,9 +45,7 @@ export function calculateETo( etoData: EToData ): number {
 
 	const clearSkyRadiation = ( 0.75 + 2e-5 * etoData.elevation ) * extraterrestrialRadiation;
 
-	const daylightHours = 24 / Math.PI * sunsetHourAngle;
-
-	const solarRadiation = ( 0.25 + 0.5 * etoData.sunshineHours / daylightHours ) * extraterrestrialRadiation;
+	const solarRadiation = etoData.solarRadiation;
 
 	const netShortWaveRadiation = ( 1 - 0.23 ) * solarRadiation;
 
