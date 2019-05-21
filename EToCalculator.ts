@@ -55,7 +55,7 @@ export function calculateETo( etoData: EToData ): number {
 
 	const netRadiation = netShortWaveRadiation - netOutgoingLongWaveRadiation;
 
-	const radiationTerm = deltaTerm * netRadiation;
+	const radiationTerm = deltaTerm * 0.408 * netRadiation;
 
 	const windTerm = psiTerm * tempTerm * ( avgSaturationVaporPressure - actualVaporPressure );
 
