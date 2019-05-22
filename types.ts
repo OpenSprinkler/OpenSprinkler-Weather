@@ -92,7 +92,7 @@ export interface WeatherProvider {
      * @return A Promise that will be resolved with the WateringData if it is successfully retrieved,
      * or resolved with undefined if an error occurs while retrieving the WateringData.
      */
-    getWateringData( coordinates : GeoCoordinates ): Promise< WateringData >;
+    getWateringData?( coordinates : GeoCoordinates ): Promise< WateringData >;
 
     /**
      * Retrieves the current weather data for usage in the mobile app.
@@ -100,7 +100,7 @@ export interface WeatherProvider {
      * @return A Promise that will be resolved with the WeatherData if it is successfully retrieved,
      * or resolved with undefined if an error occurs while retrieving the WeatherData.
      */
-    getWeatherData( coordinates : GeoCoordinates ): Promise< WeatherData >;
+    getWeatherData?( coordinates : GeoCoordinates ): Promise< WeatherData >;
 }
 
-export type WeatherProviderId = "OWM" | "DarkSky";
+export type WeatherProviderId = "OWM" | "DarkSky" | "local";

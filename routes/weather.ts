@@ -5,7 +5,6 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import * as local from "./local";
 import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData, WeatherProvider } from "../types";
 import CompositeWeatherProvider from "./weatherProviders/CompositeWeatherProvider";
 
@@ -85,16 +84,6 @@ export async function httpJSONRequest(url: string ): Promise< any > {
 		// Reject the promise if there was an error making the request or parsing the JSON.
 		throw err;
 	}
-}
-
-/**
- * Retrieves weather data necessary for watering level calculations from the a local record.
- * @param coordinates The coordinates to retrieve the watering data for.
- * @return A Promise that will be resolved with WateringData.
- */
-async function getLocalWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-	// TODO is this type assertion safe?
-	return local.getLocalWeather() as WateringData;
 }
 
 /**
@@ -262,12 +251,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
-	let wateringData: WateringData;
-	if ( local.useLocalWeather() ) {
-		wateringData = await getLocalWateringData( coordinates );
-	} else {
-		wateringData = await weatherProvider.getWateringData(coordinates);
-	}
+	let wateringData: WateringData = await weatherProvider.getWateringData(coordinates);
 
 
 	// Process data to retrieve the resulting scale, sunrise/sunset, timezone,
@@ -327,7 +311,9 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 	};
 
-	if ( local.useLocalWeather() ) {
+	/* Note: The local WeatherProvider will never return undefined, so there's no need to worry about this condition
+		failing to be met if the local WeatherProvider is used but wateringData is falsy (since it will never happen). */
+	if ( wateringData && wateringData.weatherProvider === "local" ) {
 		console.log( "OpenSprinkler Weather Response: %s", JSON.stringify( data ) );
 	}
 
