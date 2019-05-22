@@ -1,5 +1,6 @@
 import * as express	from "express";
 import { CronJob } from "cron";
+import { GeoCoordinates, WateringData, WeatherProvider } from "../../types";
 
 const count = { temp: 0, humidity: 0 };
 
@@ -42,23 +43,18 @@ export const captureWUStream = function( req: express.Request, res: express.Resp
 	res.send( "success\n" );
 };
 
-export const useLocalWeather = function(): boolean {
-	return process.env.PWS ? true : false;
-};
-
-export const getLocalWeather = function(): LocalWeather {
-	const result: LocalWeather = {};
-
-	// Use today's weather if we dont have information for yesterday yet (i.e. on startup)
-	Object.assign( result, today, yesterday);
+export const getLocalWateringData = function(): WateringData {
+	const result: WateringData = {
+		...yesterday as WateringData,
+		// Use today's weather if we dont have information for yesterday yet (i.e. on startup)
+		...today,
+		// PWS report "buckets" so consider it still raining if last bucket was less than an hour ago
+		raining: last_bucket !== undefined ? ( ( Date.now() - +last_bucket ) / 1000 / 60 / 60 < 1 ) : undefined,
+		weatherProvider: "local"
+	};
 
 	if ( "precip" in yesterday && "precip" in today ) {
 		result.precip = yesterday.precip + today.precip;
-	}
-
-	// PWS report "buckets" so consider it still raining if last bucket was less than an hour ago
-	if ( last_bucket !== undefined ) {
-		result.raining = ( ( Date.now() - +last_bucket ) / 1000 / 60 / 60 < 1 );
 	}
 
 	return result;
@@ -79,6 +75,9 @@ interface PWSStatus {
 	precip?: number;
 }
 
-export interface LocalWeather extends PWSStatus {
-	raining?: boolean;
-}
+const LocalWeatherProvider: WeatherProvider = {
+	getWateringData: async function ( coordinates: GeoCoordinates ) {
+		return getLocalWateringData();
+	}
+};
+export default LocalWeatherProvider;

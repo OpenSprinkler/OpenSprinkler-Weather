@@ -5,9 +5,12 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import * as local from "./local";
 import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData, WeatherProvider } from "../types";
-const weatherProvider: WeatherProvider = require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default;
+import CompositeWeatherProvider from "./weatherProviders/CompositeWeatherProvider";
+
+const weatherProvider: WeatherProvider = new CompositeWeatherProvider(
+	( process.env.WEATHER_PROVIDER || "OWM" ).split( "," ).map( ( id ) => require( "./weatherProviders/" + id ).default )
+);
 
 // Define regex filters to match against location
 const filters = {
@@ -16,6 +19,12 @@ const filters = {
 	url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
 	time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
 	timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
+};
+
+// Enum of available watering scale adjustment methods.
+const ADJUSTMENT_METHOD = {
+	ZIMMERMAN: 1,
+	RAIN_DELAY: 2
 };
 
 /**
@@ -78,16 +87,6 @@ export async function httpJSONRequest(url: string ): Promise< any > {
 }
 
 /**
- * Retrieves weather data necessary for watering level calculations from the a local record.
- * @param coordinates The coordinates to retrieve the watering data for.
- * @return A Promise that will be resolved with WateringData.
- */
-async function getLocalWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-	// TODO is this type assertion safe?
-	return local.getLocalWeather() as WateringData;
-}
-
-/**
  * Calculates timezone and sunrise/sunset for the specified coordinates.
  * @param coordinates The coordinates to use to calculate time data.
  * @return The TimeData for the specified coordinates.
@@ -110,56 +109,49 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
 }
 
 /**
- * Calculates how much watering should be scaled based on weather and adjustment options.
- * @param adjustmentMethod The method to use to calculate the watering percentage. The only supported method is 1, which
- * corresponds to the Zimmerman method. If an invalid adjustmentMethod is used, this method will return -1.
+ * Calculates how much watering should be scaled based on weather and adjustment options using the Zimmerman method.
  * @param adjustmentOptions Options to tweak the calculation, or undefined/null if no custom values are to be used.
  * @param wateringData The weather to use to calculate watering percentage.
- * @return The percentage that watering should be scaled by, or -1 if an invalid adjustmentMethod was provided.
+ * @return The percentage that watering should be scaled by.
  */
-function calculateWeatherScale( adjustmentMethod: number, adjustmentOptions: AdjustmentOptions, wateringData: WateringData ): number {
+function calculateZimmermanWateringScale( adjustmentOptions: AdjustmentOptions, wateringData: WateringData ): number {
 
-	// Zimmerman method
-	if ( adjustmentMethod === 1 ) {
-		let humidityBase = 30, tempBase = 70, precipBase = 0;
+	let humidityBase = 30, tempBase = 70, precipBase = 0;
 
-		// Check to make sure valid data exists for all factors
-		if ( !validateValues( [ "temp", "humidity", "precip" ], wateringData ) ) {
-			return 100;
-		}
-
-		// Get baseline conditions for 100% water level, if provided
-		if ( adjustmentOptions ) {
-			humidityBase = adjustmentOptions.hasOwnProperty( "bh" ) ? adjustmentOptions.bh : humidityBase;
-			tempBase = adjustmentOptions.hasOwnProperty( "bt" ) ? adjustmentOptions.bt : tempBase;
-			precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
-		}
-
-		let temp = wateringData.temp,
-			humidityFactor = ( humidityBase - wateringData.humidity ),
-			tempFactor = ( ( temp - tempBase ) * 4 ),
-			precipFactor = ( ( precipBase - wateringData.precip ) * 200 );
-
-		// Apply adjustment options, if provided, by multiplying the percentage against the factor
-		if ( adjustmentOptions ) {
-			if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
-				humidityFactor = humidityFactor * ( adjustmentOptions.h / 100 );
-			}
-
-			if ( adjustmentOptions.hasOwnProperty( "t" ) ) {
-				tempFactor = tempFactor * ( adjustmentOptions.t / 100 );
-			}
-
-			if ( adjustmentOptions.hasOwnProperty( "r" ) ) {
-				precipFactor = precipFactor * ( adjustmentOptions.r / 100 );
-			}
-		}
-
-		// Apply all of the weather modifying factors and clamp the result between 0 and 200%.
-		return Math.floor( Math.min( Math.max( 0, 100 + humidityFactor + tempFactor + precipFactor ), 200 ) );
+	// Check to make sure valid data exists for all factors
+	if ( !validateValues( [ "temp", "humidity", "precip" ], wateringData ) ) {
+		return 100;
 	}
 
-	return -1;
+	// Get baseline conditions for 100% water level, if provided
+	if ( adjustmentOptions ) {
+		humidityBase = adjustmentOptions.hasOwnProperty( "bh" ) ? adjustmentOptions.bh : humidityBase;
+		tempBase = adjustmentOptions.hasOwnProperty( "bt" ) ? adjustmentOptions.bt : tempBase;
+		precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
+	}
+
+	let temp = wateringData.temp,
+		humidityFactor = ( humidityBase - wateringData.humidity ),
+		tempFactor = ( ( temp - tempBase ) * 4 ),
+		precipFactor = ( ( precipBase - wateringData.precip ) * 200 );
+
+	// Apply adjustment options, if provided, by multiplying the percentage against the factor
+	if ( adjustmentOptions ) {
+		if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
+			humidityFactor = humidityFactor * ( adjustmentOptions.h / 100 );
+		}
+
+		if ( adjustmentOptions.hasOwnProperty( "t" ) ) {
+			tempFactor = tempFactor * ( adjustmentOptions.t / 100 );
+		}
+
+		if ( adjustmentOptions.hasOwnProperty( "r" ) ) {
+			precipFactor = precipFactor * ( adjustmentOptions.r / 100 );
+		}
+	}
+
+	// Apply all of the weather modifying factors and clamp the result between 0 and 200%.
+	return Math.floor( Math.min( Math.max( 0, 100 + humidityFactor + tempFactor + precipFactor ), 200 ) );
 }
 
 /**
@@ -242,8 +234,9 @@ export const getWateringData = async function( req: express.Request, res: expres
 		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
 	} catch ( err ) {
 
-		// If the JSON is not valid, do not incorporate weather adjustment options
-		adjustmentOptions = undefined;
+		// If the JSON is not valid then abort the claculation
+		res.send(`Error: Unable to parse options (${err})`);
+		return;
 	}
 
 	// Attempt to resolve provided location to GPS coordinates.
@@ -258,12 +251,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
-	let wateringData: WateringData;
-	if ( local.useLocalWeather() ) {
-		wateringData = await getLocalWateringData( coordinates );
-	} else {
-		wateringData = await weatherProvider.getWateringData(coordinates);
-	}
+	let wateringData: WateringData = await weatherProvider.getWateringData(coordinates);
 
 
 	// Process data to retrieve the resulting scale, sunrise/sunset, timezone,
@@ -280,27 +268,30 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 	}
 
-	let scale: number = calculateWeatherScale( adjustmentMethod, adjustmentOptions, wateringData ),
-		rainDelay: number = -1;
+	let scale = -1,	rainDelay = -1;
+
+	if ( adjustmentMethod === ADJUSTMENT_METHOD.ZIMMERMAN ) {
+		scale = calculateZimmermanWateringScale( adjustmentOptions, wateringData );
+	}
 
 	if (wateringData) {
 		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
 		if (checkWeatherRestriction(req.params[0], wateringData)) {
 			scale = 0;
 		}
-	}
 
-	// If any weather adjustment is being used, check the rain status
-	if ( adjustmentMethod > 0 && wateringData && wateringData.raining ) {
+		// If any weather adjustment is being used, check the rain status
+		if ( adjustmentMethod > 0 && wateringData.raining ) {
 
-		// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
-		if ( adjustmentMethod === 2 ) {
+			// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
+			if ( adjustmentMethod === ADJUSTMENT_METHOD.RAIN_DELAY ) {
 
-			rainDelay = ( adjustmentOptions && adjustmentOptions.hasOwnProperty( "d" ) ) ? adjustmentOptions.d : 24;
-		} else {
+				rainDelay = ( adjustmentOptions && adjustmentOptions.hasOwnProperty( "d" ) ) ? adjustmentOptions.d : 24;
+			} else {
 
-			// For any other adjustment method, apply a scale of 0 (as the scale will revert when the rain stops)
-			scale = 0;
+				// For any other adjustment method, apply a scale of 0 (as the scale will revert when the rain stops)
+				scale = 0;
+			}
 		}
 	}
 
@@ -320,7 +311,9 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 	};
 
-	if ( local.useLocalWeather() ) {
+	/* Note: The local WeatherProvider will never return undefined, so there's no need to worry about this condition
+		failing to be met if the local WeatherProvider is used but wateringData is falsy (since it will never happen). */
+	if ( wateringData && wateringData.weatherProvider === "local" ) {
 		console.log( "OpenSprinkler Weather Response: %s", JSON.stringify( data ) );
 	}
 

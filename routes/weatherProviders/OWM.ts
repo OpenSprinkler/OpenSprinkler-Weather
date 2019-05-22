@@ -31,6 +31,7 @@ async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< Water
 	}
 
 	return {
+		weatherProvider: "OWM",
 		temp: totalTemp / periods,
 		humidity: totalHumidity / periods,
 		precip: totalPrecip / 25.4,
@@ -58,6 +59,7 @@ async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< Weathe
 	}
 
 	const weather: WeatherData = {
+		weatherProvider: "OWM",
 		temp:  parseInt( current.main.temp ),
 		humidity: parseInt( current.main.humidity ),
 		wind: parseInt( current.wind.speed ),
