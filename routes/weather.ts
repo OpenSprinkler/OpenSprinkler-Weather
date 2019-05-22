@@ -7,7 +7,11 @@ import * as geoTZ from "geo-tz";
 
 import * as local from "./local";
 import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData, WeatherProvider } from "../types";
-const weatherProvider: WeatherProvider = require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default;
+import CompositeWeatherProvider from "./weatherProviders/CompositeWeatherProvider";
+
+const weatherProvider: WeatherProvider = new CompositeWeatherProvider(
+	( process.env.WEATHER_PROVIDER || "OWM" ).split( "," ).map( ( id ) => require( "./weatherProviders/" + id ).default )
+);
 
 // Define regex filters to match against location
 const filters = {
