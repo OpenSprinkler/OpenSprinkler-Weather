@@ -31,8 +31,11 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 	}
 
 	const totals = { temp: 0, humidity: 0, precip: 0 };
+	// The number of hourly forecasts from today's data that use historic data (not forecast data).
+	// Find the first element that contains forecast data.
+	const todayHistoricElements = todayData.hourly.data.findIndex( ( data ) => data.time > todayTimestamp - 60 * 60 );
 	// Sum data from the current calendar day.
-	const todayPeriods =  Math.min( 24, todayData.hourly.data.length );
+	const todayPeriods =  Math.min( 24, todayHistoricElements );
 	for ( let index = todayPeriods - 1; index >= 0; index-- ) {
 		totals.temp += todayData.hourly.data[ index ].temperature;
 		totals.humidity += todayData.hourly.data[ index ].humidity;
@@ -50,7 +53,7 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 		temp : totals.temp / 24,
 		humidity: totals.humidity / 24 * 100,
 		precip: totals.precip,
-		raining: todayData.hourly.data[ todayData.hourly.data.length - 1 ].precipIntensity > 0
+		raining: todayData.hourly.data[ todayHistoricElements - 1 ].precipIntensity > 0
 	};
 }
 
