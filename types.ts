@@ -13,6 +13,8 @@ export interface TimeData {
 }
 
 export interface WeatherData {
+    /** The WeatherProvider that generated this data. */
+    weatherProvider: WeatherProviderId;
     /** The current temperature (in Fahrenheit). */
     temp: number;
     /** The current humidity (as a percentage). */
@@ -54,6 +56,8 @@ export interface WeatherDataForecast {
  * available.
  */
 export interface WateringData {
+    /** The WeatherProvider that generated this data. */
+    weatherProvider: WeatherProviderId;
     /** The average temperature over the window (in Fahrenheit). */
     temp: number;
     /** The average humidity over the window (as a percentage). */
@@ -98,3 +102,5 @@ export interface WeatherProvider {
      */
     getWeatherData( coordinates : GeoCoordinates ): Promise< WeatherData >;
 }
+
+export type WeatherProviderId = "OWM" | "DarkSky";

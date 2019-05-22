@@ -19,6 +19,7 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 	}
 
 	return {
+		weatherProvider: "DarkSky",
 		// Calculate average temperature for the day using hourly data.
 		temp : historicData.hourly.data.reduce( ( sum, hourlyData ) => sum + hourlyData.temperature, 0 ) / historicData.hourly.data.length,
 		humidity: historicData.daily.data[ 0 ].humidity * 100,
@@ -40,6 +41,7 @@ async function getDarkSkyWeatherData( coordinates: GeoCoordinates ): Promise< We
 	}
 
 	const weather: WeatherData = {
+		weatherProvider: "DarkSky",
 		temp: Math.floor( forecast.currently.temperature ),
 		humidity: Math.floor( forecast.currently.humidity * 100 ),
 		wind: Math.floor( forecast.currently.windSpeed ),
