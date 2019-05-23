@@ -6,13 +6,7 @@
 			"tz": 32,
 			"sunrise": 332,
 			"sunset": 1203,
-			"eip": 2130706433,
-			"rawData": {
-				"h": 98.5,
-				"p": 1.09,
-				"t": 70.8,
-				"raining": 1
-			}
+			"eip": 2130706433
 		}
 	},
 	"adjustment1": {

@@ -19,6 +19,7 @@ const filters = {
 
 // Enum of available watering scale adjustment methods.
 const ADJUSTMENT_METHOD = {
+	MANUAL: 0,
 	ZIMMERMAN: 1,
 	RAIN_DELAY: 2
 };
@@ -247,7 +248,10 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
-	let wateringData: WateringData = await weatherProvider.getWateringData(coordinates);
+	let wateringData: WateringData;
+	if ( adjustmentMethod !== ADJUSTMENT_METHOD.MANUAL ) {
+		wateringData = await weatherProvider.getWateringData( coordinates );
+	}
 
 
 	// Process data to retrieve the resulting scale, sunrise/sunset, timezone,
@@ -277,7 +281,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 
 		// If any weather adjustment is being used, check the rain status
-		if ( adjustmentMethod > 0 && wateringData.raining ) {
+		if ( adjustmentMethod > ADJUSTMENT_METHOD.MANUAL && wateringData.raining ) {
 
 			// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
 			if ( adjustmentMethod === ADJUSTMENT_METHOD.RAIN_DELAY ) {
@@ -298,14 +302,17 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sunrise:	timeData.sunrise,
 		sunset:		timeData.sunset,
 		eip:		ipToInt( remoteAddress ),
-		// TODO this may need to be changed (https://github.com/OpenSprinkler/OpenSprinkler-Weather/pull/11#issuecomment-491037948)
-		rawData:    {
+		rawData:	undefined
+	};
+
+	if ( adjustmentMethod > ADJUSTMENT_METHOD.MANUAL ) {
+		data.rawData = {
 			h: wateringData ? Math.round( wateringData.humidity * 100) / 100 : null,
 			p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
 			t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
 			raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
-		}
-	};
+		};
+	}
 
 	/* Note: The local WeatherProvider will never return undefined, so there's no need to worry about this condition
 		failing to be met if the local WeatherProvider is used but wateringData is falsy (since it will never happen). */
@@ -323,7 +330,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 			"&sunrise="		+	data.sunrise +
 			"&sunset="		+	data.sunset +
 			"&eip="			+	data.eip +
-			"&rawData="     +   JSON.stringify( data.rawData )
+			( data.rawData ? "&rawData=" + JSON.stringify( data.rawData ) : "" )
 		);
 	}
 
