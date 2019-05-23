@@ -262,7 +262,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let wateringData: WateringData;
 	if ( local.useLocalWeather() ) {
 		wateringData = await getLocalWateringData( coordinates );
-	} else {
+	} else if ( adjustmentMethod !== 0 ) {
 		wateringData = await weatherProvider.getWateringData(coordinates);
 	}
 
