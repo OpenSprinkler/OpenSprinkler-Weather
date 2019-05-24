@@ -72,7 +72,7 @@ async function getDarkSkyWeatherData( coordinates: GeoCoordinates ): Promise< We
 	return weather;
 }
 
-async function getDarkSkyEToData( coordinates: GeoCoordinates, elevation: number ): Promise< EToData > {
+async function getDarkSkyEToData( coordinates: GeoCoordinates ): Promise< EToData > {
 	// TODO use a rolling 24 hour window instead of fixed calendar days?
 	// The Unix epoch seconds timestamp of 24 hours ago.
 	const timestamp: number = moment().subtract( 1, "day" ).unix();
@@ -116,9 +116,9 @@ async function getDarkSkyEToData( coordinates: GeoCoordinates, elevation: number
 		windSpeed: historicData.daily.data[ 0 ].windSpeed,
 		// TODO find out what height wind speed measurements are actually taken at.
 		windSpeedMeasurementHeight: 2,
-		elevation: elevation,
 		dayOfYear: moment().subtract( 1, "day" ).dayOfYear(),
-		lat: coordinates[0]
+		lat: coordinates[ 0 ],
+		precip: historicData.daily.data[ 0 ].precipIntensity * 24
 	};
 }
 

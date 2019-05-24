@@ -5,9 +5,10 @@ import { EToData } from "./types";
  * Calculates the reference evapotranspiration using the Penman-Monteith (FAO-56) method (http://www.fao.org/3/X0490E/x0490e07.htm).
  *
  * @param etoData The data to calculate the ETo with.
+ * @param elevation The elevation above sea level of the watering site (in meters).
  * @return The reference evapotranspiration (in millimeters per day).
  */
-export function calculateETo( etoData: EToData ): number {
+export function calculateETo( etoData: EToData, elevation: number ): number {
 	const avgTemp = ( etoData.maxTemp + etoData.minTemp ) / 2;
 
 	// Adjust the wind speed to a 2m height.
@@ -15,7 +16,7 @@ export function calculateETo( etoData: EToData ): number {
 
 	const saturationVaporPressureCurveSlope = 4098 * 0.6108 * Math.exp( 17.27 * avgTemp / ( avgTemp + 237.3 ) ) / Math.pow( avgTemp + 237.3, 2 );
 
-	const pressure = 101.3 * Math.pow( ( 293 - 0.0065 * etoData.elevation ) / 293, 2.36 );
+	const pressure = 101.3 * Math.pow( ( 293 - 0.0065 * elevation ) / 293, 2.36 );
 
 	const psychrometricConstant = 0.000665 * pressure;
 
@@ -43,7 +44,7 @@ export function calculateETo( etoData: EToData ): number {
 
 	const extraterrestrialRadiation = 24 * 60 / Math.PI * 0.082 * inverseRelativeEarthSunDistance * ( sunsetHourAngle * Math.sin( latitudeRads ) * Math.sin( solarDeclination ) + Math.cos( latitudeRads ) * Math.cos( solarDeclination ) * Math.sin( sunsetHourAngle ) );
 
-	const clearSkyRadiation = ( 0.75 + 2e-5 * etoData.elevation ) * extraterrestrialRadiation;
+	const clearSkyRadiation = ( 0.75 + 2e-5 * elevation ) * extraterrestrialRadiation;
 
 	const solarRadiation = etoData.solarRadiation;
 

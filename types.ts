@@ -105,11 +105,10 @@ export interface WeatherProvider {
     /**
      * Retrieves the data necessary for calculating ETo.
      * @param coordinates The coordinates to retrieve the data for.
-     * @param elevation The elevation above sea level of the watering site (in meters).
      * @return A Promise that will be resolved with the EToData if it is successfully retrieved,
      * or resolved with undefined if an error occurs while retrieving the EToData.
      */
-    getEToData?( coordinates: GeoCoordinates, elevation: number ): Promise< EToData >;
+    getEToData?( coordinates: GeoCoordinates ): Promise< EToData >;
 }
 
 /**
@@ -130,12 +129,12 @@ export interface EToData {
     windSpeed: number;
     /** The height the wind speed measurement was taken at (in meters). */
     windSpeedMeasurementHeight: number;
-    /** The elevation above sea level of the watering site (in meters). */
-    elevation: number;
     /** The day of the year between 1 (January 1) and 365/366 (December 31). */
     dayOfYear: number;
     /** The latitude of the watering site (in degrees). */
     lat: number;
+    /** The total precipitation over the time period (in millimeters). */
+    precip: number;
 }
 
 export type WeatherProviderId = "OWM" | "DarkSky" | "local";
