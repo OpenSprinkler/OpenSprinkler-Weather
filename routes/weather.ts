@@ -5,7 +5,18 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData, WeatherProvider } from "../types";
+import {
+	AdjustmentOptions,
+	EToData,
+	ETScalingAdjustmentOptions,
+	GeoCoordinates,
+	TimeData,
+	WateringData,
+	WeatherData,
+	WeatherProvider,
+	ZimmermanAdjustmentOptions
+} from "../types";
+import { calculateETo } from "../EToCalculator";
 const weatherProvider: WeatherProvider = require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default;
 
 // Define regex filters to match against location
@@ -21,7 +32,8 @@ const filters = {
 const ADJUSTMENT_METHOD = {
 	MANUAL: 0,
 	ZIMMERMAN: 1,
-	RAIN_DELAY: 2
+	RAIN_DELAY: 2,
+	ET_SCALING: 3
 };
 
 /**
@@ -111,7 +123,7 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  * @param wateringData The weather to use to calculate watering percentage.
  * @return The percentage that watering should be scaled by.
  */
-function calculateZimmermanWateringScale( adjustmentOptions: AdjustmentOptions, wateringData: WateringData ): number {
+function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdjustmentOptions, wateringData: WateringData ): number {
 
 	let humidityBase = 30, tempBase = 70, precipBase = 0;
 
@@ -149,6 +161,31 @@ function calculateZimmermanWateringScale( adjustmentOptions: AdjustmentOptions, 
 
 	// Apply all of the weather modifying factors and clamp the result between 0 and 200%.
 	return Math.floor( Math.min( Math.max( 0, 100 + humidityFactor + tempFactor + precipFactor ), 200 ) );
+}
+
+/**
+ * Calculates how much watering should be scaled based on weather and adjustment options by comparing a recent ETo to
+ * the base ETo that the watering program was designed for.
+ * @param adjustmentOptions Options to tweak the calculation, or undefined/null if no custom values are to be used.
+ * @param etoData The data to use to calculate the recent ETo.
+ * @return A promise that will be resolved with the percentage that watering should be scaled by.
+ */
+async function calculateETScaling( adjustmentOptions: ETScalingAdjustmentOptions, etoData: EToData ): Promise< number > {
+
+	// TODO this default baseETo is not based on any data. Automatically determine ETo based on geographic location instead.
+	let elevation = 150, baseETo = 2;
+
+	if ( adjustmentOptions && "elevation" in adjustmentOptions ) {
+		elevation = adjustmentOptions.elevation;
+	}
+
+	if ( adjustmentOptions && "baseETo" in adjustmentOptions ) {
+		baseETo = adjustmentOptions.baseETo
+	}
+
+	const eto: number = calculateETo( etoData, elevation );
+
+	return Math.floor( Math.min( Math.max( 0, ( eto - etoData.precip ) / baseETo * 100 ), 200 ) );
 }
 
 /**
@@ -282,6 +319,14 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	if ( adjustmentMethod === ADJUSTMENT_METHOD.ZIMMERMAN ) {
 		scale = calculateZimmermanWateringScale( adjustmentOptions, wateringData );
+	} else if ( adjustmentMethod === ADJUSTMENT_METHOD.ET_SCALING ) {
+		if ( !weatherProvider.getEToData ) {
+			res.send( "Error: selected WeatherProvider does not support getEToData" );
+			return;
+		}
+
+		const etoData: EToData = await weatherProvider.getEToData( coordinates );
+		scale = await calculateETScaling( adjustmentOptions, etoData );
 	}
 
 	if (wateringData) {
@@ -315,7 +360,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		rawData:	undefined
 	};
 
-	if ( adjustmentMethod > ADJUSTMENT_METHOD.MANUAL ) {
+	if ( adjustmentMethod === ADJUSTMENT_METHOD.ZIMMERMAN || adjustmentMethod === ADJUSTMENT_METHOD.RAIN_DELAY ) {
 		data.rawData = {
 			h: wateringData ? Math.round( wateringData.humidity * 100) / 100 : null,
 			p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
@@ -323,6 +368,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 			raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
 		};
 	}
+	// TODO include raw data from ETo scaling.
 
 	/* Note: The local WeatherProvider will never return undefined, so there's no need to worry about this condition
 		failing to be met if the local WeatherProvider is used but wateringData is falsy (since it will never happen). */
