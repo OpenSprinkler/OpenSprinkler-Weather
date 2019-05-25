@@ -182,6 +182,11 @@ function checkWeatherRestriction( adjustmentValue: number, weather: WateringData
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
 
+	if ( !weatherProvider.getWeatherData ) {
+		res.send( "Error: selected WeatherProvider does not support getWeatherData" );
+		return;
+	}
+
 	let coordinates: GeoCoordinates;
 	try {
 		coordinates = await resolveCoordinates( location );
@@ -250,6 +255,11 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let timeData: TimeData = getTimeData( coordinates );
 	let wateringData: WateringData;
 	if ( adjustmentMethod !== ADJUSTMENT_METHOD.MANUAL ) {
+		if ( !weatherProvider.getWateringData ) {
+			res.send( "Error: selected WeatherProvider does not support getWateringData" );
+			return;
+		}
+
 		wateringData = await weatherProvider.getWateringData( coordinates );
 	}
 
