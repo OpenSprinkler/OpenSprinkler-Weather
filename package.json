@@ -8,6 +8,7 @@
     "start": "node js/server",
     "dev": "node scripts/serve",
     "bundle": "npm run compile && zip weather.zip -r js package.json package-lock.json",
+    "deploy": "npm run bundle && eb deploy",
     "compile": "tsc"
   },
   "dependencies": {
@@ -16,6 +17,7 @@
     "dotenv": "^8.0.0",
     "express": "^4.16.4",
     "geo-tz": "^5.0.4",
+    "mockdate": "^2.0.2",
     "moment-timezone": "^0.5.25",
     "suncalc": "^1.8.0"
   },

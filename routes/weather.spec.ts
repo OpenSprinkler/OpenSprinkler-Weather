@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import * as nock from 'nock';
 import * as MockExpressRequest from 'mock-express-request';
 import * as MockExpressResponse from 'mock-express-response';
+import * as MockDate from 'mockdate';
 
 import { getWateringData } from './weather';
 
@@ -11,6 +12,8 @@ const replies = require( '../test/replies.json' );
 const location = '01002';
 
 describe('Watering Data', () => {
+    beforeEach(() => MockDate.set('5/13/2019'));
+
     it('OpenWeatherMap Lookup (Adjustment Method 0, Location 01002)', async () => {
         mockOWM();
 

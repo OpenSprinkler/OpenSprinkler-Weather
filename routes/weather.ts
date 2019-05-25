@@ -262,7 +262,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let wateringData: WateringData;
 	if ( local.useLocalWeather() ) {
 		wateringData = await getLocalWateringData( coordinates );
-	} else {
+	} else if ( adjustmentMethod !== 0 ) {
 		wateringData = await weatherProvider.getWateringData(coordinates);
 	}
 
@@ -312,14 +312,17 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sunrise:	timeData.sunrise,
 		sunset:		timeData.sunset,
 		eip:		ipToInt( remoteAddress ),
-		// TODO this may need to be changed (https://github.com/OpenSprinkler/OpenSprinkler-Weather/pull/11#issuecomment-491037948)
-		rawData:    {
+		rawData:	undefined
+	};
+
+	if ( adjustmentMethod > 0 ) {
+		data.rawData = {
 			h: wateringData ? Math.round( wateringData.humidity * 100) / 100 : null,
 			p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
 			t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
 			raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
 		}
-	};
+	}
 
 	if ( local.useLocalWeather() ) {
 		console.log( "OpenSprinkler Weather Response: %s", JSON.stringify( data ) );
@@ -335,7 +338,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 			"&sunrise="		+	data.sunrise +
 			"&sunset="		+	data.sunset +
 			"&eip="			+	data.eip +
-			"&rawData="     +   JSON.stringify( data.rawData )
+			( adjustmentMethod > 0 ? "&rawData=" + JSON.stringify( data.rawData ) : "" )
 		);
 	}
 
