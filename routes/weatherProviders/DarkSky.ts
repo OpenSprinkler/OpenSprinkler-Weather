@@ -25,16 +25,16 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 		return undefined;
 	}
 
-	// The number of hourly forecasts to use from today's data. This will only include elements that contain historic
-	// data (not forecast data).
+	/* The number of hourly forecasts to use from today's data. This will only include elements that contain historic
+		data (not forecast data). */
 	// Find the first element that contains forecast data.
 	const todayElements = Math.min( 24, todayData.hourly.data.findIndex( ( data ) => data.time > todayTimestamp - 60 * 60 ) );
 
+	/* Take as much data as possible from the first elements of today's data and take the remaining required data from
+		the remaining data from the last elements of yesterday's data. */
 	const samples = [
-		// Take as much data as possible from the first elements of today's data.
-		...todayData.hourly.data.slice( 0, todayElements ),
-		// Take the remaining data from the last elements of yesterday's data.
 		...yesterdayData.hourly.data.slice( todayElements - 24 ),
+		...todayData.hourly.data.slice( 0, todayElements )
 	];
 
 	// Fail if not enough data is available.
@@ -43,19 +43,17 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 	}
 
 	const totals = { temp: 0, humidity: 0, precip: 0 };
-	for ( let index = 0; index < samples.length; index++ ) {
-		totals.temp += todayData.hourly.data[ index ].temperature;
-		totals.humidity += todayData.hourly.data[ index ].humidity;
-		totals.precip += todayData.hourly.data[ index ].precipIntensity
+	for ( const sample of samples ) {
+		totals.temp += sample.temperature;
+		totals.humidity += sample.humidity;
+		totals.precip += sample.precipIntensity
 	}
 
-	const mostRecentSample = todayElements > 0 ?
-		todayData.hourly.data[ todayElements - 1 ] : yesterdayData.hourly.data[ yesterdayData.hourly.data.length - 1 ];
 	return {
 		temp : totals.temp / 24,
 		humidity: totals.humidity / 24 * 100,
 		precip: totals.precip,
-		raining: mostRecentSample.precipIntensity > 0
+		raining: samples[ samples.length - 1 ].precipIntensity > 0
 	};
 }
 
