@@ -25,35 +25,37 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 		return undefined;
 	}
 
+	// The number of hourly forecasts to use from today's data. This will only include elements that contain historic
+	// data (not forecast data).
+	// Find the first element that contains forecast data.
+	const todayElements = Math.min( 24, todayData.hourly.data.findIndex( ( data ) => data.time > todayTimestamp - 60 * 60 ) );
+
+	const samples = [
+		// Take as much data as possible from the first elements of today's data.
+		...todayData.hourly.data.slice( 0, todayElements ),
+		// Take the remaining data from the last elements of yesterday's data.
+		...yesterdayData.hourly.data.slice( todayElements - 24 ),
+	];
+
 	// Fail if not enough data is available.
-	if ( yesterdayData.hourly.data.length + todayData.hourly.data.length < 24 ) {
+	if ( samples.length !== 24 ) {
 		return undefined;
 	}
 
 	const totals = { temp: 0, humidity: 0, precip: 0 };
-	// The number of hourly forecasts from today's data that use historic data (not forecast data).
-	// Find the first element that contains forecast data.
-	const todayHistoricElements = todayData.hourly.data.findIndex( ( data ) => data.time > todayTimestamp - 60 * 60 );
-	// Sum data from the current calendar day.
-	const todayPeriods =  Math.min( 24, todayHistoricElements );
-	for ( let index = todayPeriods - 1; index >= 0; index-- ) {
+	for ( let index = 0; index < samples.length; index++ ) {
 		totals.temp += todayData.hourly.data[ index ].temperature;
 		totals.humidity += todayData.hourly.data[ index ].humidity;
 		totals.precip += todayData.hourly.data[ index ].precipIntensity
 	}
 
-	// Sum data from yesterday.
-	for ( let index = 24 - todayPeriods - 1; index >= 0; index-- ) {
-		totals.temp += yesterdayData.hourly.data[ index ].temperature;
-		totals.humidity += yesterdayData.hourly.data[ index ].humidity;
-		totals.precip += yesterdayData.hourly.data[ index ].precipIntensity
-	}
-
+	const mostRecentSample = todayElements > 0 ?
+		todayData.hourly.data[ todayElements - 1 ] : yesterdayData.hourly.data[ yesterdayData.hourly.data.length - 1 ];
 	return {
 		temp : totals.temp / 24,
 		humidity: totals.humidity / 24 * 100,
 		precip: totals.precip,
-		raining: todayData.hourly.data[ todayHistoricElements - 1 ].precipIntensity > 0
+		raining: mostRecentSample.precipIntensity > 0
 	};
 }
 
