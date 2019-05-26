@@ -58,7 +58,7 @@ async function resolveCoordinates( location: string ): Promise< GeoCoordinates >
 		if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
 
 			// If it is, reply with an array containing the GPS coordinates
-			return [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ];
+			return [ parseFloat( data.RESULTS[ 0 ].lat ), parseFloat( data.RESULTS[ 0 ].lon ) ];
 		} else {
 
 			// Otherwise, indicate no data was found
@@ -127,9 +127,8 @@ function calculateZimmermanWateringScale( adjustmentOptions: AdjustmentOptions, 
 		precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
 	}
 
-	let temp = wateringData.temp,
-		humidityFactor = ( humidityBase - wateringData.humidity ),
-		tempFactor = ( ( temp - tempBase ) * 4 ),
+	let humidityFactor = ( humidityBase - wateringData.humidity ),
+		tempFactor = ( ( wateringData.temp - tempBase ) * 4 ),
 		precipFactor = ( ( precipBase - wateringData.precip ) * 200 );
 
 	// Apply adjustment options, if provided, by multiplying the percentage against the factor
@@ -249,7 +248,6 @@ export const getWateringData = async function( req: express.Request, res: expres
 		res.send(`Error: Unable to resolve location (${err})`);
 		return;
 	}
-	location = coordinates;
 
 	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
@@ -261,21 +259,6 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 
 		wateringData = await weatherProvider.getWateringData( coordinates );
-	}
-
-
-	// Process data to retrieve the resulting scale, sunrise/sunset, timezone,
-	// and also calculate if a restriction is met to prevent watering.
-
-	// Use getTimeData as fallback if a PWS is used but time data is not provided.
-	// This will never occur, but it might become possible in the future when PWS support is re-added.
-	if ( !timeData ) {
-		if ( typeof location[ 0 ] === "number" && typeof location[ 1 ] === "number" ) {
-			timeData = getTimeData( location as GeoCoordinates );
-		} else {
-			res.send( "Error: No weather data found." );
-			return;
-		}
 	}
 
 	let scale = -1,	rainDelay = -1;
@@ -322,12 +305,6 @@ export const getWateringData = async function( req: express.Request, res: expres
 			t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
 			raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
 		};
-	}
-
-	/* Note: The local WeatherProvider will never return undefined, so there's no need to worry about this condition
-		failing to be met if the local WeatherProvider is used but wateringData is falsy (since it will never happen). */
-	if ( wateringData && wateringData.weatherProvider === "local" ) {
-		console.log( "OpenSprinkler Weather Response: %s", JSON.stringify( data ) );
 	}
 
 	// Return the response to the client in the requested format
@@ -392,6 +369,11 @@ async function httpRequest( url: string ): Promise< string > {
  */
 function validateValues( keys: string[], obj: object ): boolean {
 	let key: string;
+
+	// Return false if the object is null/undefined.
+	if ( !obj ) {
+		return false;
+	}
 
 	for ( key in keys ) {
 		if ( !keys.hasOwnProperty( key ) ) {
