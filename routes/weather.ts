@@ -214,6 +214,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
 	let adjustmentMethod: number			= req.params[ 0 ] & ~( 1 << 7 ),
+		checkRestrictions: boolean			= ( ( req.params[ 0 ] >> 7 ) & 1 ) > 0,
 		adjustmentOptionsString: string		= getParameter(req.query.wto),
 		location: string | GeoCoordinates	= getParameter(req.query.loc),
 		outputFormat: string				= getParameter(req.query.format),
