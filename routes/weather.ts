@@ -253,7 +253,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
 	let wateringData: WateringData;
-	if ( adjustmentMethod !== ADJUSTMENT_METHOD.MANUAL ) {
+	if ( adjustmentMethod !== ADJUSTMENT_METHOD.MANUAL || checkRestrictions ) {
 		if ( !weatherProvider.getWateringData ) {
 			res.send( "Error: selected WeatherProvider does not support getWateringData" );
 			return;
