@@ -50,6 +50,7 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 	}
 
 	return {
+		weatherProvider: "DarkSky",
 		temp : totals.temp / 24,
 		humidity: totals.humidity / 24 * 100,
 		precip: totals.precip,
@@ -74,6 +75,7 @@ async function getDarkSkyWeatherData( coordinates: GeoCoordinates ): Promise< We
 	}
 
 	const weather: WeatherData = {
+		weatherProvider: "DarkSky",
 		temp: Math.floor( forecast.currently.temperature ),
 		humidity: Math.floor( forecast.currently.humidity * 100 ),
 		wind: Math.floor( forecast.currently.windSpeed ),
