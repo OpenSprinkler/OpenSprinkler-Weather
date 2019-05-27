@@ -5,18 +5,13 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import {
-	AdjustmentOptions,
-	EToData,
-	ETScalingAdjustmentOptions,
-	GeoCoordinates,
-	TimeData,
-	WateringData,
-	WeatherData,
-	WeatherProvider,
-	ZimmermanAdjustmentOptions
-} from "../types";
-import { calculateETo } from "../EToCalculator";
+import { GeoCoordinates, TimeData, WateringData, WeatherData, WeatherProvider } from "../types";
+import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
+import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
+import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
+import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
+import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
+
 const weatherProvider: WeatherProvider = require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default;
 
 // Define regex filters to match against location
@@ -28,12 +23,12 @@ const filters = {
 	timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
 };
 
-// Enum of available watering scale adjustment methods.
-const ADJUSTMENT_METHOD = {
-	MANUAL: 0,
-	ZIMMERMAN: 1,
-	RAIN_DELAY: 2,
-	ET_SCALING: 3
+/** AdjustmentMethods mapped to their numeric IDs. */
+const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
+	0: ManualAdjustmentMethod,
+	1: ZimmermanAdjustmentMethod,
+	2: RainDelayAdjustmentMethod,
+	3: EToAdjustmentMethod
 };
 
 /**
@@ -118,77 +113,6 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
 }
 
 /**
- * Calculates how much watering should be scaled based on weather and adjustment options using the Zimmerman method.
- * @param adjustmentOptions Options to tweak the calculation, or undefined/null if no custom values are to be used.
- * @param wateringData The weather to use to calculate watering percentage.
- * @return The percentage that watering should be scaled by.
- */
-function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdjustmentOptions, wateringData: WateringData ): number {
-
-	let humidityBase = 30, tempBase = 70, precipBase = 0;
-
-	// Check to make sure valid data exists for all factors
-	if ( !validateValues( [ "temp", "humidity", "precip" ], wateringData ) ) {
-		return 100;
-	}
-
-	// Get baseline conditions for 100% water level, if provided
-	if ( adjustmentOptions ) {
-		humidityBase = adjustmentOptions.hasOwnProperty( "bh" ) ? adjustmentOptions.bh : humidityBase;
-		tempBase = adjustmentOptions.hasOwnProperty( "bt" ) ? adjustmentOptions.bt : tempBase;
-		precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
-	}
-
-	let temp = wateringData.temp,
-		humidityFactor = ( humidityBase - wateringData.humidity ),
-		tempFactor = ( ( temp - tempBase ) * 4 ),
-		precipFactor = ( ( precipBase - wateringData.precip ) * 200 );
-
-	// Apply adjustment options, if provided, by multiplying the percentage against the factor
-	if ( adjustmentOptions ) {
-		if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
-			humidityFactor = humidityFactor * ( adjustmentOptions.h / 100 );
-		}
-
-		if ( adjustmentOptions.hasOwnProperty( "t" ) ) {
-			tempFactor = tempFactor * ( adjustmentOptions.t / 100 );
-		}
-
-		if ( adjustmentOptions.hasOwnProperty( "r" ) ) {
-			precipFactor = precipFactor * ( adjustmentOptions.r / 100 );
-		}
-	}
-
-	// Apply all of the weather modifying factors and clamp the result between 0 and 200%.
-	return Math.floor( Math.min( Math.max( 0, 100 + humidityFactor + tempFactor + precipFactor ), 200 ) );
-}
-
-/**
- * Calculates how much watering should be scaled based on weather and adjustment options by comparing a recent ETo to
- * the base ETo that the watering program was designed for.
- * @param adjustmentOptions Options to tweak the calculation, or undefined/null if no custom values are to be used.
- * @param etoData The data to use to calculate the recent ETo.
- * @return A promise that will be resolved with the percentage that watering should be scaled by.
- */
-async function calculateETScaling( adjustmentOptions: ETScalingAdjustmentOptions, etoData: EToData ): Promise< number > {
-
-	// TODO this default baseETo is not based on any data. Automatically determine ETo based on geographic location instead.
-	let elevation = 150, baseETo = 2;
-
-	if ( adjustmentOptions && "elevation" in adjustmentOptions ) {
-		elevation = adjustmentOptions.elevation;
-	}
-
-	if ( adjustmentOptions && "baseETo" in adjustmentOptions ) {
-		baseETo = adjustmentOptions.baseETo
-	}
-
-	const eto: number = calculateETo( etoData, elevation );
-
-	return Math.floor( Math.min( Math.max( 0, ( eto - etoData.precip ) / baseETo * 100 ), 200 ) );
-}
-
-/**
  * Checks if the weather data meets any of the restrictions set by OpenSprinkler. Restrictions prevent any watering
  * from occurring and are similar to 0% watering level. Known restrictions are:
  *
@@ -251,13 +175,17 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
-	let adjustmentMethod: number			= req.params[ 0 ] & ~( 1 << 7 ),
+	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ req.params[ 0 ] & ~( 1 << 7 ) ],
 		adjustmentOptionsString: string		= getParameter(req.query.wto),
 		location: string | GeoCoordinates	= getParameter(req.query.loc),
 		outputFormat: string				= getParameter(req.query.format),
 		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
 		adjustmentOptions: AdjustmentOptions;
 
+	if ( !adjustmentMethod ) {
+		res.send( "Error: invalid adjustment method specified" );
+		return;
+	}
 
 	// X-Forwarded-For header may contain more than one IP address and therefore
 	// the string is split against a comma and the first value is selected
@@ -286,12 +214,12 @@ export const getWateringData = async function( req: express.Request, res: expres
 		res.send(`Error: Unable to resolve location (${err})`);
 		return;
 	}
-	location = coordinates;
 
 	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
 	let wateringData: WateringData;
-	if ( adjustmentMethod !== ADJUSTMENT_METHOD.MANUAL ) {
+
+	if ( adjustmentMethod !== ManualAdjustmentMethod ) {
 		if ( !weatherProvider.getWateringData ) {
 			res.send( "Error: selected WeatherProvider does not support getWateringData" );
 			return;
@@ -300,53 +228,25 @@ export const getWateringData = async function( req: express.Request, res: expres
 		wateringData = await weatherProvider.getWateringData( coordinates );
 	}
 
+	const adjustmentMethodResponse: AdjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
+		adjustmentOptions, wateringData, coordinates, weatherProvider
+	);
 
-	// Process data to retrieve the resulting scale, sunrise/sunset, timezone,
-	// and also calculate if a restriction is met to prevent watering.
-
-	// Use getTimeData as fallback if a PWS is used but time data is not provided.
-	// This will never occur, but it might become possible in the future when PWS support is re-added.
-	if ( !timeData ) {
-		if ( typeof location[ 0 ] === "number" && typeof location[ 1 ] === "number" ) {
-			timeData = getTimeData( location as GeoCoordinates );
-		} else {
-			res.send( "Error: No weather data found." );
-			return;
-		}
+	// If an error that should be sent to the user occurred, send it to them.
+	if ( adjustmentMethodResponse.errorMessage ) {
+		res.send( "Error: " + adjustmentMethodResponse.errorMessage );
+		return;
 	}
 
-	let scale = -1,	rainDelay = -1;
+	// If an error that should be gracefully handled occurred, default to 100% watering.
+	let scale = ( adjustmentMethodResponse.scale !== undefined ) ? adjustmentMethodResponse.scale : 100;
+	// Default to a rain delay of -1 if one was not specified.
+	let rainDelay = ( adjustmentMethodResponse.rainDelay !== undefined ) ? adjustmentMethodResponse.rainDelay : -1;
 
-	if ( adjustmentMethod === ADJUSTMENT_METHOD.ZIMMERMAN ) {
-		scale = calculateZimmermanWateringScale( adjustmentOptions, wateringData );
-	} else if ( adjustmentMethod === ADJUSTMENT_METHOD.ET_SCALING ) {
-		if ( !weatherProvider.getEToData ) {
-			res.send( "Error: selected WeatherProvider does not support getEToData" );
-			return;
-		}
-
-		const etoData: EToData = await weatherProvider.getEToData( coordinates );
-		scale = await calculateETScaling( adjustmentOptions, etoData );
-	}
-
-	if (wateringData) {
+	if ( wateringData ) {
 		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-		if (checkWeatherRestriction(req.params[0], wateringData)) {
+		if ( checkWeatherRestriction( req.params[ 0 ], wateringData ) ) {
 			scale = 0;
-		}
-
-		// If any weather adjustment is being used, check the rain status
-		if ( adjustmentMethod > ADJUSTMENT_METHOD.MANUAL && wateringData.raining ) {
-
-			// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
-			if ( adjustmentMethod === ADJUSTMENT_METHOD.RAIN_DELAY ) {
-
-				rainDelay = ( adjustmentOptions && adjustmentOptions.hasOwnProperty( "d" ) ) ? adjustmentOptions.d : 24;
-			} else {
-
-				// For any other adjustment method, apply a scale of 0 (as the scale will revert when the rain stops)
-				scale = 0;
-			}
 		}
 	}
 
@@ -357,24 +257,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sunrise:	timeData.sunrise,
 		sunset:		timeData.sunset,
 		eip:		ipToInt( remoteAddress ),
-		rawData:	undefined
+		rawData:	adjustmentMethodResponse.rawData
 	};
-
-	if ( adjustmentMethod === ADJUSTMENT_METHOD.ZIMMERMAN || adjustmentMethod === ADJUSTMENT_METHOD.RAIN_DELAY ) {
-		data.rawData = {
-			h: wateringData ? Math.round( wateringData.humidity * 100) / 100 : null,
-			p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
-			t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
-			raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
-		};
-	}
-	// TODO include raw data from ETo scaling.
-
-	/* Note: The local WeatherProvider will never return undefined, so there's no need to worry about this condition
-		failing to be met if the local WeatherProvider is used but wateringData is falsy (since it will never happen). */
-	if ( wateringData && wateringData.weatherProvider === "local" ) {
-		console.log( "OpenSprinkler Weather Response: %s", JSON.stringify( data ) );
-	}
 
 	// Return the response to the client in the requested format
 	if ( outputFormat === "json" ) {
@@ -436,7 +320,7 @@ async function httpRequest( url: string ): Promise< string > {
  * @param obj The object to check.
  * @return A boolean indicating if the object has numeric values for all of the specified keys.
  */
-function validateValues( keys: string[], obj: object ): boolean {
+export function validateValues( keys: string[], obj: object ): boolean {
 	let key: string;
 
 	for ( key in keys ) {

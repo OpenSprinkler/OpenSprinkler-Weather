@@ -68,33 +68,6 @@ export interface WateringData {
     raining: boolean;
 }
 
-export interface AdjustmentOptions {
-    /** The rain delay to use (in hours). */
-    d?: number;
-}
-
-export interface ZimmermanAdjustmentOptions extends AdjustmentOptions {
-    /** Base humidity (as a percentage). */
-    bh?: number;
-    /** Base temperature (in Fahrenheit). */
-    bt?: number;
-    /** Base precipitation (in inches). */
-    br?: number;
-    /** The percentage to weight the humidity factor by. */
-    h?: number;
-    /** The percentage to weight the temperature factor by. */
-    t?: number;
-    /** The percentage to weight the precipitation factor by. */
-    r?: number;
-}
-
-export interface ETScalingAdjustmentOptions extends  AdjustmentOptions {
-    /** The watering site's height above sea level (in meters). */
-    elevation?: number;
-    /** Base ETo (in millimeters per day). */
-    baseETo?: number;
-}
-
 export interface WeatherProvider {
     /**
      * Retrieves weather data necessary for watering level calculations.
