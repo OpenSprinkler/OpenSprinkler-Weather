@@ -65,7 +65,7 @@ async function resolveCoordinates( location: string ): Promise< GeoCoordinates >
 		if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
 
 			// If it is, reply with an array containing the GPS coordinates
-			return [ data.RESULTS[ 0 ].lat, data.RESULTS[ 0 ].lon ];
+			return [ parseFloat( data.RESULTS[ 0 ].lat ), parseFloat( data.RESULTS[ 0 ].lon ) ];
 		} else {
 
 			// Otherwise, indicate no data was found
@@ -176,6 +176,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
 	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ req.params[ 0 ] & ~( 1 << 7 ) ],
+		checkRestrictions: boolean			= ( ( req.params[ 0 ] >> 7 ) & 1 ) > 0,
 		adjustmentOptionsString: string		= getParameter(req.query.wto),
 		location: string | GeoCoordinates	= getParameter(req.query.loc),
 		outputFormat: string				= getParameter(req.query.format),
@@ -219,7 +220,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let timeData: TimeData = getTimeData( coordinates );
 	let wateringData: WateringData;
 
-	if ( adjustmentMethod !== ManualAdjustmentMethod ) {
+	if ( adjustmentMethod !== ManualAdjustmentMethod || checkRestrictions ) {
 		if ( !weatherProvider.getWateringData ) {
 			res.send( "Error: selected WeatherProvider does not support getWateringData" );
 			return;
@@ -322,6 +323,11 @@ async function httpRequest( url: string ): Promise< string > {
  */
 export function validateValues( keys: string[], obj: object ): boolean {
 	let key: string;
+
+	// Return false if the object is null/undefined.
+	if ( !obj ) {
+		return false;
+	}
 
 	for ( key in keys ) {
 		if ( !keys.hasOwnProperty( key ) ) {

@@ -1,43 +1,78 @@
 import * as moment from "moment-timezone";
 
-import {EToData, GeoCoordinates, WateringData, WeatherData, WeatherProvider} from "../../types";
+import { EToData, GeoCoordinates, WateringData, WeatherData, WeatherProvider } from "../../types";
 import { httpJSONRequest } from "../weather";
 import * as SunCalc from "suncalc";
 
 async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-	// The Unix epoch seconds timestamp of 24 hours ago.
-	const timestamp: number = moment().subtract( 1, "day" ).unix();
+	// The Unix seconds timestamp of 24 hours ago.
+	const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
+	// The current Unix seconds timestamp.
+	const todayTimestamp: number = moment().unix();
 
 	const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
-		historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}`;
+		yesterdayUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${yesterdayTimestamp}?exclude=currently,minutely,daily,alerts,flags`,
+		todayUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${todayTimestamp}?exclude=currently,minutely,daily,alerts,flags`;
 
-	let historicData;
+	let yesterdayData, todayData;
 	try {
-		historicData = await httpJSONRequest( historicUrl );
+		yesterdayData = await httpJSONRequest( yesterdayUrl );
+		todayData = await httpJSONRequest( todayUrl );
 	} catch (err) {
 		// Indicate watering data could not be retrieved if an API error occurs.
 		return undefined;
 	}
 
+	if ( !todayData.hourly || !todayData.hourly.data || !yesterdayData.hourly || !yesterdayData.hourly.data ) {
+		return undefined;
+	}
+
+	/* The number of hourly forecasts to use from today's data. This will only include elements that contain historic
+		data (not forecast data). */
+	// Find the first element that contains forecast data.
+	const todayElements = Math.min( 24, todayData.hourly.data.findIndex( ( data ) => data.time > todayTimestamp - 60 * 60 ) );
+
+	/* Take as much data as possible from the first elements of today's data and take the remaining required data from
+		the remaining data from the last elements of yesterday's data. */
+	const samples = [
+		...yesterdayData.hourly.data.slice( todayElements - 24 ),
+		...todayData.hourly.data.slice( 0, todayElements )
+	];
+
+	// Fail if not enough data is available.
+	if ( samples.length !== 24 ) {
+		return undefined;
+	}
+
+	const totals = { temp: 0, humidity: 0, precip: 0 };
+	for ( const sample of samples ) {
+		totals.temp += sample.temperature;
+		totals.humidity += sample.humidity;
+		totals.precip += sample.precipIntensity
+	}
+
 	return {
 		weatherProvider: "DarkSky",
-		// Calculate average temperature for the day using hourly data.
-		temp : historicData.hourly.data.reduce( ( sum, hourlyData ) => sum + hourlyData.temperature, 0 ) / historicData.hourly.data.length,
-		humidity: historicData.daily.data[ 0 ].humidity * 100,
-		precip: historicData.daily.data[ 0 ].precipIntensity * 24,
-		raining: historicData.currently.precipType === "rain"
+		temp : totals.temp / 24,
+		humidity: totals.humidity / 24 * 100,
+		precip: totals.precip,
+		raining: samples[ samples.length - 1 ].precipIntensity > 0
 	};
 }
 
 async function getDarkSkyWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 	const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
-		forecastUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]}`;
+		forecastUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]}?exclude=minutely,alerts,flags`;
 
 	let forecast;
 	try {
 		forecast = await httpJSONRequest( forecastUrl );
 	} catch (err) {
-		// Indicate watering data could not be retrieved if an API error occurs.
+		// Indicate weather data could not be retrieved if an API error occurs.
+		return undefined;
+	}
+
+	if ( !forecast.currently || !forecast.daily || !forecast.daily.data ) {
 		return undefined;
 	}
 
@@ -52,16 +87,16 @@ async function getDarkSkyWeatherData( coordinates: GeoCoordinates ): Promise< We
 
 		region: "",
 		city: "",
-		minTemp: Math.floor( forecast.daily.data[ 0 ].temperatureLow ),
-		maxTemp: Math.floor( forecast.daily.data[ 0 ].temperatureHigh ),
+		minTemp: Math.floor( forecast.daily.data[ 0 ].temperatureMin ),
+		maxTemp: Math.floor( forecast.daily.data[ 0 ].temperatureMax ),
 		precip: forecast.daily.data[ 0 ].precipIntensity * 24,
-		forecast: []
+		forecast: [ ]
 	};
 
 	for ( let index = 0; index < forecast.daily.data.length; index++ ) {
 		weather.forecast.push( {
-			temp_min: Math.floor( forecast.daily.data[ index ].temperatureLow ),
-			temp_max: Math.floor( forecast.daily.data[ index ].temperatureHigh ),
+			temp_min: Math.floor( forecast.daily.data[ index ].temperatureMin ),
+			temp_max: Math.floor( forecast.daily.data[ index ].temperatureMax ),
 			date: forecast.daily.data[ index ].time,
 			// TODO set this
 			icon: "",
