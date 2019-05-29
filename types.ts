@@ -98,6 +98,8 @@ export interface WeatherProvider {
  * Data used to calculate ETo. This data should be taken from a 24 hour time window.
  */
 export interface EToData {
+    /** The WeatherProvider that generated this data. */
+    weatherProvider: WeatherProviderId;
     /** The minimum temperature over the time period (in Celsius). */
     minTemp: number;
     /** The maximum temperature over the time period (in Celsius). */

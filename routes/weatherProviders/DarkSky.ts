@@ -143,6 +143,7 @@ async function getDarkSkyEToData( coordinates: GeoCoordinates ): Promise< EToDat
 	}, 0 );
 
 	return {
+		weatherProvider: "DarkSky",
 		minTemp: historicData.daily.data[ 0 ].temperatureMin,
 		maxTemp: historicData.daily.data[ 0 ].temperatureMax,
 		minHumidity: historicData.hourly.data.reduce( ( min, hour ) => Math.min( min, hour.humidity ), 1) * 100,
