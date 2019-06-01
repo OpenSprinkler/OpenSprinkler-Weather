@@ -99,9 +99,9 @@ You should now be able to go to your PWS configuration screen and connect the PW
 
 Now that we have the PWS connected to the Raspberry Pi's WiFi access point and sending information to Weather Underground, we can set-up the intercept to redirect that information to our local Weather Service. We do this by identifying all packets arriving at the Pi from the PWS and heading towards Port 80 (the WU cloud port).
 
-These packets can be redirected to the IP and Port of our local Weather Service using the `iptable` command. We will need to setup the configuration and then save it to a file `iptables.ipv4.nat` so that we can restore the configuration easily after a reboot. When executing the commands below, make sure to substitute <PWS_IP> with the PWS address selected earlier and to use the IP and Port for your local Weather Service in place of `<Weather Service IP:PORT>`:
+These packets can be redirected to the IP and Port of our local Weather Service using the `iptable` command. We will need to setup the configuration and then save it to a file `iptables.ipv4.nat` so that we can restore the configuration easily after a reboot. When executing the commands below, make sure to substitute <PWS_IP> with your PWS address and to use the IP and Port for your local Weather Service in place of `<Weather Service IP:PORT>`:
 ```
-pi@raspberry:~ $ sudo iptables -t nat -A PREROUTING -s <PWS IP> -p tcp --dport 80 -j DNAT --to-destination <Weather Service IP:PORT>
+pi@raspberry:~ $ sudo iptables -t nat -A PREROUTING -m physdev --physdev-in wlan0 -s <PWS IP> -p tcp --dport 80 -j DNAT --to-destination <Weather Service IP:PORT>
 pi@raspberry:~ $ sudo sh -c "iptables-save > /etc/iptables.ipv4.nat"
 ```
 In order to ensure these forwarding rules are always operating, we need to create a small batch file called `/etc/network/if-up.d/eth0-iptables` that is run every time the ethernet inerface is started:
