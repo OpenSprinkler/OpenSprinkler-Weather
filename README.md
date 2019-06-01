@@ -46,7 +46,9 @@ Many PWS already support the Weather Underground format and can be connected to 
 
 To do this intercepting, you place a physical device - such as a Raspberry Pi - in-between the PWS and the home network. It is this "man-in-the-middle" device that will look for information heading from the PWS toward the WU cloud and redirect that information to the local Weather Service.
 
-For more information on configuring a Raspberry Pi Zero W to act as a "Man In The Middle" solution click [here](docs/man-in-middle.md)
+For more information on configuring a Raspberry Pi Zero W to act as a "Man In The Middle" solution follow these links:
+- If you have a PWS that connects to your home network using an ethernet cable then click [here](docs/man-in-middle.md)
+- If you have a PWS that connects to your home network via wifi then click [here](docs/wifi-hotspot.md)
 
 **3 ) PWS Supported By WeeWX**
 

@@ -48,7 +48,7 @@ bridge_ports eth0 wlan0
 
 Now we need to provide a mechanism to allow the PWS to connect to the Raspberry Pi's WiFi. We do this using the `hostapd` package to create a dedicated Access Point for the PWS.
 
-You need to edit the hostapd configuration file, located at `/etc/hostapd/hostapd.conf`. This is an empty file so we just need to open it up in an editor add the somes lines from below:
+You need to edit the hostapd configuration file, located at `/etc/hostapd/hostapd.conf`. This is an empty file so we just need to open it up in an editor add some line from below:
 ```
 pi@raspberry:~ $ sudo nano /etc/hostapd/hostapd.conf
 ```
