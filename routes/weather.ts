@@ -282,9 +282,9 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 				rainDelay = ( adjustmentOptions && adjustmentOptions.hasOwnProperty( "d" ) ) ? adjustmentOptions.d : 24;
 			} else {
-
+				// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
 				// For any other adjustment method, apply a scale of 0 (as the scale will revert when the rain stops)
-				scale = 0;
+				// scale = 0;
 			}
 		}
 	}
