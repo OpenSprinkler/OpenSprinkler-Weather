@@ -36,7 +36,7 @@ async function calculateEToWateringScale(
 	}
 
 	// TODO this default baseETo is not based on any data. Automatically determine ETo based on geographic location instead.
-	let elevation = 150, baseETo = 2;
+	let elevation = 150 * 3.281, baseETo = 2 / 25.4;
 
 	if ( adjustmentOptions && "elevation" in adjustmentOptions ) {
 		elevation = adjustmentOptions.elevation;
@@ -53,8 +53,8 @@ async function calculateEToWateringScale(
 		scale: scale,
 		// TODO should more data be included and should fields be renamed?
 		rawData: {
-			baseETo: Math.round( baseETo * 100) / 100,
-			eto: Math.round( eto * 100) / 100,
+			baseETo: Math.round( baseETo * 1000) / 1000,
+			eto: Math.round( eto * 1000) / 1000,
 			radiation: Math.round( etoData.solarRadiation * 100) / 100
 		}
 	}
@@ -65,14 +65,19 @@ async function calculateEToWateringScale(
  * Calculates the reference evapotranspiration using the Penman-Monteith (FAO-56) method (http://www.fao.org/3/X0490E/x0490e07.htm).
  *
  * @param etoData The data to calculate the ETo with.
- * @param elevation The elevation above sea level of the watering site (in meters).
- * @return The reference evapotranspiration (in millimeters per day).
+ * @param elevation The elevation above sea level of the watering site (in feet).
+ * @return The reference evapotranspiration (in inches per day).
  */
 export function calculateETo( etoData: EToData, elevation: number ): number {
-	const avgTemp = ( etoData.maxTemp + etoData.minTemp ) / 2;
+	// Convert to Celsius.
+	const minTemp = ( etoData.minTemp - 32 ) * 5 / 9;
+	const maxTemp = ( etoData.maxTemp - 32 ) * 5 / 9;
+	elevation = elevation / 3.281;
 
-	// Adjust the wind speed to a 2m height.
-	const windSpeed = etoData.windSpeed * 4.87 / Math.log( 67.8 * etoData.windSpeedMeasurementHeight - 5.42 );
+	const avgTemp = ( maxTemp + minTemp ) / 2;
+
+	// Convert the wind speed to metric and adjust it to a 2m height.
+	const windSpeed = etoData.windSpeed / 2.237 * 4.87 / Math.log( 67.8 * etoData.windSpeedMeasurementHeight / 3.281 - 5.42 );
 
 	const saturationVaporPressureCurveSlope = 4098 * 0.6108 * Math.exp( 17.27 * avgTemp / ( avgTemp + 237.3 ) ) / Math.pow( avgTemp + 237.3, 2 );
 
@@ -86,9 +91,9 @@ export function calculateETo( etoData: EToData, elevation: number ): number {
 
 	const tempTerm = ( 900 / ( avgTemp + 273 ) ) * windSpeed;
 
-	const minSaturationVaporPressure = 0.6108 * Math.exp( 17.27 * etoData.minTemp / ( etoData.minTemp + 237.3 ) );
+	const minSaturationVaporPressure = 0.6108 * Math.exp( 17.27 * minTemp / ( minTemp + 237.3 ) );
 
-	const maxSaturationVaporPressure = 0.6108 * Math.exp( 17.27 * etoData.maxTemp / ( etoData.maxTemp + 237.3 ) );
+	const maxSaturationVaporPressure = 0.6108 * Math.exp( 17.27 * maxTemp / ( maxTemp + 237.3 ) );
 
 	const avgSaturationVaporPressure = ( minSaturationVaporPressure + maxSaturationVaporPressure ) / 2;
 
@@ -110,7 +115,7 @@ export function calculateETo( etoData: EToData, elevation: number ): number {
 
 	const netShortWaveRadiation = ( 1 - 0.23 ) * solarRadiation;
 
-	const netOutgoingLongWaveRadiation = 4.903e-9 * ( Math.pow( etoData.maxTemp + 273.16, 4 ) + Math.pow( etoData.minTemp + 273.16, 4 ) ) / 2 * ( 0.34 - 0.14 * Math.sqrt( actualVaporPressure ) ) * ( 1.35 * solarRadiation / clearSkyRadiation - 0.35);
+	const netOutgoingLongWaveRadiation = 4.903e-9 * ( Math.pow( maxTemp + 273.16, 4 ) + Math.pow( minTemp + 273.16, 4 ) ) / 2 * ( 0.34 - 0.14 * Math.sqrt( actualVaporPressure ) ) * ( 1.35 * solarRadiation / clearSkyRadiation - 0.35);
 
 	const netRadiation = netShortWaveRadiation - netOutgoingLongWaveRadiation;
 
@@ -118,7 +123,7 @@ export function calculateETo( etoData: EToData, elevation: number ): number {
 
 	const windTerm = psiTerm * tempTerm * ( avgSaturationVaporPressure - actualVaporPressure );
 
-	return windTerm + radiationTerm;
+	return ( windTerm + radiationTerm ) / 25.4;
 }
 
 

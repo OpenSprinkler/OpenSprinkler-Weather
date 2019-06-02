@@ -113,7 +113,7 @@ async function getDarkSkyEToData( coordinates: GeoCoordinates ): Promise< EToDat
 	const timestamp: number = moment().subtract( 1, "day" ).unix();
 
 	const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
-		historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}?units=si`;
+		historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}`;
 
 	let historicData;
 	try {
@@ -151,7 +151,7 @@ async function getDarkSkyEToData( coordinates: GeoCoordinates ): Promise< EToDat
 		solarRadiation: solarRadiation,
 		windSpeed: historicData.daily.data[ 0 ].windSpeed,
 		// TODO find out what height wind speed measurements are actually taken at.
-		windSpeedMeasurementHeight: 2,
+		windSpeedMeasurementHeight: 2 * 3.281,
 		dayOfYear: moment().subtract( 1, "day" ).dayOfYear(),
 		lat: coordinates[ 0 ],
 		precip: historicData.daily.data[ 0 ].precipIntensity * 24

@@ -100,9 +100,9 @@ export interface WeatherProvider {
 export interface EToData {
     /** The WeatherProvider that generated this data. */
     weatherProvider: WeatherProviderId;
-    /** The minimum temperature over the time period (in Celsius). */
+    /** The minimum temperature over the time period (in Fahrenheit). */
     minTemp: number;
-    /** The maximum temperature over the time period (in Celsius). */
+    /** The maximum temperature over the time period (in Fahrenheit). */
     maxTemp: number;
     /** The minimum relative humidity over the time period (as a percentage). */
     minHumidity: number;
@@ -110,15 +110,15 @@ export interface EToData {
     maxHumidity: number;
     /** The solar radiation, accounting for cloud coverage (in megajoules per square meter per day). */
     solarRadiation: number;
-    /** The average wind speed over the time period (in meters per second). */
+    /** The average wind speed over the time period (in miles per hour). */
     windSpeed: number;
-    /** The height the wind speed measurement was taken at (in meters). */
+    /** The height the wind speed measurement was taken at (in feet). */
     windSpeedMeasurementHeight: number;
     /** The day of the year between 1 (January 1) and 365/366 (December 31). */
     dayOfYear: number;
     /** The latitude of the watering site (in degrees). */
     lat: number;
-    /** The total precipitation over the time period (in millimeters). */
+    /** The total precipitation over the time period (in inches). */
     precip: number;
 }
 
