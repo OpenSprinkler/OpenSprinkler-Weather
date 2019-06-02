@@ -122,4 +122,4 @@ export interface EToData {
     precip: number;
 }
 
-export type WeatherProviderId = "OWM" | "DarkSky" | "local";
+export type WeatherProviderId = "OWM" | "DarkSky" | "local" | "mock";
