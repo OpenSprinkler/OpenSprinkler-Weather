@@ -20,12 +20,15 @@ async function calculateEToWateringScale(
 		};
 	}
 
+	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
+	/*
 	if ( wateringData && wateringData.raining ) {
 		return {
 			scale: 0,
 			rawData: { raining: 1 }
 		}
 	}
+	 */
 
 	const etoData: EToData = await weatherProvider.getEToData( coordinates );
 

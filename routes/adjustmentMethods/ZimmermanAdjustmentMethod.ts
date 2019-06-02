@@ -9,6 +9,8 @@ import { validateValues } from "../weather";
  */
 async function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdjustmentOptions, wateringData: WateringData | undefined ): Promise< AdjustmentMethodResponse > {
 
+	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
+	/*
 	// Don't water if it is currently raining.
 	if ( wateringData && wateringData.raining ) {
 		return {
@@ -16,6 +18,7 @@ async function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdju
 			rawData: { raining: 1 }
 		}
 	}
+	*/
 
 	const rawData = {
 		h: wateringData ? Math.round( wateringData.humidity * 100) / 100 : null,
