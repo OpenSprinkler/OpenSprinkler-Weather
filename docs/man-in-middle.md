@@ -13,7 +13,7 @@ pi@raspberry:~ $ sudo apt-get install dnsmasq
 pi@raspberry:~ $ sudo rm -rf /etc/dnsmasq.d/*
 ```
 
-Then, we need to change one of the default Raspberry Pi setting to enable IP forwarding. We will be using this forwarding functional later in the installation process. The setting can be changed by editing the file `sysctl.conf`:
+Then, we need to change one of the default Raspberry Pi setting to enable IP forwarding. We will be using this forwarding functionality later in the installation process. The setting can be changed by editing the file `sysctl.conf`:
 
 ```
 pi@raspberry:~ $ sudo nano /etc/sysctl.conf
@@ -66,7 +66,7 @@ These packets can be redirected to the IP and Port of our local Weather Service 
 ```
 pi@raspberry:~ $ sudo iptables -t nat -A PREROUTING -s <PWS IP> -p tcp --dport 80 -j DNAT --to-destination <Weather Service IP:PORT>
 pi@raspberry:~ $ sudo iptables -t nat -A POSTROUTING -j MASQUERADE
-pi@raspberry:~ $ sudo iptables-save > /etc/iptables.ipv4.nat
+pi@raspberry:~ $ sudo sh -c "iptables-save >/etc/iptables.ipv4.nat"
 ```
 In order to ensure these forwarding rules are always operating, we need to create a small batch file called `/etc/network/if-up.d/eth0-iptables` that is run every time the ethernet inerface is started:
 ```
@@ -79,7 +79,7 @@ sudo iptables-restore < /etc/iptables.ipv4.nat
 ```
 Lastly, ensure that the file is executable:
 ```
-pi@raspberry:~ $ chmod +x /etc/network/if-up.d/eth0-iptables
+pi@raspberry:~ $ sudo chmod +x /etc/network/if-up.d/eth0-iptables
 ```
 We have now configured the various port forwarding rules and ensured they will survive a reboot and/or a restart of the ethernet interface.
 
