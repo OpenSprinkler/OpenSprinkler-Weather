@@ -10,7 +10,6 @@
   "include": [
     "server.ts",
     "types.ts",
-    "EToCalculator.ts",
     "routes/**/*"
   ]
 }
