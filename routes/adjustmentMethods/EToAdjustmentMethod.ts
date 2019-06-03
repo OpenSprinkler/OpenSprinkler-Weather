@@ -49,7 +49,7 @@ async function calculateEToWateringScale(
 		baseETo = adjustmentOptions.baseETo
 	}
 
-	const eto: number = calculateETo( etoData, elevation );
+	const eto: number = calculateETo( etoData, elevation, coordinates );
 
 	const scale =  Math.floor( Math.min( Math.max( 0, ( eto - etoData.precip ) / baseETo * 100 ), 200 ) );
 	return {
@@ -69,9 +69,10 @@ async function calculateEToWateringScale(
  *
  * @param etoData The data to calculate the ETo with.
  * @param elevation The elevation above sea level of the watering site (in feet).
+ * @param coordinates The coordinates of the watering site.
  * @return The reference evapotranspiration (in inches per day).
  */
-export function calculateETo( etoData: EToData, elevation: number ): number {
+export function calculateETo( etoData: EToData, elevation: number, coordinates: GeoCoordinates ): number {
 	// Convert to Celsius.
 	const minTemp = ( etoData.minTemp - 32 ) * 5 / 9;
 	const maxTemp = ( etoData.maxTemp - 32 ) * 5 / 9;
@@ -106,7 +107,7 @@ export function calculateETo( etoData: EToData, elevation: number ): number {
 
 	const solarDeclination = 0.409 * Math.sin( 2 * Math.PI / 365 * etoData.dayOfYear - 1.39 );
 
-	const latitudeRads = Math.PI / 180 * etoData.lat;
+	const latitudeRads = Math.PI / 180 * coordinates[ 0 ];
 
 	const sunsetHourAngle = Math.acos( -Math.tan( latitudeRads ) * Math.tan( solarDeclination ) );
 

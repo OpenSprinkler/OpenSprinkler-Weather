@@ -116,8 +116,6 @@ export interface EToData {
     windSpeedMeasurementHeight: number;
     /** The day of the year between 1 (January 1) and 365/366 (December 31). */
     dayOfYear: number;
-    /** The latitude of the watering site (in degrees). */
-    lat: number;
     /** The total precipitation over the time period (in inches). */
     precip: number;
 }

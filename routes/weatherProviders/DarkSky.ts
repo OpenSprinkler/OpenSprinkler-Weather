@@ -153,7 +153,6 @@ async function getDarkSkyEToData( coordinates: GeoCoordinates ): Promise< EToDat
 		// TODO find out what height wind speed measurements are actually taken at.
 		windSpeedMeasurementHeight: 2 * 3.281,
 		dayOfYear: moment().subtract( 1, "day" ).dayOfYear(),
-		lat: coordinates[ 0 ],
 		precip: historicData.daily.data[ 0 ].precipIntensity * 24
 	};
 }
