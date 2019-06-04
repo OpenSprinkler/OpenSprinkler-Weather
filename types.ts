@@ -110,10 +110,11 @@ export interface EToData {
     maxHumidity: number;
     /** The solar radiation, accounting for cloud coverage (in megajoules per square meter per day). */
     solarRadiation: number;
-    /** The average wind speed over the time period (in miles per hour). */
+    /**
+     * The average wind speed measured at 2 meters over the time period (in miles per hour). A measurement taken at a
+     * different height can be standardized to 2m using the `standardizeWindSpeed` function in EToAdjustmentMethod.
+     */
     windSpeed: number;
-    /** The height the wind speed measurement was taken at (in feet). */
-    windSpeedMeasurementHeight: number;
     /** The day of the year between 1 (January 1) and 365/366 (December 31). */
     dayOfYear: number;
     /** The total precipitation over the time period (in inches). */

@@ -149,9 +149,8 @@ async function getDarkSkyEToData( coordinates: GeoCoordinates ): Promise< EToDat
 		minHumidity: historicData.hourly.data.reduce( ( min, hour ) => Math.min( min, hour.humidity ), 1) * 100,
 		maxHumidity: historicData.hourly.data.reduce( ( max, hour ) => Math.max( max, hour.humidity ), 0) * 100,
 		solarRadiation: solarRadiation,
+		// Assume wind speed measurements are taken at 2 meters.
 		windSpeed: historicData.daily.data[ 0 ].windSpeed,
-		// TODO find out what height wind speed measurements are actually taken at.
-		windSpeedMeasurementHeight: 2 * 3.281,
 		dayOfYear: moment().subtract( 1, "day" ).dayOfYear(),
 		precip: historicData.daily.data[ 0 ].precipIntensity * 24
 	};

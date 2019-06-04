@@ -80,20 +80,17 @@ export function calculateETo( etoData: EToData, elevation: number, coordinates: 
 
 	const avgTemp = ( maxTemp + minTemp ) / 2;
 
-	// Convert the wind speed to metric and adjust it to a 2m height.
-	const windSpeed = etoData.windSpeed / 2.237 * 4.87 / Math.log( 67.8 * etoData.windSpeedMeasurementHeight / 3.281 - 5.42 );
-
 	const saturationVaporPressureCurveSlope = 4098 * 0.6108 * Math.exp( 17.27 * avgTemp / ( avgTemp + 237.3 ) ) / Math.pow( avgTemp + 237.3, 2 );
 
 	const pressure = 101.3 * Math.pow( ( 293 - 0.0065 * elevation ) / 293, 5.26 );
 
 	const psychrometricConstant = 0.000665 * pressure;
 
-	const deltaTerm = saturationVaporPressureCurveSlope / ( saturationVaporPressureCurveSlope + psychrometricConstant * ( 1 + 0.34 * windSpeed ) );
+	const deltaTerm = saturationVaporPressureCurveSlope / ( saturationVaporPressureCurveSlope + psychrometricConstant * ( 1 + 0.34 * etoData.windSpeed ) );
 
-	const psiTerm = psychrometricConstant / ( saturationVaporPressureCurveSlope + psychrometricConstant * ( 1 + 0.34 * windSpeed ) );
+	const psiTerm = psychrometricConstant / ( saturationVaporPressureCurveSlope + psychrometricConstant * ( 1 + 0.34 * etoData.windSpeed ) );
 
-	const tempTerm = ( 900 / ( avgTemp + 273 ) ) * windSpeed;
+	const tempTerm = ( 900 / ( avgTemp + 273 ) ) * etoData.windSpeed;
 
 	const minSaturationVaporPressure = 0.6108 * Math.exp( 17.27 * minTemp / ( minTemp + 237.3 ) );
 
@@ -128,6 +125,16 @@ export function calculateETo( etoData: EToData, elevation: number, coordinates: 
 	const windTerm = psiTerm * tempTerm * ( avgSaturationVaporPressure - actualVaporPressure );
 
 	return ( windTerm + radiationTerm ) / 25.4;
+}
+
+/**
+ * Approximates the wind speed at 2 meters using the wind speed measured at another height.
+ * @param speed The wind speed measured at the specified height (in miles per hour).
+ * @param height The height of the measurement (in feet).
+ * @returns The approximate wind speed at 2 meters (in miles per hour).
+ */
+export function standardizeWindSpeed( speed: number, height: number ) {
+	return speed / 2.237 * 4.87 / Math.log( 67.8 * height / 3.281 - 5.42 );
 }
 
 
