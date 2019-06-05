@@ -2,7 +2,7 @@ import * as moment from "moment-timezone";
 
 import { EToData, GeoCoordinates, WateringData, WeatherData, WeatherProvider } from "../../types";
 import { httpJSONRequest } from "../weather";
-import * as SunCalc from "suncalc";
+import {approximateSolarRadiation, CloudCoverInfo} from "../adjustmentMethods/EToAdjustmentMethod";
 
 async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
 	// The Unix seconds timestamp of 24 hours ago.
@@ -123,24 +123,13 @@ async function getDarkSkyEToData( coordinates: GeoCoordinates ): Promise< EToDat
 		return undefined;
 	}
 
-	// Approximate solar radiation using a formula from http://www.shodor.org/os411/courses/_master/tools/calculators/solarrad/
-	const solarRadiation = historicData.hourly.data.reduce( ( total, hour ) => {
-		const currPosition = SunCalc.getPosition( new Date( hour.time * 1000 ), coordinates[ 0 ], coordinates[ 1 ] );
-		// The Sun's position 1 hour ago.
-		const lastPosition = SunCalc.getPosition( new Date( hour.time * 1000 - 60 * 60 * 1000 ), coordinates[ 0 ], coordinates[ 1 ] );
-		const solarElevationAngle = ( currPosition.altitude + lastPosition.altitude ) / 2;
-
-		// Calculate radiation and convert from watts to megajoules.
-		const clearSkyIsolation = ( 990 * Math.sin( solarElevationAngle ) - 30 ) * 0.0036;
-
-		// TODO include the radiation from hours where the sun is partially above the horizon.
-		// Skip hours where the sun was below the horizon.
-		if ( clearSkyIsolation <= 0 ) {
-			return total;
-		}
-
-		return total + clearSkyIsolation * ( 1 - 0.75 * Math.pow( hour.cloudCover, 3.4 ) );
-	}, 0 );
+	const cloudCoverInfo: CloudCoverInfo[] = historicData.hourly.data.map( ( hour ): CloudCoverInfo => {
+		return {
+			startTime: moment.unix( hour.time ),
+			endTime: moment.unix( hour.time ).add( 1, "hours" ),
+			cloudCover: hour.cloudCover
+		};
+	} );
 
 	return {
 		weatherProvider: "DarkSky",
@@ -148,7 +137,7 @@ async function getDarkSkyEToData( coordinates: GeoCoordinates ): Promise< EToDat
 		maxTemp: historicData.daily.data[ 0 ].temperatureMax,
 		minHumidity: historicData.hourly.data.reduce( ( min, hour ) => Math.min( min, hour.humidity ), 1) * 100,
 		maxHumidity: historicData.hourly.data.reduce( ( max, hour ) => Math.max( max, hour.humidity ), 0) * 100,
-		solarRadiation: solarRadiation,
+		solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
 		// Assume wind speed measurements are taken at 2 meters.
 		windSpeed: historicData.daily.data[ 0 ].windSpeed,
 		dayOfYear: moment().subtract( 1, "day" ).dayOfYear(),
