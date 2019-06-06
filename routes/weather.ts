@@ -5,8 +5,9 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData, WeatherProvider } from "../types";
-const weatherProvider: WeatherProvider = require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default;
+import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData } from "../types";
+import { WeatherProvider } from "./weatherProviders/WeatherProvider";
+const weatherProvider: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
 
 // Define regex filters to match against location
 const filters = {
