@@ -225,6 +225,12 @@ export const getWateringData = async function( req: express.Request, res: expres
 		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
 		adjustmentOptions: AdjustmentOptions;
 
+	/* A message to include in the response to indicate that the watering scale was not calculated correctly and
+	defaulted to 100%. This approach is used for backwards compatibility because older OS firmware versions were
+	hardcoded to keep the previous watering scale if the response did not include a watering scale, but newer versions
+	might allow for different behaviors. */
+	let errorMessage: string = undefined;
+
 
 	// X-Forwarded-For header may contain more than one IP address and therefore
 	// the string is split against a comma and the first value is selected
@@ -272,8 +278,9 @@ export const getWateringData = async function( req: express.Request, res: expres
 		try {
 			scale = calculateZimmermanWateringScale( adjustmentOptions, wateringData );
 		} catch ( err ) {
-			res.send( "Error: " + err );
-			return;
+			// Default to a scale of 100% if the scale can't be calculated.
+			scale = 100;
+			errorMessage = err;
 		}
 	}
 
@@ -305,7 +312,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sunrise:	timeData.sunrise,
 		sunset:		timeData.sunset,
 		eip:		ipToInt( remoteAddress ),
-		rawData:	undefined
+		rawData:	undefined,
+		error:		errorMessage
 	};
 
 	if ( adjustmentMethod > ADJUSTMENT_METHOD.MANUAL ) {
@@ -327,7 +335,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 			"&sunrise="		+	data.sunrise +
 			"&sunset="		+	data.sunset +
 			"&eip="			+	data.eip +
-			( data.rawData ? "&rawData=" + JSON.stringify( data.rawData ) : "" )
+			( data.rawData ? "&rawData=" + JSON.stringify( data.rawData ) : "" ) +
+			( errorMessage ? "&error=" + encodeURIComponent( errorMessage ) : "" )
 		);
 	}
 
