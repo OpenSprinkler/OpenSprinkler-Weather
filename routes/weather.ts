@@ -278,7 +278,12 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let scale = -1,	rainDelay = -1;
 
 	if ( adjustmentMethod === ADJUSTMENT_METHOD.ZIMMERMAN ) {
-		scale = calculateZimmermanWateringScale( adjustmentOptions, wateringData );
+		try {
+			scale = calculateZimmermanWateringScale( adjustmentOptions, wateringData );
+		} catch ( err ) {
+			res.send( "Error: " + err );
+			return;
+		}
 	}
 
 	if (wateringData) {
