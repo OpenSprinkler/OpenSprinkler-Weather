@@ -103,4 +103,4 @@ export interface WeatherProvider {
     getWeatherData?( coordinates : GeoCoordinates ): Promise< WeatherData >;
 }
 
-export type WeatherProviderId = "OWM" | "DarkSky" | "local";
+export type WeatherProviderId = "OWM" | "DarkSky" | "local" | "mock";
