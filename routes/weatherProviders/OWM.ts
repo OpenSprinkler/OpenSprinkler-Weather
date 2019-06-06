@@ -10,13 +10,13 @@ async function getOWMWateringData( coordinates: GeoCoordinates ): Promise< Water
 	try {
 		forecast = await httpJSONRequest( forecastUrl );
 	} catch (err) {
-		// Indicate watering data could not be retrieved if an API error occurs.
-		return undefined;
+		console.error( "Error retrieving weather information from OWM:", err );
+		throw "An error occurred while retrieving weather information from OWM."
 	}
 
 	// Indicate watering data could not be retrieved if the forecast data is incomplete.
 	if ( !forecast || !forecast.list ) {
-		return undefined;
+		throw "Necessary field(s) were missing from weather information returned by OWM.";
 	}
 
 	let totalTemp = 0,
@@ -49,13 +49,13 @@ async function getOWMWeatherData( coordinates: GeoCoordinates ): Promise< Weathe
 		current = await httpJSONRequest( currentUrl );
 		forecast = await httpJSONRequest( forecastDailyUrl );
 	} catch (err) {
-		// Indicate watering data could not be retrieved if an API error occurs.
-		return undefined;
+		console.error( "Error retrieving weather information from OWM:", err );
+		throw "An error occurred while retrieving weather information from OWM."
 	}
 
 	// Indicate watering data could not be retrieved if the forecast data is incomplete.
 	if ( !current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list ) {
-		return undefined;
+		throw "Necessary field(s) were missing from weather information returned by OWM.";
 	}
 
 	const weather: WeatherData = {

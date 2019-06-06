@@ -17,12 +17,12 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 		yesterdayData = await httpJSONRequest( yesterdayUrl );
 		todayData = await httpJSONRequest( todayUrl );
 	} catch (err) {
-		// Indicate watering data could not be retrieved if an API error occurs.
-		return undefined;
+		console.error( "Error retrieving weather information from Dark Sky:", err );
+		throw "An error occurred while retrieving weather information from Dark Sky."
 	}
 
 	if ( !todayData.hourly || !todayData.hourly.data || !yesterdayData.hourly || !yesterdayData.hourly.data ) {
-		return undefined;
+		throw "Necessary field(s) were missing from weather information returned by Dark Sky.";
 	}
 
 	/* The number of hourly forecasts to use from today's data. This will only include elements that contain historic
@@ -39,7 +39,7 @@ async function getDarkSkyWateringData( coordinates: GeoCoordinates ): Promise< W
 
 	// Fail if not enough data is available.
 	if ( samples.length !== 24 ) {
-		return undefined;
+		throw "Insufficient data was returned by Dark Sky.";
 	}
 
 	const totals = { temp: 0, humidity: 0, precip: 0 };
@@ -66,12 +66,12 @@ async function getDarkSkyWeatherData( coordinates: GeoCoordinates ): Promise< We
 	try {
 		forecast = await httpJSONRequest( forecastUrl );
 	} catch (err) {
-		// Indicate weather data could not be retrieved if an API error occurs.
-		return undefined;
+		console.error( "Error retrieving weather information from Dark Sky:", err );
+		throw "An error occurred while retrieving weather information from Dark Sky."
 	}
 
 	if ( !forecast.currently || !forecast.daily || !forecast.daily.data ) {
-		return undefined;
+		throw "Necessary field(s) were missing from weather information returned by Dark Sky.";
 	}
 
 	const weather: WeatherData = {

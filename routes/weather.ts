@@ -71,7 +71,8 @@ async function resolveCoordinates( location: string ): Promise< GeoCoordinates >
  * Makes an HTTP/HTTPS GET request to the specified URL and parses the JSON response body.
  * @param url The URL to fetch.
  * @return A Promise that will be resolved the with parsed response body if the request succeeds, or will be rejected
- * with an Error if the request or JSON parsing fails.
+ * with an error if the request or JSON parsing fails. This error may contain information about the HTTP request or,
+ * response including API keys and other sensitive information.
  */
 export async function httpJSONRequest(url: string ): Promise< any > {
 	try {
@@ -110,6 +111,7 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  * @param adjustmentOptions Options to tweak the calculation, or undefined/null if no custom values are to be used.
  * @param wateringData The weather to use to calculate watering percentage.
  * @return The percentage that watering should be scaled by.
+ * @throws An error message will be thrown if the watering scale cannot be calculated.
  */
 function calculateZimmermanWateringScale( adjustmentOptions: AdjustmentOptions, wateringData: WateringData ): number {
 
@@ -117,7 +119,7 @@ function calculateZimmermanWateringScale( adjustmentOptions: AdjustmentOptions, 
 
 	// Check to make sure valid data exists for all factors
 	if ( !validateValues( [ "temp", "humidity", "precip" ], wateringData ) ) {
-		return 100;
+		throw "Necessary field(s) were missing from WateringData.";
 	}
 
 	// Get baseline conditions for 100% water level, if provided
@@ -196,7 +198,13 @@ export const getWeatherData = async function( req: express.Request, res: express
 
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
-	const weatherData: WeatherData = await weatherProvider.getWeatherData( coordinates );
+	let weatherData: WeatherData;
+	try {
+		weatherData = await weatherProvider.getWeatherData( coordinates );
+	} catch ( err ) {
+		res.send( "Error: " + err );
+		return;
+	}
 
 	res.json( {
 		...timeData,
@@ -259,7 +267,12 @@ export const getWateringData = async function( req: express.Request, res: expres
 			return;
 		}
 
-		wateringData = await weatherProvider.getWateringData( coordinates );
+		try {
+			wateringData = await weatherProvider.getWateringData( coordinates );
+		} catch ( err ) {
+			res.send( "Error: " + err );
+			return;
+		}
 	}
 
 	let scale = -1,	rainDelay = -1;
@@ -328,7 +341,8 @@ export const getWateringData = async function( req: express.Request, res: expres
  * Makes an HTTP/HTTPS GET request to the specified URL and returns the response body.
  * @param url The URL to fetch.
  * @return A Promise that will be resolved the with response body if the request succeeds, or will be rejected with an
- * Error if the request fails.
+ * error if the request fails or returns a non-200 status code. This error may contain information about the HTTP
+ * request or, response including API keys and other sensitive information.
  */
 async function httpRequest( url: string ): Promise< string > {
 	return new Promise< any >( ( resolve, reject ) => {
@@ -343,6 +357,11 @@ async function httpRequest( url: string ): Promise< string > {
 		};
 
 		( isHttps ? https : http ).get( options, ( response ) => {
+			if ( response.statusCode !== 200 ) {
+				reject( `Received ${ response.statusCode } status code for URL '${ url }'.` );
+				return;
+			}
+
 			let data = "";
 
 			// Reassemble the data as it comes in
