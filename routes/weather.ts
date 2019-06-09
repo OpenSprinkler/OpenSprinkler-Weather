@@ -266,17 +266,34 @@ export const getWateringData = async function( req: express.Request, res: expres
 	if ( outputFormat === "json" ) {
 		res.json( data );
 	} else {
-		res.send(	"&scale="		+	data.scale +
-			"&rd="			+	data.rd +
-			"&tz="			+	data.tz +
-			"&sunrise="		+	data.sunrise +
-			"&sunset="		+	data.sunset +
-			"&eip="			+	data.eip +
-			( data.rawData ? "&rawData=" + JSON.stringify( data.rawData ) : "" ) +
-			( data.error ? "&error=" + encodeURIComponent( data.error ) : "" )
-		);
-	}
+		// Return the data formatted as a URL query string.
+		let formatted = "";
+		for ( const key in data ) {
+			// Skip inherited properties.
+			if ( !data.hasOwnProperty( key ) ) {
+				continue;
+			}
 
+			let value = data[ key ];
+			switch ( typeof value ) {
+				case "undefined":
+					// Skip undefined properties.
+					continue;
+				case "object":
+					// Convert objects to JSON.
+					value = JSON.stringify( value );
+					// Fallthrough.
+				case "string":
+					/* URL encode strings. Since the OS firmware uses a primitive version of query string parsing and
+					decoding, only some characters need to be escaped and only spaces ("+" or "%20") will be decoded. */
+					value = value.replace( / /g, "+" ).replace( /\n/g, "\\n" ).replace( /&/g, "AMPERSAND" );
+					break;
+			}
+
+			formatted += `&${ key }=${ value }`;
+		}
+		res.send( formatted );
+	}
 };
 
 /**
