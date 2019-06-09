@@ -5,8 +5,9 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData, WeatherProvider } from "../types";
-const weatherProvider: WeatherProvider = require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default;
+import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData } from "../types";
+import { WeatherProvider } from "./weatherProviders/WeatherProvider";
+const weatherProvider: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
 
 // Define regex filters to match against location
 const filters = {
@@ -71,7 +72,8 @@ async function resolveCoordinates( location: string ): Promise< GeoCoordinates >
  * Makes an HTTP/HTTPS GET request to the specified URL and parses the JSON response body.
  * @param url The URL to fetch.
  * @return A Promise that will be resolved the with parsed response body if the request succeeds, or will be rejected
- * with an Error if the request or JSON parsing fails.
+ * with an error if the request or JSON parsing fails. This error may contain information about the HTTP request or,
+ * response including API keys and other sensitive information.
  */
 export async function httpJSONRequest(url: string ): Promise< any > {
 	try {
@@ -110,6 +112,7 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  * @param adjustmentOptions Options to tweak the calculation, or undefined/null if no custom values are to be used.
  * @param wateringData The weather to use to calculate watering percentage.
  * @return The percentage that watering should be scaled by.
+ * @throws An error message will be thrown if the watering scale cannot be calculated.
  */
 function calculateZimmermanWateringScale( adjustmentOptions: AdjustmentOptions, wateringData: WateringData ): number {
 
@@ -117,7 +120,7 @@ function calculateZimmermanWateringScale( adjustmentOptions: AdjustmentOptions, 
 
 	// Check to make sure valid data exists for all factors
 	if ( !validateValues( [ "temp", "humidity", "precip" ], wateringData ) ) {
-		return 100;
+		throw "Necessary field(s) were missing from WateringData.";
 	}
 
 	// Get baseline conditions for 100% water level, if provided
@@ -181,11 +184,6 @@ function checkWeatherRestriction( adjustmentValue: number, weather: WateringData
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
 
-	if ( !weatherProvider.getWeatherData ) {
-		res.send( "Error: selected WeatherProvider does not support getWeatherData" );
-		return;
-	}
-
 	let coordinates: GeoCoordinates;
 	try {
 		coordinates = await resolveCoordinates( location );
@@ -196,7 +194,13 @@ export const getWeatherData = async function( req: express.Request, res: express
 
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
-	const weatherData: WeatherData = await weatherProvider.getWeatherData( coordinates );
+	let weatherData: WeatherData;
+	try {
+		weatherData = await weatherProvider.getWeatherData( coordinates );
+	} catch ( err ) {
+		res.send( "Error: " + err );
+		return;
+	}
 
 	res.json( {
 		...timeData,
@@ -220,6 +224,12 @@ export const getWateringData = async function( req: express.Request, res: expres
 		outputFormat: string				= getParameter(req.query.format),
 		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
 		adjustmentOptions: AdjustmentOptions;
+
+	/* A message to include in the response to indicate that the watering scale was not calculated correctly and
+	defaulted to 100%. This approach is used for backwards compatibility because older OS firmware versions were
+	hardcoded to keep the previous watering scale if the response did not include a watering scale, but newer versions
+	might allow for different behaviors. */
+	let errorMessage: string = undefined;
 
 
 	// X-Forwarded-For header may contain more than one IP address and therefore
@@ -254,18 +264,24 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let timeData: TimeData = getTimeData( coordinates );
 	let wateringData: WateringData;
 	if ( adjustmentMethod !== ADJUSTMENT_METHOD.MANUAL || checkRestrictions ) {
-		if ( !weatherProvider.getWateringData ) {
-			res.send( "Error: selected WeatherProvider does not support getWateringData" );
+		try {
+			wateringData = await weatherProvider.getWateringData( coordinates );
+		} catch ( err ) {
+			res.send( "Error: " + err );
 			return;
 		}
-
-		wateringData = await weatherProvider.getWateringData( coordinates );
 	}
 
 	let scale = -1,	rainDelay = -1;
 
 	if ( adjustmentMethod === ADJUSTMENT_METHOD.ZIMMERMAN ) {
-		scale = calculateZimmermanWateringScale( adjustmentOptions, wateringData );
+		try {
+			scale = calculateZimmermanWateringScale( adjustmentOptions, wateringData );
+		} catch ( err ) {
+			// Default to a scale of 100% if the scale can't be calculated.
+			scale = 100;
+			errorMessage = err;
+		}
 	}
 
 	if (wateringData) {
@@ -296,7 +312,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sunrise:	timeData.sunrise,
 		sunset:		timeData.sunset,
 		eip:		ipToInt( remoteAddress ),
-		rawData:	undefined
+		rawData:	undefined,
+		error:		errorMessage
 	};
 
 	if ( adjustmentMethod > ADJUSTMENT_METHOD.MANUAL ) {
@@ -318,7 +335,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 			"&sunrise="		+	data.sunrise +
 			"&sunset="		+	data.sunset +
 			"&eip="			+	data.eip +
-			( data.rawData ? "&rawData=" + JSON.stringify( data.rawData ) : "" )
+			( data.rawData ? "&rawData=" + JSON.stringify( data.rawData ) : "" ) +
+			( errorMessage ? "&error=" + encodeURIComponent( errorMessage ) : "" )
 		);
 	}
 
@@ -328,7 +346,8 @@ export const getWateringData = async function( req: express.Request, res: expres
  * Makes an HTTP/HTTPS GET request to the specified URL and returns the response body.
  * @param url The URL to fetch.
  * @return A Promise that will be resolved the with response body if the request succeeds, or will be rejected with an
- * Error if the request fails.
+ * error if the request fails or returns a non-200 status code. This error may contain information about the HTTP
+ * request or, response including API keys and other sensitive information.
  */
 async function httpRequest( url: string ): Promise< string > {
 	return new Promise< any >( ( resolve, reject ) => {
@@ -343,6 +362,11 @@ async function httpRequest( url: string ): Promise< string > {
 		};
 
 		( isHttps ? https : http ).get( options, ( response ) => {
+			if ( response.statusCode !== 200 ) {
+				reject( `Received ${ response.statusCode } status code for URL '${ url }'.` );
+				return;
+			}
+
 			let data = "";
 
 			// Reassemble the data as it comes in
