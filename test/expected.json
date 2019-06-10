@@ -1,8 +1,6 @@
 {
 	"noWeather": {
 		"01002": {
-			"scale": -1,
-			"rd": -1,
 			"tz": 32,
 			"sunrise": 332,
 			"sunset": 1203,
@@ -12,7 +10,6 @@
 	"adjustment1": {
 		"01002": {
 			"scale": 0,
-			"rd": -1,
 			"tz": 32,
 			"sunrise": 332,
 			"sunset": 1203,

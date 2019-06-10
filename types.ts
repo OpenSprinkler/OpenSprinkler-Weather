@@ -68,21 +68,4 @@ export interface WateringData {
     raining: boolean;
 }
 
-export interface AdjustmentOptions {
-    /** Base humidity (as a percentage). */
-    bh?: number;
-    /** Base temperature (in Fahrenheit). */
-    bt?: number;
-    /** Base precipitation (in inches). */
-    br?: number;
-    /** The percentage to weight the humidity factor by. */
-    h?: number;
-    /** The percentage to weight the temperature factor by. */
-    t?: number;
-    /** The percentage to weight the precipitation factor by. */
-    r?: number;
-    /** The rain delay to use (in hours). */
-    d?: number;
-}
-
 export type WeatherProviderId = "OWM" | "DarkSky" | "local" | "mock";
