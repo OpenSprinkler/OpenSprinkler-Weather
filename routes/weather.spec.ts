@@ -5,7 +5,8 @@ import * as MockExpressResponse from 'mock-express-response';
 import * as MockDate from 'mockdate';
 
 import { getWateringData } from './weather';
-import { GeoCoordinates, WateringData, WeatherData, WeatherProvider } from "../types";
+import { GeoCoordinates, WateringData, WeatherData } from "../types";
+import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 
 const expected = require( '../test/expected.json' );
 const replies = require( '../test/replies.json' );
@@ -67,11 +68,12 @@ function mockOWM() {
  * This is a special WeatherProvider designed for testing purposes and should not be activated using the
  * WEATHER_PROVIDER environment variable.
  */
-export class MockWeatherProvider implements WeatherProvider {
+export class MockWeatherProvider extends WeatherProvider {
 
     private readonly mockData: MockWeatherData;
 
     public constructor(mockData: MockWeatherData) {
+        super();
         this.mockData = mockData;
     }
 
