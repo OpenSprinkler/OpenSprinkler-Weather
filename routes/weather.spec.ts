@@ -5,6 +5,8 @@ import * as MockExpressResponse from 'mock-express-response';
 import * as MockDate from 'mockdate';
 
 import { getWateringData } from './weather';
+import { GeoCoordinates, WateringData, WeatherData } from "../types";
+import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 
 const expected = require( '../test/expected.json' );
 const replies = require( '../test/replies.json' );
@@ -58,4 +60,43 @@ function mockOWM() {
         .filteringPath( function() { return "/"; } )
         .get( "/" )
         .reply( 200, replies[location].OWMData );
+}
+
+
+/**
+ * A WeatherProvider for testing purposes that returns weather data that is provided in the constructor.
+ * This is a special WeatherProvider designed for testing purposes and should not be activated using the
+ * WEATHER_PROVIDER environment variable.
+ */
+export class MockWeatherProvider extends WeatherProvider {
+
+    private readonly mockData: MockWeatherData;
+
+    public constructor(mockData: MockWeatherData) {
+        super();
+        this.mockData = mockData;
+    }
+
+    public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
+        const data = this.mockData.wateringData;
+        if ( !data.weatherProvider ) {
+            data.weatherProvider = "mock";
+        }
+
+        return data;
+    }
+
+    public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
+        const data = this.mockData.weatherData;
+        if ( !data.weatherProvider ) {
+            data.weatherProvider = "mock";
+        }
+
+        return data;
+    }
+}
+
+interface MockWeatherData {
+    wateringData?: WateringData,
+    weatherData?: WeatherData
 }

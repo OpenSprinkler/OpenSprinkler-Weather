@@ -85,4 +85,4 @@ export interface AdjustmentOptions {
     d?: number;
 }
 
-export type WeatherProviderId = "OWM" | "DarkSky" | "local";
+export type WeatherProviderId = "OWM" | "DarkSky" | "local" | "mock";
