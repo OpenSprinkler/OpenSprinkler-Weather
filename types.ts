@@ -68,4 +68,4 @@ export interface WateringData {
     raining: boolean;
 }
 
-export type WeatherProviderId = "OWM" | "DarkSky" | "local";
+export type WeatherProviderId = "OWM" | "DarkSky" | "local" | "mock";
