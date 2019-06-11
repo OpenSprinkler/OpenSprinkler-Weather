@@ -7,6 +7,7 @@ import * as MockDate from 'mockdate';
 import { getWateringData } from './weather';
 import { GeoCoordinates, WateringData, WeatherData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
+import { EToData } from "./adjustmentMethods/EToAdjustmentMethod";
 
 const expected = require( '../test/expected.json' );
 const replies = require( '../test/replies.json' );
@@ -78,16 +79,19 @@ export class MockWeatherProvider extends WeatherProvider {
     }
 
     public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-        const data = this.mockData.wateringData;
-        if ( !data.weatherProvider ) {
-            data.weatherProvider = "mock";
-        }
-
-        return data;
+        return await this.getData( "wateringData" ) as WateringData;
     }
 
     public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
-        const data = this.mockData.weatherData;
+        return await this.getData( "weatherData" ) as WeatherData;
+    }
+
+    public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+        return await this.getData( "etoData" ) as EToData;
+    }
+
+    private async getData( type: "wateringData" | "weatherData" | "etoData" ) {
+        const data = this.mockData[ type ];
         if ( !data.weatherProvider ) {
             data.weatherProvider = "mock";
         }
@@ -98,5 +102,6 @@ export class MockWeatherProvider extends WeatherProvider {
 
 interface MockWeatherData {
     wateringData?: WateringData,
-    weatherData?: WeatherData
+    weatherData?: WeatherData,
+    etoData?: EToData
 }
