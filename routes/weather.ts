@@ -11,6 +11,7 @@ import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from ".
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
+import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
 const weatherProvider: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
 
 // Define regex filters to match against location
@@ -26,7 +27,8 @@ const filters = {
 const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
 	0: ManualAdjustmentMethod,
 	1: ZimmermanAdjustmentMethod,
-	2: RainDelayAdjustmentMethod
+	2: RainDelayAdjustmentMethod,
+	3: EToAdjustmentMethod
 };
 
 /**
@@ -186,6 +188,11 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// X-Forwarded-For header may contain more than one IP address and therefore
 	// the string is split against a comma and the first value is selected
 	remoteAddress = remoteAddress.split( "," )[ 0 ];
+
+	if ( !adjustmentMethod ) {
+		res.send( "Error: Unknown AdjustmentMethod ID" );
+		return;
+	}
 
 	// Parse weather adjustment options
 	try {
