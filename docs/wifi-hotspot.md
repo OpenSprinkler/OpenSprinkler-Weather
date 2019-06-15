@@ -4,7 +4,7 @@ The following steps are based on a Raspberry Pi Zero W with an Ethernet/USB adap
 
 **Step 1: Install Software and Basic Setup**
 
-Install the latest version of Raspbian onto the Pi as per the instructions from the Raspberry Pi Foundation. Do not enable the WiFi interface by providing a `wpa_supplicant.conf` file but do enable `ssh`. You can now `ssh` into the Pi via the ethernet network and contiue the setup process.
+Install the latest version of Raspbian onto the Pi as per the instructions from the Raspberry Pi Foundation. Do not enable the WiFi interface at this stage instead `ssh` into the Pi via the ethernet network and contiue the setup process.
 
 We need to install two software packages to allow our Raspberry Pi to connect to our PWS and send the weather information across to our home network. The first, `hostapd`, will provide an access point to connect the PWS, and the second, `bridge-utils`, will route the information from the wifi-side of the rapsberry pi to the ethernet-side:
 ```

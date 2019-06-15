@@ -56,6 +56,7 @@ The WeeWX project provides a mechanism for OpenSprinkler owners to capture the d
 
 For more information on the "WeeWX Solution" click [here](docs/weewx.md)
 
-**4 ) Solutions for Other PWS**
+**4 ) Solutions for specific PWS (provided by OpenSprinkler Forum members)**
 
 - Davis Vantage: a solution for this PWS has been kindly provided by @rmloeb [here](docs/davis-vantage.md)
+- Netatmo: instructions for configuring this PWS have been greatfully provided by @franzstein [here](docs/netatmo.md)
