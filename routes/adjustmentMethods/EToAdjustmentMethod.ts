@@ -50,7 +50,12 @@ async function calculateEToWateringScale(
 		scale: scale,
 		rawData: {
 			eto: Math.round( eto * 1000) / 1000,
-			radiation: Math.round( etoData.solarRadiation * 100) / 100
+			radiation: Math.round( etoData.solarRadiation * 100) / 100,
+			minT: Math.round( etoData.minTemp ),
+			maxT: Math.round( etoData.maxTemp ),
+			minH: Math.round( etoData.minHumidity ),
+			maxH: Math.round( etoData.maxHumidity ),
+			wind: Math.round( etoData.windSpeed * 10 ) / 10
 		}
 	}
 }
