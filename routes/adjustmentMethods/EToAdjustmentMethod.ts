@@ -97,7 +97,7 @@ export function calculateETo( etoData: EToData, elevation: number, coordinates: 
 
 	const actualVaporPressure = ( minSaturationVaporPressure * etoData.maxHumidity / 100 + maxSaturationVaporPressure * etoData.minHumidity / 100 ) / 2;
 
-	const dayOfYear = moment.unix( etoData.timestamp ).dayOfYear();
+	const dayOfYear = moment.unix( etoData.periodStartTime ).dayOfYear();
 
 	const inverseRelativeEarthSunDistance = 1 + 0.033 * Math.cos( 2 * Math.PI / 365 * dayOfYear );
 
@@ -136,7 +136,12 @@ export function standardizeWindSpeed( speed: number, height: number ) {
 	return speed * 4.87 / Math.log( 67.8 * height / 3.281 - 5.42 );
 }
 
-// The time at which the formula for clear sky isolation will start/stop yielding a non-negative result.
+/* For hours where the Sun is too low to emit significant radiation, the formula for clear sky isolation will yield a
+ * negative value. "radiationStart" marks the times of day when the Sun will rise high for solar isolation formula to
+ * become positive, and "radiationEnd" marks the time of day when the Sun sets low enough that the equation will yield
+ * a negative result. For any times outside of these ranges, the formula will yield incorrect results (they should be
+ * clamped at 0 instead of being negative).
+ */
 SunCalc.addTime( Math.asin( 30 / 990 ) * 180 / Math.PI, "radiationStart", "radiationEnd" );
 
 /**
@@ -198,7 +203,7 @@ export interface EToData {
 	/** The WeatherProvider that generated this data. */
 	weatherProvider: WeatherProviderId;
 	/** The Unix epoch seconds timestamp of the start of this 24 hour time window. */
-	timestamp: number;
+	periodStartTime: number;
 	/** The minimum temperature over the time period (in Fahrenheit). */
 	minTemp: number;
 	/** The maximum temperature over the time period (in Fahrenheit). */

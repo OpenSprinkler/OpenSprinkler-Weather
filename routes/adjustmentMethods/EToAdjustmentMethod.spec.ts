@@ -15,7 +15,7 @@ describe( "ETo AdjustmentMethod", () => {
 					const etoData: EToData = {
 						...entry.data,
 						precip: 0,
-						timestamp: date.unix(),
+						periodStartTime: date.unix(),
 						weatherProvider: "mock"
 					};
 					const calculatedETo = calculateETo( etoData, locationData.elevation, locationData.coordinates );
