@@ -74,6 +74,8 @@ export function calculateETo( etoData: EToData, elevation: number, coordinates: 
 	elevation = elevation / 3.281;
 	// Convert to meters per second.
 	const windSpeed = etoData.windSpeed / 2.237;
+	// Convert to megajoules.
+	const solarRadiation = etoData.solarRadiation * 3.6;
 
 	const avgTemp = ( maxTemp + minTemp ) / 2;
 
@@ -111,8 +113,6 @@ export function calculateETo( etoData: EToData, elevation: number, coordinates: 
 
 	const clearSkyRadiation = ( 0.75 + 2e-5 * elevation ) * extraterrestrialRadiation;
 
-	const solarRadiation = etoData.solarRadiation;
-
 	const netShortWaveRadiation = ( 1 - 0.23 ) * solarRadiation;
 
 	const netOutgoingLongWaveRadiation = 4.903e-9 * ( Math.pow( maxTemp + 273.16, 4 ) + Math.pow( minTemp + 273.16, 4 ) ) / 2 * ( 0.34 - 0.14 * Math.sqrt( actualVaporPressure ) ) * ( 1.35 * solarRadiation / clearSkyRadiation - 0.35);
@@ -149,7 +149,7 @@ SunCalc.addTime( Math.asin( 30 / 990 ) * 180 / Math.PI, "radiationStart", "radia
  * http://www.shodor.org/os411/courses/_master/tools/calculators/solarrad/
  * @param cloudCoverInfo Information about the cloud coverage for several periods that span the entire day.
  * @param coordinates The coordinates of the location the data is from.
- * @return The total solar radiation for the day (in megajoules per square meter per day).
+ * @return The total solar radiation for the day (in kilowatt hours per square meter per day).
  */
 export function approximateSolarRadiation(cloudCoverInfo: CloudCoverInfo[], coordinates: GeoCoordinates ): number {
 	return cloudCoverInfo.reduce( ( total, window: CloudCoverInfo ) => {
@@ -172,8 +172,8 @@ export function approximateSolarRadiation(cloudCoverInfo: CloudCoverInfo[], coor
 		const endPosition = SunCalc.getPosition( endTime.toDate(), coordinates[ 0 ], coordinates[ 1 ] );
 		const solarElevationAngle = ( startPosition.altitude + endPosition.altitude ) / 2;
 
-		// Calculate radiation and convert from watts to megajoules.
-		const clearSkyIsolation = ( 990 * Math.sin( solarElevationAngle ) - 30 ) * 0.0036 * windowLength;
+		// Calculate radiation and convert from watts to kilowatts.
+		const clearSkyIsolation = ( 990 * Math.sin( solarElevationAngle ) - 30 ) / 1000 * windowLength;
 
 		return total + clearSkyIsolation * ( 1 - 0.75 * Math.pow( window.cloudCover, 3.4 ) );
 	}, 0 );
@@ -212,7 +212,7 @@ export interface EToData {
 	minHumidity: number;
 	/** The maximum relative humidity over the time period (as a percentage). */
 	maxHumidity: number;
-	/** The solar radiation, accounting for cloud coverage (in megajoules per square meter per day). */
+	/** The solar radiation, accounting for cloud coverage (in kilowatt hours per square meter per day). */
 	solarRadiation: number;
 	/**
 	 * The average wind speed measured at 2 meters over the time period (in miles per hour). A measurement taken at a
