@@ -3,6 +3,7 @@ import * as moment from "moment-timezone";
 import { GeoCoordinates, WateringData, WeatherData } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
+import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 
 export default class DarkSkyWeatherProvider extends WeatherProvider {
 
@@ -106,5 +107,53 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 		}
 
 		return weather;
+	}
+
+	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+		// The Unix epoch seconds timestamp of 24 hours ago.
+		const timestamp: number = moment().subtract( 1, "day" ).unix();
+
+		const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
+			historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}`;
+
+		let historicData;
+		try {
+			historicData = await httpJSONRequest( historicUrl );
+		} catch (err) {
+			throw "An error occurred while retrieving weather information from Dark Sky."
+		}
+
+		const cloudCoverInfo: CloudCoverInfo[] = historicData.hourly.data.map( ( hour ): CloudCoverInfo => {
+			return {
+				startTime: moment.unix( hour.time ),
+				endTime: moment.unix( hour.time ).add( 1, "hours" ),
+				cloudCover: hour.cloudCover
+			};
+		} );
+
+		let minHumidity: number = undefined, maxHumidity: number = undefined;
+		for ( const hour of historicData.hourly.data ) {
+			// Skip hours where humidity measurement does not exist to prevent result from being NaN.
+			if ( hour.humidity === undefined ) {
+				continue;
+			}
+
+			// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
+			minHumidity = minHumidity < hour.humidity ? minHumidity : hour.humidity;
+			maxHumidity = maxHumidity > hour.humidity ? maxHumidity : hour.humidity;
+		}
+
+		return {
+			weatherProvider: "DarkSky",
+			periodStartTime: historicData.hourly.data[ 0 ].time,
+			minTemp: historicData.daily.data[ 0 ].temperatureMin,
+			maxTemp: historicData.daily.data[ 0 ].temperatureMax,
+			minHumidity: minHumidity * 100,
+			maxHumidity: maxHumidity * 100,
+			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
+			// Assume wind speed measurements are taken at 2 meters.
+			windSpeed: historicData.daily.data[ 0 ].windSpeed,
+			precip: ( historicData.daily.data[ 0 ].precipIntensity || 0 ) * 24
+		};
 	}
 }
