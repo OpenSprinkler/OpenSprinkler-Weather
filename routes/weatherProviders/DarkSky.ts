@@ -6,14 +6,23 @@ import { WeatherProvider } from "./WeatherProvider";
 
 export default class DarkSkyWeatherProvider extends WeatherProvider {
 
+	private readonly API_KEY: string;
+
+	public constructor() {
+		super();
+		this.API_KEY = process.env.DARKSKY_API_KEY;
+		if (!this.API_KEY) {
+			throw "DARKSKY_API_KEY environment variable is not defined.";
+		}
+	}
+
 	public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
 		// The Unix timestamp of 24 hours ago.
 		const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
 		const todayTimestamp: number = moment().unix();
 
-		const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
-			yesterdayUrl = `https://api.darksky.net/forecast/${ DARKSKY_API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?exclude=currently,minutely,daily,alerts,flags`,
-			todayUrl = `https://api.darksky.net/forecast/${ DARKSKY_API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ todayTimestamp }?exclude=currently,minutely,daily,alerts,flags`;
+		const yesterdayUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?exclude=currently,minutely,daily,alerts,flags`,
+			todayUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ todayTimestamp }?exclude=currently,minutely,daily,alerts,flags`;
 
 		let yesterdayData, todayData;
 		try {
@@ -62,8 +71,7 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 	}
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
-		const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
-			forecastUrl = `https://api.darksky.net/forecast/${ DARKSKY_API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] }?exclude=minutely,alerts,flags`;
+		const forecastUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] }?exclude=minutely,alerts,flags`;
 
 		let forecast;
 		try {
