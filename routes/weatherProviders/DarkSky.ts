@@ -56,9 +56,16 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 
 		const totals = { temp: 0, humidity: 0, precip: 0 };
 		for ( const sample of samples ) {
+			/*
+			 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
+			 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
+			 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
+			 * significantly skewed if data is missing for several consecutive hours).
+			 */
 			totals.temp += sample.temperature;
 			totals.humidity += sample.humidity;
-			totals.precip += sample.precipIntensity
+			// This field may be missing from the response if it is snowing.
+			totals.precip += sample.precipIntensity || 0;
 		}
 
 		return {
