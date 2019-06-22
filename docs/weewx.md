@@ -21,5 +21,6 @@ Once installed and capturing data, the WeeWX solution can send the weather obser
         rapidfire = False
 ```
 Note: the `station` and `password` entries are not used by the OS Weather Service but must be populated to keep the plug-in happy.
+Second: you can't use the Wunderground upload feature twice in weewx.
 
-You can then restart the WeeWX server and your PWS observations should now be sent to the local Weather Service every 5 minutes.
+Now you can then restart the WeeWX server and your PWS observations should now be sent to the local Weather Service every 5 minutes. And do not forget to configure opensprinkler weatherservice. Go to the SuperUser Url https://<opensprinkler IP:Port>/su  and give your host and IP for the weatherservice (https://<Local Weather Service IP:Port>) 
