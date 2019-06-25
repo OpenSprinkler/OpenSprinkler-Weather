@@ -5,7 +5,7 @@
 *For Raspberry Pi 2 or Pi 3 models that are based on the newer ARMv7 and ARMv8 chip*
 ```
 pi@OSPi:~ $ curl -sL https://deb.nodesource.com/setup_11.x | sudo -E bash -l
-pi@OSPi:~ $ sudo apt install -y nodejs
+pi@OSPi:~ $ sudo apt-get install -y nodejs
 ```
 
 *For Raspberry Pi Model A, B, B+, Zero and Compute Module based on the older ARMv6 chip, the process is slightly more convoluted*
