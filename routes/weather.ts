@@ -37,7 +37,7 @@ const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
  * @return A promise that will be resolved with the coordinates of the best match for the specified location, or
  * rejected with an error message if unable to resolve the location.
  */
-async function resolveCoordinates( location: string ): Promise< GeoCoordinates > {
+export async function resolveCoordinates( location: string ): Promise< GeoCoordinates > {
 
 	if ( !location ) {
 		throw "No location specified";
@@ -428,7 +428,7 @@ function ipToInt( ip: string ): number {
  * @param parameter An array of parameters or a single parameter value.
  * @return The first element in the array of parameter or the single parameter provided.
  */
-function getParameter( parameter: string | string[] ): string {
+export function getParameter( parameter: string | string[] ): string {
 	if ( Array.isArray( parameter ) ) {
 		parameter = parameter[0];
 	}

@@ -6,3 +6,7 @@ npm-debug.log
 .idea
 js
 weather.zip
+baselineEToData/*.bin
+baselineEToData/*.png
+baselineEToData/*.tif
+baselineEToData/dataPreparer[.exe]
