@@ -55,7 +55,8 @@ async function calculateEToWateringScale(
 			maxT: Math.round( etoData.maxTemp ),
 			minH: Math.round( etoData.minHumidity ),
 			maxH: Math.round( etoData.maxHumidity ),
-			wind: Math.round( etoData.windSpeed * 10 ) / 10
+			wind: Math.round( etoData.windSpeed * 10 ) / 10,
+			p: Math.round( wateringData.precip * 100 ) / 100
 		}
 	}
 }
