@@ -40,29 +40,25 @@ async function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdju
 	let humidityBase = 30, tempBase = 70, precipBase = 0;
 
 	// Get baseline conditions for 100% water level, if provided
-	if ( adjustmentOptions ) {
-		humidityBase = adjustmentOptions.hasOwnProperty( "bh" ) ? adjustmentOptions.bh : humidityBase;
-		tempBase = adjustmentOptions.hasOwnProperty( "bt" ) ? adjustmentOptions.bt : tempBase;
-		precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
-	}
+	humidityBase = adjustmentOptions.hasOwnProperty( "bh" ) ? adjustmentOptions.bh : humidityBase;
+	tempBase = adjustmentOptions.hasOwnProperty( "bt" ) ? adjustmentOptions.bt : tempBase;
+	precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
 
 	let humidityFactor = ( humidityBase - wateringData.humidity ),
 		tempFactor = ( ( wateringData.temp - tempBase ) * 4 ),
 		precipFactor = ( ( precipBase - wateringData.precip ) * 200 );
 
 	// Apply adjustment options, if provided, by multiplying the percentage against the factor
-	if ( adjustmentOptions ) {
-		if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
-			humidityFactor = humidityFactor * ( adjustmentOptions.h / 100 );
-		}
+	if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
+		humidityFactor = humidityFactor * ( adjustmentOptions.h / 100 );
+	}
 
-		if ( adjustmentOptions.hasOwnProperty( "t" ) ) {
-			tempFactor = tempFactor * ( adjustmentOptions.t / 100 );
-		}
+	if ( adjustmentOptions.hasOwnProperty( "t" ) ) {
+		tempFactor = tempFactor * ( adjustmentOptions.t / 100 );
+	}
 
-		if ( adjustmentOptions.hasOwnProperty( "r" ) ) {
-			precipFactor = precipFactor * ( adjustmentOptions.r / 100 );
-		}
+	if ( adjustmentOptions.hasOwnProperty( "r" ) ) {
+		precipFactor = precipFactor * ( adjustmentOptions.r / 100 );
 	}
 
 	return {

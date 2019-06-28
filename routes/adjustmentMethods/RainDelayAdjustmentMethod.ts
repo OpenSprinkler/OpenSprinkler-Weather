@@ -7,7 +7,7 @@ import { WateringData } from "../../types";
  */
 async function calculateRainDelayWateringScale( adjustmentOptions: RainDelayAdjustmentOptions, wateringData: WateringData | undefined ): Promise< AdjustmentMethodResponse > {
 	const raining = wateringData && wateringData.raining;
-	const d = adjustmentOptions && adjustmentOptions.hasOwnProperty( "d" ) ? adjustmentOptions.d : 24;
+	const d = adjustmentOptions.hasOwnProperty( "d" ) ? adjustmentOptions.d : 24;
 	return {
 		scale: undefined,
 		rawData: { raining: raining ? 1 : 0 },

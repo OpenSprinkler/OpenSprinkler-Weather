@@ -5,9 +5,8 @@ import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 export interface AdjustmentMethod {
 	/**
 	 * Calculates the percentage that should be used to scale watering time.
-	 * @param adjustmentOptions The user-specified options for the calculation, or undefined/null if no custom values
-	 * are to be used. No checks will be made to ensure the AdjustmentOptions are the correct type that the function
-	 * is expecting or to ensure that any of its fields are valid.
+	 * @param adjustmentOptions The user-specified options for the calculation. No checks will be made to ensure the
+	 * AdjustmentOptions are the correct type that the function is expecting or to ensure that any of its fields are valid.
 	 * @param wateringData The basic weather information of the watering site. This may be undefined if an error occurred
 	 * while retrieving the data.
 	 * @param coordinates The coordinates of the watering site.
