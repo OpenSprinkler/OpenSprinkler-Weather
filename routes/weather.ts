@@ -5,7 +5,7 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { GeoCoordinates, TimeData, WateringData, WeatherData } from "../types";
+import { GeoCoordinates, TimeData, WeatherData, BaseWateringData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
@@ -121,7 +121,7 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  * @param weather Watering data to use to determine if any restrictions apply.
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
-function checkWeatherRestriction( adjustmentValue: number, weather: WateringData ): boolean {
+function checkWeatherRestriction( adjustmentValue: number, weather: BaseWateringData ): boolean {
 
 	const californiaRestriction = ( adjustmentValue >> 7 ) & 1;
 
@@ -211,22 +211,12 @@ export const getWateringData = async function( req: express.Request, res: expres
 		return;
 	}
 
-	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
-	let wateringData: WateringData;
-	if ( adjustmentMethod !== ManualAdjustmentMethod || checkRestrictions ) {
-		try {
-			wateringData = await weatherProvider.getWateringData( coordinates );
-		} catch ( err ) {
-			res.send( "Error: " + err );
-			return;
-		}
-	}
 
 	let adjustmentMethodResponse: AdjustmentMethodResponse;
 	try {
 		adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
-			adjustmentOptions, wateringData, coordinates, weatherProvider
+			adjustmentOptions, coordinates, weatherProvider
 		);
 	} catch ( err ) {
 		if ( typeof err != "string" ) {
@@ -244,7 +234,19 @@ export const getWateringData = async function( req: express.Request, res: expres
 	}
 
 	let scale = adjustmentMethodResponse.scale;
-	if ( wateringData ) {
+
+	if ( checkRestrictions ) {
+		let wateringData: BaseWateringData = adjustmentMethodResponse.wateringData;
+		// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
+		if ( checkRestrictions && !wateringData ) {
+			try {
+				wateringData = await weatherProvider.getWateringData( coordinates );
+			} catch ( err ) {
+				res.send( "Error: " + err );
+				return;
+			}
+		}
+
 		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
 		if ( checkWeatherRestriction( req.params[ 0 ], wateringData ) ) {
 			scale = 0;

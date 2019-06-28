@@ -1,13 +1,15 @@
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./AdjustmentMethod";
-import { WateringData } from "../../types";
+import { GeoCoordinates, ZimmermanWateringData } from "../../types";
 import { validateValues } from "../weather";
+import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 
 
 /**
  * Calculates how much watering should be scaled based on weather and adjustment options using the Zimmerman method.
  * (https://github.com/rszimm/sprinklers_pi/wiki/Weather-adjustments#formula-for-setting-the-scale)
  */
-async function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdjustmentOptions, wateringData: WateringData | undefined ): Promise< AdjustmentMethodResponse > {
+async function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdjustmentOptions, coordinates: GeoCoordinates, weatherProvider: WeatherProvider ): Promise< AdjustmentMethodResponse > {
+	const wateringData: ZimmermanWateringData = await weatherProvider.getWateringData( coordinates );
 
 	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
 	/*
@@ -15,7 +17,8 @@ async function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdju
 	if ( wateringData && wateringData.raining ) {
 		return {
 			scale: 0,
-			rawData: { raining: 1 }
+			rawData: { raining: 1 },
+			wateringData: wateringData
 		}
 	}
 	*/
@@ -33,7 +36,8 @@ async function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdju
 		return {
 			scale: 100,
 			rawData: rawData,
-			errorMessage: "Necessary field(s) were missing from WateringData."
+			errorMessage: "Necessary field(s) were missing from ZimmermanWateringData.",
+			wateringData: wateringData
 		};
 	}
 
@@ -64,7 +68,8 @@ async function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdju
 	return {
 		// Apply all of the weather modifying factors and clamp the result between 0 and 200%.
 		scale: Math.floor( Math.min( Math.max( 0, 100 + humidityFactor + tempFactor + precipFactor ), 200 ) ),
-		rawData: rawData
+		rawData: rawData,
+		wateringData: wateringData
 	}
 }
 

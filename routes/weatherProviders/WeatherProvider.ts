@@ -1,14 +1,14 @@
-import { GeoCoordinates, WateringData, WeatherData } from "../../types";
+import { GeoCoordinates, ZimmermanWateringData, WeatherData } from "../../types";
 
 export class WeatherProvider {
 	/**
-	 * Retrieves weather data necessary for watering level calculations.
+	 * Retrieves weather data necessary for Zimmerman watering level calculations.
 	 * @param coordinates The coordinates to retrieve the watering data for.
-	 * @return A Promise that will be resolved with the WateringData if it is successfully retrieved,
-	 * or rejected with an error message if an error occurs while retrieving the WateringData or the WeatherProvider
+	 * @return A Promise that will be resolved with the ZimmermanWateringData if it is successfully retrieved,
+	 * or rejected with an error message if an error occurs while retrieving the ZimmermanWateringData or the WeatherProvider
 	 * does not support this method.
 	 */
-	getWateringData( coordinates : GeoCoordinates ): Promise< WateringData > {
+	getWateringData( coordinates : GeoCoordinates ): Promise< ZimmermanWateringData > {
 		throw "Selected WeatherProvider does not support getWateringData";
 	}
 
