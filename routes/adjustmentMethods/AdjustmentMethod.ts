@@ -1,4 +1,4 @@
-import { BaseWateringData, GeoCoordinates } from "../../types";
+import { BaseWateringData, GeoCoordinates, PWS } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 
 
@@ -10,6 +10,8 @@ export interface AdjustmentMethod {
 	 * @param coordinates The coordinates of the watering site.
 	 * @param weatherProvider The WeatherProvider that should be used if the adjustment method needs to obtain any
 	 * weather data.
+	 * @param pws The PWS to retrieve weather data from, or undefined if a PWS should not be used. If the implementation
+	 * of this method does not have PWS support, this parameter may be ignored and coordinates may be used instead.
 	 * @return A Promise that will be resolved with the result of the calculation, or rejected with an error message if
 	 * the watering scale cannot be calculated.
 	 * @throws An error message can be thrown if an error occurs while calculating the watering scale.
@@ -17,7 +19,8 @@ export interface AdjustmentMethod {
 	calculateWateringScale(
 		adjustmentOptions: AdjustmentOptions,
 		coordinates: GeoCoordinates,
-		weatherProvider: WeatherProvider
+		weatherProvider: WeatherProvider,
+		pws?: PWS
 	): Promise< AdjustmentMethodResponse >;
 }
 

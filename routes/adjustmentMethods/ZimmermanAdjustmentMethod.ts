@@ -1,5 +1,5 @@
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./AdjustmentMethod";
-import { GeoCoordinates, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, PWS, ZimmermanWateringData } from "../../types";
 import { validateValues } from "../weather";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 
@@ -8,8 +8,13 @@ import { WeatherProvider } from "../weatherProviders/WeatherProvider";
  * Calculates how much watering should be scaled based on weather and adjustment options using the Zimmerman method.
  * (https://github.com/rszimm/sprinklers_pi/wiki/Weather-adjustments#formula-for-setting-the-scale)
  */
-async function calculateZimmermanWateringScale( adjustmentOptions: ZimmermanAdjustmentOptions, coordinates: GeoCoordinates, weatherProvider: WeatherProvider ): Promise< AdjustmentMethodResponse > {
-	const wateringData: ZimmermanWateringData = await weatherProvider.getWateringData( coordinates );
+async function calculateZimmermanWateringScale(
+	adjustmentOptions: ZimmermanAdjustmentOptions,
+	coordinates: GeoCoordinates,
+	weatherProvider: WeatherProvider,
+	pws?: PWS
+): Promise< AdjustmentMethodResponse > {
+	const wateringData: ZimmermanWateringData = await weatherProvider.getWateringData( coordinates, pws );
 
 	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
 	/*
