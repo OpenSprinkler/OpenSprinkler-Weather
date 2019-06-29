@@ -453,10 +453,13 @@ function getParameter( parameter: string | string[] ): string {
  * @throws Throws an error message if the string is in an invalid format and cannot be parsed.
  */
 function parsePWS( pwsString: string): PWS {
-	const match = pwsString.match( /^pws:(?<apiKey>[a-f\d]{32})@(?<id>[a-zA-Z\d]+)$/ );
+	const match = pwsString.match( /^pws:([a-f\d]{32})@([a-zA-Z\d]+)$/ );
 	if ( !match ) {
 		throw "Invalid PWS format.";
 	}
 
-	return match.groups as PWS;
+	return {
+		apiKey: match[ 1 ],
+		id: match[ 2 ]
+	};
 }
