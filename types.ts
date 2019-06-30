@@ -1,6 +1,9 @@
 /** Geographic coordinates. The 1st element is the latitude, and the 2nd element is the longitude. */
 export type GeoCoordinates = [number, number];
 
+/** A PWS ID and API key. */
+export type PWS = { id: string, apiKey: string };
+
 export interface TimeData {
     /** The UTC offset, in minutes. This uses POSIX offsets, which are the negation of typically used offsets
      * (https://github.com/eggert/tz/blob/2017b/etcetera#L36-L42).
@@ -50,22 +53,25 @@ export interface WeatherDataForecast {
     description: string;
 }
 
+export interface BaseWateringData {
+    /** The WeatherProvider that generated this data. */
+    weatherProvider: WeatherProviderId;
+    /** The total precipitation over the window (in inches). */
+    precip: number;
+}
+
 /**
  * Data from a 24 hour window that is used to calculate how watering levels should be scaled. This should ideally use
  * historic data from the past day, but may also use forecasted data for the next day if historical data is not
  * available.
  */
-export interface WateringData {
-    /** The WeatherProvider that generated this data. */
-    weatherProvider: WeatherProviderId;
+export interface ZimmermanWateringData extends BaseWateringData {
     /** The average temperature over the window (in Fahrenheit). */
     temp: number;
     /** The average humidity over the window (as a percentage). */
     humidity: number;
-    /** The total precipitation over the window (in inches). */
-    precip: number;
     /** A boolean indicating if it is raining at the time that this data was retrieved. */
     raining: boolean;
 }
 
-export type WeatherProviderId = "OWM" | "DarkSky" | "local" | "mock";
+export type WeatherProviderId = "OWM" | "DarkSky" | "local" | "mock" | "WUnderground";
