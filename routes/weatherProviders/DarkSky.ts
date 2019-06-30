@@ -26,8 +26,7 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 
 		let yesterdayData, todayData;
 		try {
-			yesterdayData = await httpJSONRequest( yesterdayUrl );
-			todayData = await httpJSONRequest( todayUrl );
+			[ yesterdayData, todayData ] = await Promise.all( [ httpJSONRequest( yesterdayUrl ), httpJSONRequest( todayUrl ) ] );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from Dark Sky:", err );
 			throw "An error occurred while retrieving weather information from Dark Sky."
