@@ -1,7 +1,7 @@
 import * as SunCalc from "suncalc";
 import * as moment from "moment";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./AdjustmentMethod";
-import { GeoCoordinates, WateringData, WeatherProviderId } from "../../types";
+import { BaseWateringData, GeoCoordinates, PWS } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 
 
@@ -11,9 +11,9 @@ import { WeatherProvider } from "../weatherProviders/WeatherProvider";
  */
 async function calculateEToWateringScale(
 	adjustmentOptions: EToScalingAdjustmentOptions,
-	wateringData: WateringData | undefined,
 	coordinates: GeoCoordinates,
-	weatherProvider: WeatherProvider
+	weatherProvider: WeatherProvider,
+	pws?: PWS
 ): Promise< AdjustmentMethodResponse > {
 
 	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
@@ -56,8 +56,9 @@ async function calculateEToWateringScale(
 			minH: Math.round( etoData.minHumidity ),
 			maxH: Math.round( etoData.maxHumidity ),
 			wind: Math.round( etoData.windSpeed * 10 ) / 10,
-			p: Math.round( wateringData.precip * 100 ) / 100
-		}
+			p: Math.round( etoData.precip * 100 ) / 100
+		},
+		wateringData: etoData
 	}
 }
 
@@ -205,9 +206,7 @@ export interface CloudCoverInfo {
 /**
  * Data used to calculate ETo. This data should be taken from a 24 hour time window.
  */
-export interface EToData {
-	/** The WeatherProvider that generated this data. */
-	weatherProvider: WeatherProviderId;
+export interface EToData extends BaseWateringData {
 	/** The Unix epoch seconds timestamp of the start of this 24 hour time window. */
 	periodStartTime: number;
 	/** The minimum temperature over the time period (in Fahrenheit). */
@@ -225,8 +224,6 @@ export interface EToData {
 	 * different height can be standardized to 2m using the `standardizeWindSpeed` function in EToAdjustmentMethod.
 	 */
 	windSpeed: number;
-	/** The total precipitation over the time period (in inches). */
-	precip: number;
 }
 
 const EToAdjustmentMethod: AdjustmentMethod = {

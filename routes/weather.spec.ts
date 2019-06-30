@@ -5,7 +5,7 @@ import * as MockExpressResponse from 'mock-express-response';
 import * as MockDate from 'mockdate';
 
 import { getWateringData } from './weather';
-import { GeoCoordinates, WateringData, WeatherData } from "../types";
+import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import { EToData } from "./adjustmentMethods/EToAdjustmentMethod";
 
@@ -78,8 +78,8 @@ export class MockWeatherProvider extends WeatherProvider {
         this.mockData = mockData;
     }
 
-    public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-        return await this.getData( "wateringData" ) as WateringData;
+    public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
+        return await this.getData( "wateringData" ) as ZimmermanWateringData;
     }
 
     public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
@@ -101,7 +101,7 @@ export class MockWeatherProvider extends WeatherProvider {
 }
 
 interface MockWeatherData {
-    wateringData?: WateringData,
+    wateringData?: ZimmermanWateringData,
     weatherData?: WeatherData,
     etoData?: EToData
 }

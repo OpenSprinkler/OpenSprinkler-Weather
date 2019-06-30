@@ -1,15 +1,17 @@
-import { GeoCoordinates, WateringData, WeatherData } from "../../types";
+import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
 import { EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 
 export class WeatherProvider {
 	/**
-	 * Retrieves weather data necessary for watering level calculations.
+	 * Retrieves weather data necessary for Zimmerman watering level calculations.
 	 * @param coordinates The coordinates to retrieve the watering data for.
-	 * @return A Promise that will be resolved with the WateringData if it is successfully retrieved,
-	 * or rejected with an error message if an error occurs while retrieving the WateringData or the WeatherProvider
+	 * @param pws The PWS to retrieve the weather from, or undefined if a PWS should not be used. If the implementation
+	 * of this method does not have PWS support, this parameter may be ignored and coordinates may be used instead.
+	 * @return A Promise that will be resolved with the ZimmermanWateringData if it is successfully retrieved,
+	 * or rejected with an error message if an error occurs while retrieving the ZimmermanWateringData or the WeatherProvider
 	 * does not support this method.
 	 */
-	getWateringData( coordinates : GeoCoordinates ): Promise< WateringData > {
+	getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData > {
 		throw "Selected WeatherProvider does not support getWateringData";
 	}
 
