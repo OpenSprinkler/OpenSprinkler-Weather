@@ -1,4 +1,4 @@
-import { GeoCoordinates, WateringData, WeatherData } from "../../types";
+import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 
@@ -14,7 +14,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		}
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
+	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
 		const forecastUrl = `http://api.openweathermap.org/data/2.5/forecast?appid=${ this.API_KEY }&units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }`;
 
 		// Perform the HTTP request to retrieve the weather data

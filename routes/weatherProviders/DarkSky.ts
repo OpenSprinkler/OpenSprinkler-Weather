@@ -1,6 +1,6 @@
 import * as moment from "moment-timezone";
 
-import { GeoCoordinates, WateringData, WeatherData } from "../../types";
+import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 
@@ -16,7 +16,7 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 		}
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
+	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
 		// The Unix timestamp of 24 hours ago.
 		const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
 		const todayTimestamp: number = moment().unix();

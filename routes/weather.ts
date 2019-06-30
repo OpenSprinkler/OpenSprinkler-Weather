@@ -5,13 +5,14 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { GeoCoordinates, TimeData, WateringData, WeatherData } from "../types";
+import { BaseWateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
-const weatherProvider: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
+const WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
+const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
 
 // Define regex filters to match against location
 const filters = {
@@ -42,7 +43,7 @@ async function resolveCoordinates( location: string ): Promise< GeoCoordinates >
 	}
 
 	if ( filters.pws.test( location ) ) {
-		throw "Weather Underground is discontinued";
+		throw "PWS ID must be specified in the pws parameter.";
 	} else if ( filters.gps.test( location ) ) {
 		const split: string[] = location.split( "," );
 		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
@@ -121,7 +122,7 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  * @param weather Watering data to use to determine if any restrictions apply.
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
-function checkWeatherRestriction( adjustmentValue: number, weather: WateringData ): boolean {
+function checkWeatherRestriction( adjustmentValue: number, weather: BaseWateringData ): boolean {
 
 	const californiaRestriction = ( adjustmentValue >> 7 ) & 1;
 
@@ -154,7 +155,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 	const timeData: TimeData = getTimeData( coordinates );
 	let weatherData: WeatherData;
 	try {
-		weatherData = await weatherProvider.getWeatherData( coordinates );
+		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates );
 	} catch ( err ) {
 		res.send( "Error: " + err );
 		return;
@@ -181,6 +182,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		location: string | GeoCoordinates	= getParameter(req.query.loc),
 		outputFormat: string				= getParameter(req.query.format),
 		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
+		pwsString: string					= getParameter( req.query.pws ),
 		adjustmentOptions: AdjustmentOptions;
 
 	// X-Forwarded-For header may contain more than one IP address and therefore
@@ -211,22 +213,24 @@ export const getWateringData = async function( req: express.Request, res: expres
 		return;
 	}
 
-	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
-	let wateringData: WateringData;
-	if ( adjustmentMethod !== ManualAdjustmentMethod || checkRestrictions ) {
+
+	// Parse the PWS information.
+	let pws: PWS | undefined = undefined;
+	if ( pwsString ) {
 		try {
-			wateringData = await weatherProvider.getWateringData( coordinates );
+			pws = parsePWS( pwsString );
 		} catch ( err ) {
-			res.send( "Error: " + err );
+			res.send( `Error: ${ err }` );
 			return;
 		}
 	}
 
+	const weatherProvider = pws ? PWS_WEATHER_PROVIDER : WEATHER_PROVIDER;
 	let adjustmentMethodResponse: AdjustmentMethodResponse;
 	try {
 		adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
-			adjustmentOptions, wateringData, coordinates, weatherProvider
+			adjustmentOptions, coordinates, weatherProvider, pws
 		);
 	} catch ( err ) {
 		if ( typeof err != "string" ) {
@@ -244,7 +248,19 @@ export const getWateringData = async function( req: express.Request, res: expres
 	}
 
 	let scale = adjustmentMethodResponse.scale;
-	if ( wateringData ) {
+
+	if ( checkRestrictions ) {
+		let wateringData: BaseWateringData = adjustmentMethodResponse.wateringData;
+		// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
+		if ( checkRestrictions && !wateringData ) {
+			try {
+				wateringData = await weatherProvider.getWateringData( coordinates );
+			} catch ( err ) {
+				res.send( "Error: " + err );
+				return;
+			}
+		}
+
 		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
 		if ( checkWeatherRestriction( req.params[ 0 ], wateringData ) ) {
 			scale = 0;
@@ -428,4 +444,22 @@ function getParameter( parameter: string | string[] ): string {
 
 	// Return an empty string if the parameter is undefined.
 	return parameter || "";
+}
+
+/**
+ * Creates a PWS object from a string.
+ * @param pwsString Information about the PWS in the format "pws:API_KEY@PWS_ID".
+ * @return The PWS specified by the string.
+ * @throws Throws an error message if the string is in an invalid format and cannot be parsed.
+ */
+function parsePWS( pwsString: string): PWS {
+	const match = pwsString.match( /^pws:([a-f\d]{32})@([a-zA-Z\d]+)$/ );
+	if ( !match ) {
+		throw "Invalid PWS format.";
+	}
+
+	return {
+		apiKey: match[ 1 ],
+		id: match[ 2 ]
+	};
 }

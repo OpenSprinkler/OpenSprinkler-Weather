@@ -9,7 +9,7 @@ process.env.WEATHER_PROVIDER = "OWM";
 process.env.OWM_API_KEY = "NO_KEY";
 
 import { getWateringData } from './weather';
-import { GeoCoordinates, WateringData, WeatherData } from "../types";
+import { GeoCoordinates, ZimmermanWateringData, WeatherData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 
 const expected = require( '../test/expected.json' );
@@ -81,7 +81,7 @@ export class MockWeatherProvider extends WeatherProvider {
         this.mockData = mockData;
     }
 
-    public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
+    public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
         const data = this.mockData.wateringData;
         if ( !data.weatherProvider ) {
             data.weatherProvider = "mock";
@@ -101,6 +101,6 @@ export class MockWeatherProvider extends WeatherProvider {
 }
 
 interface MockWeatherData {
-    wateringData?: WateringData,
+    wateringData?: ZimmermanWateringData,
     weatherData?: WeatherData
 }

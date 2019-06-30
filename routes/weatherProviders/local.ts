@@ -1,6 +1,6 @@
 import * as express	from "express";
 import { CronJob } from "cron";
-import { GeoCoordinates, WateringData } from "../../types";
+import { GeoCoordinates, ZimmermanWateringData } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
 
 const count = { temp: 0, humidity: 0 };
@@ -46,9 +46,9 @@ export const captureWUStream = function( req: express.Request, res: express.Resp
 
 export default class LocalWeatherProvider extends WeatherProvider {
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData > {
-		const result: WateringData = {
-			...yesterday as WateringData,
+	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
+		const result: ZimmermanWateringData = {
+			...yesterday as ZimmermanWateringData,
 			// Use today's weather if we dont have information for yesterday yet (i.e. on startup)
 			...today,
 			// PWS report "buckets" so consider it still raining if last bucket was less than an hour ago
