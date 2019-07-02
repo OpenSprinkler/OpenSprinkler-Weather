@@ -6,6 +6,7 @@ import * as cors from "cors";
 
 import * as weather from "./routes/weather";
 import * as local from "./routes/weatherProviders/local";
+import * as baselineETo from "./routes/baselineETo";
 
 let	host	= process.env.HOST || "127.0.0.1",
 	port	= parseInt( process.env.PORT ) || 3000;
@@ -31,6 +32,10 @@ if ( pws === "WU" ) {
 app.get( "/", function( req, res ) {
 	res.send( process.env.npm_package_description + " v" + process.env.npm_package_version );
 } );
+
+// Handle requests matching /baselineETo
+app.options( /baselineETo/, cors() );
+app.get( /baselineETo/, cors(), baselineETo.getBaselineETo );
 
 // Handle 404 error
 app.use( function( req, res ) {
