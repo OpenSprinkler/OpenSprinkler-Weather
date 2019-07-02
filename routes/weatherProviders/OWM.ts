@@ -4,9 +4,18 @@ import { WeatherProvider } from "./WeatherProvider";
 
 export default class OWMWeatherProvider extends WeatherProvider {
 
+	private readonly API_KEY: string;
+
+	public constructor() {
+		super();
+		this.API_KEY = process.env.OWM_API_KEY;
+		if (!this.API_KEY) {
+			throw "OWM_API_KEY environment variable is not defined.";
+		}
+	}
+
 	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
-		const OWM_API_KEY = process.env.OWM_API_KEY,
-			forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
+		const forecastUrl = `http://api.openweathermap.org/data/2.5/forecast?appid=${ this.API_KEY }&units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }`;
 
 		// Perform the HTTP request to retrieve the weather data
 		let forecast;
@@ -43,9 +52,8 @@ export default class OWMWeatherProvider extends WeatherProvider {
 	}
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
-		const OWM_API_KEY = process.env.OWM_API_KEY,
-			currentUrl = "http://api.openweathermap.org/data/2.5/weather?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ],
-			forecastDailyUrl = "http://api.openweathermap.org/data/2.5/forecast/daily?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
+		const currentUrl = `http://api.openweathermap.org/data/2.5/weather?appid=${ this.API_KEY }&units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }`,
+			forecastDailyUrl = `http://api.openweathermap.org/data/2.5/forecast/daily?appid=${ this.API_KEY }&units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }`;
 
 		let current, forecast;
 		try {
