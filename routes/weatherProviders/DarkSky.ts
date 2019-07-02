@@ -19,33 +19,23 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
 		// The Unix timestamp of 24 hours ago.
 		const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
-		const todayTimestamp: number = moment().unix();
 
-		const yesterdayUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?exclude=currently,minutely,daily,alerts,flags`,
-			todayUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ todayTimestamp }?exclude=currently,minutely,daily,alerts,flags`;
+		const yesterdayUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?exclude=currently,minutely,daily,alerts,flags`;
 
-		let yesterdayData, todayData;
+		let yesterdayData;
 		try {
-			[ yesterdayData, todayData ] = await Promise.all( [ httpJSONRequest( yesterdayUrl ), httpJSONRequest( todayUrl ) ] );
+			yesterdayData = await httpJSONRequest( yesterdayUrl );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from Dark Sky:", err );
 			throw "An error occurred while retrieving weather information from Dark Sky."
 		}
 
-		if ( !todayData.hourly || !todayData.hourly.data || !yesterdayData.hourly || !yesterdayData.hourly.data ) {
+		if ( !yesterdayData.hourly || !yesterdayData.hourly.data ) {
 			throw "Necessary field(s) were missing from weather information returned by Dark Sky.";
 		}
 
-		/* The number of hourly forecasts to use from today's data. This will only include elements that contain historic
-			data (not forecast data). */
-		// Find the first element that contains forecast data.
-		const todayElements = Math.min( 24, todayData.hourly.data.findIndex( ( data ) => data.time > todayTimestamp - 60 * 60 ) );
-
-		/* Take as much data as possible from the first elements of today's data and take the remaining required data from
-			the remaining data from the last elements of yesterday's data. */
 		const samples = [
-			...yesterdayData.hourly.data.slice( todayElements - 24 ),
-			...todayData.hourly.data.slice( 0, todayElements )
+			...yesterdayData.hourly.data
 		];
 
 		// Fail if not enough data is available.
