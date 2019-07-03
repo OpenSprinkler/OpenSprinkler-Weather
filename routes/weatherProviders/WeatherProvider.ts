@@ -24,4 +24,13 @@ export class WeatherProvider {
 	getWeatherData( coordinates : GeoCoordinates ): Promise< WeatherData > {
 		throw "Selected WeatherProvider does not support getWeatherData";
 	}
+
+	/**
+	 * Returns a boolean indicating if watering scales calculated using data from this WeatherProvider should be cached
+	 * until the end of the day in timezone the data was for.
+	 * @return a boolean indicating if watering scales calculated using data from this WeatherProvider should be cached.
+	 */
+	shouldCacheWateringScale(): boolean {
+		return false;
+	}
 }
