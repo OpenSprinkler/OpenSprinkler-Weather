@@ -111,4 +111,8 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 
 		return weather;
 	}
+
+	public shouldCacheWateringScale(): boolean {
+		return true;
+	}
 }

@@ -11,6 +11,7 @@ import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from ".
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
+import WateringScaleCache, { CachedScale } from "../WateringScaleCache";
 const WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
 const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
 
@@ -29,6 +30,8 @@ const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
 	1: ZimmermanAdjustmentMethod,
 	2: RainDelayAdjustmentMethod
 };
+
+const cache = new WateringScaleCache();
 
 /**
  * Resolves a location description to geographic coordinates.
@@ -227,56 +230,82 @@ export const getWateringData = async function( req: express.Request, res: expres
 	}
 
 	const weatherProvider = pws ? PWS_WEATHER_PROVIDER : WEATHER_PROVIDER;
-	let adjustmentMethodResponse: AdjustmentMethodResponse;
-	try {
-		adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
-			adjustmentOptions, coordinates, weatherProvider, pws
-		);
-	} catch ( err ) {
-		if ( typeof err != "string" ) {
-			/* If an error occurs under expected circumstances (e.g. required optional fields from a weather API are
-			missing), an AdjustmentOption must throw a string. If a non-string error is caught, it is likely an Error
-			thrown by the JS engine due to unexpected circumstances. The user should not be shown the error message
-			since it may contain sensitive information. */
-			res.send( "Error: an unexpected error occurred." );
-			console.error( `An unexpected error occurred for ${ req.url }: `, err );
-		} else {
-			res.send( "Error: " + err );
-		}
-
-		return;
-	}
-
-	let scale = adjustmentMethodResponse.scale;
-
-	if ( checkRestrictions ) {
-		let wateringData: BaseWateringData = adjustmentMethodResponse.wateringData;
-		// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
-		if ( checkRestrictions && !wateringData ) {
-			try {
-				wateringData = await weatherProvider.getWateringData( coordinates );
-			} catch ( err ) {
-				res.send( "Error: " + err );
-				return;
-			}
-		}
-
-		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-		if ( checkWeatherRestriction( req.params[ 0 ], wateringData ) ) {
-			scale = 0;
-		}
-	}
 
 	const data = {
-		scale:		scale,
-		rd:			adjustmentMethodResponse.rainDelay,
+		scale:		undefined,
+		rd:			undefined,
 		tz:			getTimezone( timeData.timezone, undefined ),
 		sunrise:	timeData.sunrise,
 		sunset:		timeData.sunset,
 		eip:		ipToInt( remoteAddress ),
-		rawData:	adjustmentMethodResponse.rawData,
-		error:		adjustmentMethodResponse.errorMessage
+		rawData:	undefined,
+		error:		undefined
 	};
+
+	let cachedScale: CachedScale;
+	if ( weatherProvider.shouldCacheWateringScale() ) {
+		cachedScale = cache.getWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions );
+	}
+
+	if ( cachedScale ) {
+		// Use the cached data if it exists.
+		data.scale = cachedScale.scale;
+		data.rawData = cachedScale.rawData;
+		data.rd = cachedScale.rainDelay;
+	} else {
+		// Calculate the watering scale if it wasn't found in the cache.
+		let adjustmentMethodResponse: AdjustmentMethodResponse;
+		try {
+			adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
+				adjustmentOptions, coordinates, weatherProvider, pws
+			);
+		} catch ( err ) {
+			if ( typeof err != "string" ) {
+				/* If an error occurs under expected circumstances (e.g. required optional fields from a weather API are
+				missing), an AdjustmentOption must throw a string. If a non-string error is caught, it is likely an Error
+				thrown by the JS engine due to unexpected circumstances. The user should not be shown the error message
+				since it may contain sensitive information. */
+				res.send( "Error: an unexpected error occurred." );
+				console.error( `An unexpected error occurred for ${ req.url }: `, err );
+			} else {
+				res.send( "Error: " + err );
+			}
+
+			return;
+		}
+
+		data.scale = adjustmentMethodResponse.scale;
+		data.error = adjustmentMethodResponse.errorMessage;
+		data.rd = adjustmentMethodResponse.rainDelay;
+		data.rawData = adjustmentMethodResponse.rawData;
+
+		if ( checkRestrictions ) {
+			let wateringData: BaseWateringData = adjustmentMethodResponse.wateringData;
+			// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
+			if ( checkRestrictions && !wateringData ) {
+				try {
+					wateringData = await weatherProvider.getWateringData( coordinates );
+				} catch ( err ) {
+					res.send( "Error: " + err );
+					return;
+				}
+			}
+
+			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
+			if ( checkWeatherRestriction( req.params[ 0 ], wateringData ) ) {
+				data.scale = 0;
+			}
+		}
+
+		// Cache the watering scale if caching is enabled and no error occurred.
+		if ( weatherProvider.shouldCacheWateringScale() && !data.error ) {
+			cache.storeWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions, {
+				scale: data.scale,
+				rawData: data.rawData,
+				rainDelay: data.rd
+			} );
+		}
+	}
 
 	// Return the response to the client in the requested format
 	if ( outputFormat === "json" ) {
