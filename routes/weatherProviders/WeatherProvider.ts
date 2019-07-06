@@ -36,4 +36,13 @@ export class WeatherProvider {
 	getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
 		throw "Selected WeatherProvider does not support getEToData";
 	};
+
+	/**
+	 * Returns a boolean indicating if watering scales calculated using data from this WeatherProvider should be cached
+	 * until the end of the day in timezone the data was for.
+	 * @return a boolean indicating if watering scales calculated using data from this WeatherProvider should be cached.
+	 */
+	shouldCacheWateringScale(): boolean {
+		return false;
+	}
 }
