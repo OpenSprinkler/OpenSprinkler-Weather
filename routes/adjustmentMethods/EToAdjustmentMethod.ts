@@ -16,6 +16,10 @@ async function calculateEToWateringScale(
 	pws?: PWS
 ): Promise< AdjustmentMethodResponse > {
 
+	if ( pws ) {
+		throw "ETo adjustment method does not support personal weather stations through WUnderground.";
+	}
+
 	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
 	/*
 	if ( wateringData && wateringData.raining ) {
