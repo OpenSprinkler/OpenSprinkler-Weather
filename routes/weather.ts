@@ -185,7 +185,6 @@ export const getWateringData = async function( req: express.Request, res: expres
 		location: string | GeoCoordinates	= getParameter(req.query.loc),
 		outputFormat: string				= getParameter(req.query.format),
 		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
-		pwsString: string					= getParameter( req.query.pws ),
 		adjustmentOptions: AdjustmentOptions;
 
 	// X-Forwarded-For header may contain more than one IP address and therefore
@@ -219,6 +218,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let timeData: TimeData = getTimeData( coordinates );
 
 	// Parse the PWS information.
+	const pwsString: string | undefined = adjustmentOptions.pws;
 	let pws: PWS | undefined = undefined;
 	if ( pwsString ) {
 		try {

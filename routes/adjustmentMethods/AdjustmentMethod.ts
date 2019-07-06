@@ -56,4 +56,7 @@ export interface AdjustmentMethodResponse {
 	wateringData: BaseWateringData;
 }
 
-export interface AdjustmentOptions {}
+export interface AdjustmentOptions {
+	/** Information about the PWS to use in the format "pws:API_KEY@PWS_ID". */
+	pws?: string;
+}
