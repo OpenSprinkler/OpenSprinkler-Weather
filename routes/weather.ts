@@ -218,15 +218,29 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let timeData: TimeData = getTimeData( coordinates );
 
 	// Parse the PWS information.
-	const pwsString: string | undefined = adjustmentOptions.pws;
 	let pws: PWS | undefined = undefined;
-	if ( pwsString ) {
-		try {
-			pws = parsePWS( pwsString );
-		} catch ( err ) {
-			res.send( `Error: ${ err }` );
+	if ( adjustmentOptions.pws ) {
+		if ( !adjustmentOptions.key ) {
+			res.send("Error: An API key must be provided when using a PWS.");
 			return;
 		}
+
+		const idMatch = adjustmentOptions.pws.match( /^pws:([a-zA-Z\d]+)$/ );
+		const pwsId = idMatch ? idMatch[ 1 ] : undefined;
+		const keyMatch = adjustmentOptions.key.match( /^[a-f\d]{32}$/ );
+		const apiKey = keyMatch ? keyMatch[ 0 ] : undefined;
+
+		// Make sure that the PWS ID and API key look valid.
+		if ( !pwsId ) {
+			res.send("Error: PWS ID does not appear to be valid.");
+			return;
+		}
+		if ( !apiKey ) {
+			res.send("Error: PWS API key does not appear to be valid.");
+			return;
+		}
+
+		pws = { id: pwsId, apiKey: apiKey };
 	}
 
 	const weatherProvider = pws ? PWS_WEATHER_PROVIDER : WEATHER_PROVIDER;
@@ -473,22 +487,4 @@ function getParameter( parameter: string | string[] ): string {
 
 	// Return an empty string if the parameter is undefined.
 	return parameter || "";
-}
-
-/**
- * Creates a PWS object from a string.
- * @param pwsString Information about the PWS in the format "pws:API_KEY@PWS_ID".
- * @return The PWS specified by the string.
- * @throws Throws an error message if the string is in an invalid format and cannot be parsed.
- */
-function parsePWS( pwsString: string): PWS {
-	const match = pwsString.match( /^pws:([a-f\d]{32})@([a-zA-Z\d]+)$/ );
-	if ( !match ) {
-		throw "Invalid PWS format.";
-	}
-
-	return {
-		apiKey: match[ 1 ],
-		id: match[ 2 ]
-	};
 }

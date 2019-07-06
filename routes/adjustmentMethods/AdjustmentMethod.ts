@@ -57,6 +57,8 @@ export interface AdjustmentMethodResponse {
 }
 
 export interface AdjustmentOptions {
-	/** Information about the PWS to use in the format "pws:API_KEY@PWS_ID". */
+	/** The ID of the PWS to use, prefixed with "pws:". */
 	pws?: string;
+	/** The API key to use to access PWS data. */
+	key?: string;
 }
