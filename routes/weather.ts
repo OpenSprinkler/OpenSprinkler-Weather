@@ -219,11 +219,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	// Parse the PWS information.
 	let pws: PWS | undefined = undefined;
-	if ( adjustmentOptions.pws ) {
-		if ( !adjustmentOptions.key ) {
-			res.send("Error: An API key must be provided when using a PWS.");
-			return;
-		}
+	if ( adjustmentOptions.pws && adjustmentOptions.key ) {
 
 		const idMatch = adjustmentOptions.pws.match( /^pws:([a-zA-Z\d]+)$/ );
 		const pwsId = idMatch ? idMatch[ 1 ] : undefined;
