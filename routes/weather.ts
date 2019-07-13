@@ -221,8 +221,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let pws: PWS | undefined = undefined;
 	if ( adjustmentOptions.pws && adjustmentOptions.key ) {
 
-		const idMatch = adjustmentOptions.pws.match( /^pws:([a-zA-Z\d]+)$/ );
-		const pwsId = idMatch ? idMatch[ 1 ] : undefined;
+		const idMatch = adjustmentOptions.pws.match( /^[a-zA-Z\d]+$/ );
+		const pwsId = idMatch ? idMatch[ 0 ] : undefined;
 		const keyMatch = adjustmentOptions.key.match( /^[a-f\d]{32}$/ );
 		const apiKey = keyMatch ? keyMatch[ 0 ] : undefined;
 
