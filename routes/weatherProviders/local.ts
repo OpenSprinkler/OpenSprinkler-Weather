@@ -48,9 +48,10 @@ export default class LocalWeatherProvider extends WeatherProvider {
 
 	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
 		const result: ZimmermanWateringData = {
-			...yesterday as ZimmermanWateringData,
-			// Use today's weather if we dont have information for yesterday yet (i.e. on startup)
+			// Use today's weather if we don't have information for yesterday yet (i.e. on startup)
 			...today,
+			// Use yesterday's weather updated every midnight, if available after startup
+			...yesterday as ZimmermanWateringData,
 			// PWS report "buckets" so consider it still raining if last bucket was less than an hour ago
 			raining: last_bucket !== undefined ? ( ( Date.now() - +last_bucket ) / 1000 / 60 / 60 < 1 ) : undefined,
 			weatherProvider: "local"
