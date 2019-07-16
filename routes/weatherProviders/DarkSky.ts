@@ -88,8 +88,7 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 			humidity: Math.floor( forecast.currently.humidity * 100 ),
 			wind: Math.floor( forecast.currently.windSpeed ),
 			description: forecast.currently.summary,
-			// TODO set this
-			icon: "",
+			icon: this.getOWMIconCode( forecast.currently.icon ),
 
 			region: "",
 			city: "",
@@ -104,8 +103,7 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 				temp_min: Math.floor( forecast.daily.data[ index ].temperatureMin ),
 				temp_max: Math.floor( forecast.daily.data[ index ].temperatureMax ),
 				date: forecast.daily.data[ index ].time,
-				// TODO set this
-				icon: "",
+				icon: this.getOWMIconCode( forecast.daily.data[ index ].icon ),
 				description: forecast.daily.data[ index ].summary
 			} );
 		}
@@ -163,5 +161,29 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 
 	public shouldCacheWateringScale(): boolean {
 		return true;
+	}
+
+	private getOWMIconCode(icon: string) {
+		switch(icon) {
+			case "partly-cloudy-night":
+				return "02n";
+			case "partly-cloudy-day":
+				return "02d";
+			case "cloudy":
+				return "03d";
+			case "fog":
+			case "wind":
+				return "50d";
+			case "sleet":
+			case "snow":
+				return "13d";
+			case "rain":
+				return "10d";
+			case "clear-night":
+				return "01n";
+			case "clear-day":
+			default:
+				return "01d";
+		}
 	}
 }
