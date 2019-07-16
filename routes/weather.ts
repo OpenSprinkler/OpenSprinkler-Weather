@@ -8,10 +8,11 @@ import * as geoTZ from "geo-tz";
 import { BaseWateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
+import WateringScaleCache, { CachedScale } from "../WateringScaleCache";
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
-import WateringScaleCache, { CachedScale } from "../WateringScaleCache";
+import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
 const WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
 const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
 
@@ -28,7 +29,8 @@ const filters = {
 const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
 	0: ManualAdjustmentMethod,
 	1: ZimmermanAdjustmentMethod,
-	2: RainDelayAdjustmentMethod
+	2: RainDelayAdjustmentMethod,
+	3: EToAdjustmentMethod
 };
 
 const cache = new WateringScaleCache();
@@ -39,7 +41,7 @@ const cache = new WateringScaleCache();
  * @return A promise that will be resolved with the coordinates of the best match for the specified location, or
  * rejected with an error message if unable to resolve the location.
  */
-async function resolveCoordinates( location: string ): Promise< GeoCoordinates > {
+export async function resolveCoordinates( location: string ): Promise< GeoCoordinates > {
 
 	if ( !location ) {
 		throw "No location specified";
@@ -190,6 +192,11 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// X-Forwarded-For header may contain more than one IP address and therefore
 	// the string is split against a comma and the first value is selected
 	remoteAddress = remoteAddress.split( "," )[ 0 ];
+
+	if ( !adjustmentMethod ) {
+		res.send( "Error: Unknown AdjustmentMethod ID" );
+		return;
+	}
 
 	// Parse weather adjustment options
 	try {
@@ -476,7 +483,7 @@ function ipToInt( ip: string ): number {
  * @param parameter An array of parameters or a single parameter value.
  * @return The first element in the array of parameter or the single parameter provided.
  */
-function getParameter( parameter: string | string[] ): string {
+export function getParameter( parameter: string | string[] ): string {
 	if ( Array.isArray( parameter ) ) {
 		parameter = parameter[0];
 	}

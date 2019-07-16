@@ -1,0 +1,42 @@
+[
+  {
+    "description": "Badgerys Creek, AU for May 2019",
+    "source": "http://www.bom.gov.au/watl/eto/tables/nsw/badgerys_creek/badgerys_creek-201905.csv",
+    "elevation": 266,
+    "coordinates": [ -33.90, 150.73 ],
+    "startTimestamp": 1556668800,
+    "entries": [
+      {"eto":0.075,"data":{"maxTemp":76.46,"minTemp":55.04,"maxHumidity":100,"minHumidity":58,"windSpeed":2.309,"solarRadiation":2.889}},
+      {"eto":0.063,"data":{"maxTemp":77,"minTemp":56.84,"maxHumidity":100,"minHumidity":63,"windSpeed":1.707,"solarRadiation":2.406}},
+      {"eto":0.035,"data":{"maxTemp":68.36,"minTemp":56.84,"maxHumidity":100,"minHumidity":91,"windSpeed":2.309,"solarRadiation":1.186}},
+      {"eto":0.11,"data":{"maxTemp":72.86,"minTemp":58.46,"maxHumidity":100,"minHumidity":36,"windSpeed":5.254,"solarRadiation":3.375}},
+      {"eto":0.098,"data":{"maxTemp":69.44,"minTemp":48.56,"maxHumidity":96,"minHumidity":46,"windSpeed":6.324,"solarRadiation":2.947}},
+      {"eto":0.098,"data":{"maxTemp":70.16,"minTemp":47.84,"maxHumidity":97,"minHumidity":39,"windSpeed":4.551,"solarRadiation":3.8}},
+      {"eto":0.075,"data":{"maxTemp":71.42,"minTemp":39.74,"maxHumidity":100,"minHumidity":37,"windSpeed":2.259,"solarRadiation":3.767}},
+      {"eto":0.114,"data":{"maxTemp":68.36,"minTemp":41.36,"maxHumidity":99,"minHumidity":34,"windSpeed":6.676,"solarRadiation":3.6}},
+      {"eto":0.063,"data":{"maxTemp":68.72,"minTemp":36.32,"maxHumidity":99,"minHumidity":36,"windSpeed":1.673,"solarRadiation":3.65}},
+      {"eto":0.071,"data":{"maxTemp":65.66,"minTemp":41.18,"maxHumidity":100,"minHumidity":43,"windSpeed":3.999,"solarRadiation":1.878}},
+      {"eto":0.13,"data":{"maxTemp":69.08,"minTemp":42.08,"maxHumidity":78,"minHumidity":38,"windSpeed":7.88,"solarRadiation":3.608}},
+      {"eto":0.071,"data":{"maxTemp":71.6,"minTemp":38.48,"maxHumidity":99,"minHumidity":35,"windSpeed":2.158,"solarRadiation":3.606}},
+      {"eto":0.067,"data":{"maxTemp":73.04,"minTemp":38.84,"maxHumidity":100,"minHumidity":51,"windSpeed":2.326,"solarRadiation":3.469}},
+      {"eto":0.079,"data":{"maxTemp":75.74,"minTemp":43.52,"maxHumidity":100,"minHumidity":33,"windSpeed":2.242,"solarRadiation":3.542}},
+      {"eto":0.067,"data":{"maxTemp":72.68,"minTemp":44.42,"maxHumidity":100,"minHumidity":45,"windSpeed":1.991,"solarRadiation":3.506}},
+      {"eto":0.067,"data":{"maxTemp":71.6,"minTemp":44.06,"maxHumidity":100,"minHumidity":47,"windSpeed":2.326,"solarRadiation":3.464}},
+      {"eto":0.071,"data":{"maxTemp":73.94,"minTemp":43.16,"maxHumidity":100,"minHumidity":45,"windSpeed":2.393,"solarRadiation":3.411}},
+      {"eto":0.071,"data":{"maxTemp":73.4,"minTemp":45.5,"maxHumidity":100,"minHumidity":50,"windSpeed":2.56,"solarRadiation":3.417}},
+      {"eto":0.063,"data":{"maxTemp":73.22,"minTemp":51.44,"maxHumidity":100,"minHumidity":51,"windSpeed":2.342,"solarRadiation":2.783}},
+      {"eto":0.055,"data":{"maxTemp":74.12,"minTemp":46.58,"maxHumidity":100,"minHumidity":51,"windSpeed":1.69,"solarRadiation":2.706}},
+      {"eto":0.067,"data":{"maxTemp":78.44,"minTemp":44.06,"maxHumidity":100,"minHumidity":43,"windSpeed":1.723,"solarRadiation":3.289}},
+      {"eto":0.071,"data":{"maxTemp":77.36,"minTemp":47.3,"maxHumidity":100,"minHumidity":40,"windSpeed":2.125,"solarRadiation":3.267}},
+      {"eto":0.063,"data":{"maxTemp":74.48,"minTemp":53.06,"maxHumidity":100,"minHumidity":53,"windSpeed":1.991,"solarRadiation":3.175}},
+      {"eto":0.059,"data":{"maxTemp":73.58,"minTemp":44.42,"maxHumidity":100,"minHumidity":48,"windSpeed":2.008,"solarRadiation":3.108}},
+      {"eto":0.087,"data":{"maxTemp":77.9,"minTemp":42.8,"maxHumidity":100,"minHumidity":26,"windSpeed":2.828,"solarRadiation":3.272}},
+      {"eto":0.091,"data":{"maxTemp":72.68,"minTemp":44.24,"maxHumidity":92,"minHumidity":29,"windSpeed":3.865,"solarRadiation":2.747}},
+      {"eto":0.13,"data":{"maxTemp":66.02,"minTemp":39.74,"maxHumidity":82,"minHumidity":35,"windSpeed":9.905,"solarRadiation":2.425}},
+      {"eto":0.106,"data":{"maxTemp":65.66,"minTemp":37.58,"maxHumidity":69,"minHumidity":31,"windSpeed":5.739,"solarRadiation":3.211}},
+      {"eto":0.161,"data":{"maxTemp":65.48,"minTemp":47.66,"maxHumidity":52,"minHumidity":31,"windSpeed":10.859,"solarRadiation":2.997}},
+      {"eto":0.102,"data":{"maxTemp":60.08,"minTemp":36.68,"maxHumidity":70,"minHumidity":31,"windSpeed":6.743,"solarRadiation":3.172}},
+      {"eto":0.087,"data":{"maxTemp":68,"minTemp":34.34,"maxHumidity":82,"minHumidity":34,"windSpeed":4.149,"solarRadiation":3.15}}
+    ]
+  }
+]

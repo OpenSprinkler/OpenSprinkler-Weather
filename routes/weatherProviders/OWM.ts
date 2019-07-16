@@ -1,6 +1,8 @@
 import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
+import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
+import * as moment from "moment";
 
 export default class OWMWeatherProvider extends WeatherProvider {
 
@@ -96,5 +98,69 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		}
 
 		return weather;
+	}
+
+	// Uses a rolling window since forecast data from further in the future (i.e. the next full day) would be less accurate.
+	async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+		const OWM_API_KEY = process.env.OWM_API_KEY,
+			forecastUrl = "http://api.openweathermap.org/data/2.5/forecast?appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[ 0 ] + "&lon=" + coordinates[ 1 ];
+
+		// Perform the HTTP request to retrieve the weather data
+		let forecast;
+		try {
+			forecast = await httpJSONRequest( forecastUrl );
+		} catch (err) {
+			console.error( "Error retrieving ETo information from OWM:", err );
+			throw "An error occurred while retrieving ETo information from OWM."
+		}
+
+		// Indicate ETo data could not be retrieved if the forecast data is incomplete.
+		if ( !forecast || !forecast.list || forecast.list.length < 8 ) {
+			throw "Insufficient data available from OWM."
+		}
+
+		// Take a sample over 24 hours.
+		const samples = forecast.list.slice( 0, 8 );
+
+		const cloudCoverInfo: CloudCoverInfo[] = samples.map( ( window ): CloudCoverInfo => {
+			return {
+				startTime: moment.unix( window.dt ),
+				endTime: moment.unix( window.dt ).add( 3, "hours" ),
+				cloudCover: window.clouds.all / 100
+			};
+		} );
+
+		let minTemp: number = undefined, maxTemp: number = undefined;
+		let minHumidity: number = undefined, maxHumidity: number = undefined;
+		// Skip hours where measurements don't exist to prevent result from being NaN.
+		for ( const sample of samples ) {
+			const temp: number = sample.main.temp;
+			if ( temp !== undefined ) {
+				// If minTemp or maxTemp is undefined, these comparisons will yield false.
+				minTemp = minTemp < temp ? minTemp : temp;
+				maxTemp = maxTemp > temp ? maxTemp : temp;
+			}
+
+			const humidity: number = sample.main.humidity;
+			if ( humidity !== undefined ) {
+				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
+				minHumidity = minHumidity < humidity ? minHumidity : humidity;
+				maxHumidity = maxHumidity > humidity ? maxHumidity : humidity;
+			}
+		}
+
+		return {
+			weatherProvider: "OWM",
+			periodStartTime: samples[ 0 ].dt,
+			minTemp: minTemp,
+			maxTemp: maxTemp,
+			minHumidity: minHumidity,
+			maxHumidity: maxHumidity,
+			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
+			// Assume wind speed measurements are taken at 2 meters.
+			windSpeed: samples.reduce( ( sum, window ) => sum + ( window.wind.speed || 0 ), 0) / samples.length,
+			// OWM always returns precip in mm, so it must be converted.
+			precip: samples.reduce( ( sum, window ) => sum + ( window.rain ? window.rain[ "3h" ] || 0 : 0 ), 0) / 25.4
+		};
 	}
 }

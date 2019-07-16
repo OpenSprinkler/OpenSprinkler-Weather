@@ -1,4 +1,5 @@
 import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
+import { EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 
 export class WeatherProvider {
 	/**
@@ -24,6 +25,17 @@ export class WeatherProvider {
 	getWeatherData( coordinates : GeoCoordinates ): Promise< WeatherData > {
 		throw "Selected WeatherProvider does not support getWeatherData";
 	}
+
+	/**
+	 * Retrieves the data necessary for calculating potential ETo.
+	 * @param coordinates The coordinates to retrieve the data for.
+	 * @return A Promise that will be resolved with the EToData if it is successfully retrieved,
+	 * or rejected with an error message if an error occurs while retrieving the EToData or the WeatherProvider does
+	 * not support this method.
+	 */
+	getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+		throw "Selected WeatherProvider does not support getEToData";
+	};
 
 	/**
 	 * Returns a boolean indicating if watering scales calculated using data from this WeatherProvider should be cached
