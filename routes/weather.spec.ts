@@ -4,7 +4,13 @@ import * as MockExpressRequest from 'mock-express-request';
 import * as MockExpressResponse from 'mock-express-response';
 import * as MockDate from 'mockdate';
 
+// The tests don't use OWM, but the WeatherProvider API key must be set to prevent an error from being thrown on startup.
+process.env.WEATHER_PROVIDER = "OWM";
+process.env.OWM_API_KEY = "NO_KEY";
+
 import { getWateringData } from './weather';
+import { GeoCoordinates, ZimmermanWateringData, WeatherData } from "../types";
+import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 
 const expected = require( '../test/expected.json' );
 const replies = require( '../test/replies.json' );
@@ -58,4 +64,43 @@ function mockOWM() {
         .filteringPath( function() { return "/"; } )
         .get( "/" )
         .reply( 200, replies[location].OWMData );
+}
+
+
+/**
+ * A WeatherProvider for testing purposes that returns weather data that is provided in the constructor.
+ * This is a special WeatherProvider designed for testing purposes and should not be activated using the
+ * WEATHER_PROVIDER environment variable.
+ */
+export class MockWeatherProvider extends WeatherProvider {
+
+    private readonly mockData: MockWeatherData;
+
+    public constructor(mockData: MockWeatherData) {
+        super();
+        this.mockData = mockData;
+    }
+
+    public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
+        const data = this.mockData.wateringData;
+        if ( !data.weatherProvider ) {
+            data.weatherProvider = "mock";
+        }
+
+        return data;
+    }
+
+    public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
+        const data = this.mockData.weatherData;
+        if ( !data.weatherProvider ) {
+            data.weatherProvider = "mock";
+        }
+
+        return data;
+    }
+}
+
+interface MockWeatherData {
+    wateringData?: ZimmermanWateringData,
+    weatherData?: WeatherData
 }

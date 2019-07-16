@@ -5,8 +5,15 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { AdjustmentOptions, GeoCoordinates, TimeData, WateringData, WeatherData, WeatherProvider } from "../types";
-const weatherProvider: WeatherProvider = require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default;
+import { BaseWateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
+import { WeatherProvider } from "./weatherProviders/WeatherProvider";
+import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
+import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
+import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
+import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
+import WateringScaleCache, { CachedScale } from "../WateringScaleCache";
+const WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
+const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
 
 // Define regex filters to match against location
 const filters = {
@@ -17,12 +24,14 @@ const filters = {
 	timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
 };
 
-// Enum of available watering scale adjustment methods.
-const ADJUSTMENT_METHOD = {
-	MANUAL: 0,
-	ZIMMERMAN: 1,
-	RAIN_DELAY: 2
+/** AdjustmentMethods mapped to their numeric IDs. */
+const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
+	0: ManualAdjustmentMethod,
+	1: ZimmermanAdjustmentMethod,
+	2: RainDelayAdjustmentMethod
 };
+
+const cache = new WateringScaleCache();
 
 /**
  * Resolves a location description to geographic coordinates.
@@ -37,7 +46,7 @@ async function resolveCoordinates( location: string ): Promise< GeoCoordinates >
 	}
 
 	if ( filters.pws.test( location ) ) {
-		throw "Weather Underground is discontinued";
+		throw "PWS ID must be specified in the pws parameter.";
 	} else if ( filters.gps.test( location ) ) {
 		const split: string[] = location.split( "," );
 		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
@@ -71,7 +80,8 @@ async function resolveCoordinates( location: string ): Promise< GeoCoordinates >
  * Makes an HTTP/HTTPS GET request to the specified URL and parses the JSON response body.
  * @param url The URL to fetch.
  * @return A Promise that will be resolved the with parsed response body if the request succeeds, or will be rejected
- * with an Error if the request or JSON parsing fails.
+ * with an error if the request or JSON parsing fails. This error may contain information about the HTTP request or,
+ * response including API keys and other sensitive information.
  */
 export async function httpJSONRequest(url: string ): Promise< any > {
 	try {
@@ -106,51 +116,6 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
 }
 
 /**
- * Calculates how much watering should be scaled based on weather and adjustment options using the Zimmerman method.
- * @param adjustmentOptions Options to tweak the calculation, or undefined/null if no custom values are to be used.
- * @param wateringData The weather to use to calculate watering percentage.
- * @return The percentage that watering should be scaled by.
- */
-function calculateZimmermanWateringScale( adjustmentOptions: AdjustmentOptions, wateringData: WateringData ): number {
-
-	let humidityBase = 30, tempBase = 70, precipBase = 0;
-
-	// Check to make sure valid data exists for all factors
-	if ( !validateValues( [ "temp", "humidity", "precip" ], wateringData ) ) {
-		return 100;
-	}
-
-	// Get baseline conditions for 100% water level, if provided
-	if ( adjustmentOptions ) {
-		humidityBase = adjustmentOptions.hasOwnProperty( "bh" ) ? adjustmentOptions.bh : humidityBase;
-		tempBase = adjustmentOptions.hasOwnProperty( "bt" ) ? adjustmentOptions.bt : tempBase;
-		precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
-	}
-
-	let humidityFactor = ( humidityBase - wateringData.humidity ),
-		tempFactor = ( ( wateringData.temp - tempBase ) * 4 ),
-		precipFactor = ( ( precipBase - wateringData.precip ) * 200 );
-
-	// Apply adjustment options, if provided, by multiplying the percentage against the factor
-	if ( adjustmentOptions ) {
-		if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
-			humidityFactor = humidityFactor * ( adjustmentOptions.h / 100 );
-		}
-
-		if ( adjustmentOptions.hasOwnProperty( "t" ) ) {
-			tempFactor = tempFactor * ( adjustmentOptions.t / 100 );
-		}
-
-		if ( adjustmentOptions.hasOwnProperty( "r" ) ) {
-			precipFactor = precipFactor * ( adjustmentOptions.r / 100 );
-		}
-	}
-
-	// Apply all of the weather modifying factors and clamp the result between 0 and 200%.
-	return Math.floor( Math.min( Math.max( 0, 100 + humidityFactor + tempFactor + precipFactor ), 200 ) );
-}
-
-/**
  * Checks if the weather data meets any of the restrictions set by OpenSprinkler. Restrictions prevent any watering
  * from occurring and are similar to 0% watering level. Known restrictions are:
  *
@@ -160,7 +125,7 @@ function calculateZimmermanWateringScale( adjustmentOptions: AdjustmentOptions, 
  * @param weather Watering data to use to determine if any restrictions apply.
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
-function checkWeatherRestriction( adjustmentValue: number, weather: WateringData ): boolean {
+function checkWeatherRestriction( adjustmentValue: number, weather: BaseWateringData ): boolean {
 
 	const californiaRestriction = ( adjustmentValue >> 7 ) & 1;
 
@@ -181,11 +146,6 @@ function checkWeatherRestriction( adjustmentValue: number, weather: WateringData
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
 
-	if ( !weatherProvider.getWeatherData ) {
-		res.send( "Error: selected WeatherProvider does not support getWeatherData" );
-		return;
-	}
-
 	let coordinates: GeoCoordinates;
 	try {
 		coordinates = await resolveCoordinates( location );
@@ -196,7 +156,13 @@ export const getWeatherData = async function( req: express.Request, res: express
 
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
-	const weatherData: WeatherData = await weatherProvider.getWeatherData( coordinates );
+	let weatherData: WeatherData;
+	try {
+		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates );
+	} catch ( err ) {
+		res.send( "Error: " + err );
+		return;
+	}
 
 	res.json( {
 		...timeData,
@@ -213,14 +179,13 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
-	let adjustmentMethod: number			= req.params[ 0 ] & ~( 1 << 7 ),
+	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ req.params[ 0 ] & ~( 1 << 7 ) ],
 		checkRestrictions: boolean			= ( ( req.params[ 0 ] >> 7 ) & 1 ) > 0,
 		adjustmentOptionsString: string		= getParameter(req.query.wto),
 		location: string | GeoCoordinates	= getParameter(req.query.loc),
 		outputFormat: string				= getParameter(req.query.format),
 		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
 		adjustmentOptions: AdjustmentOptions;
-
 
 	// X-Forwarded-For header may contain more than one IP address and therefore
 	// the string is split against a comma and the first value is selected
@@ -250,85 +215,148 @@ export const getWateringData = async function( req: express.Request, res: expres
 		return;
 	}
 
-	// Continue with the weather request
 	let timeData: TimeData = getTimeData( coordinates );
-	let wateringData: WateringData;
-	if ( adjustmentMethod !== ADJUSTMENT_METHOD.MANUAL || checkRestrictions ) {
-		if ( !weatherProvider.getWateringData ) {
-			res.send( "Error: selected WeatherProvider does not support getWateringData" );
+
+	// Parse the PWS information.
+	let pws: PWS | undefined = undefined;
+	if ( adjustmentOptions.pws && adjustmentOptions.key ) {
+
+		const idMatch = adjustmentOptions.pws.match( /^[a-zA-Z\d]+$/ );
+		const pwsId = idMatch ? idMatch[ 0 ] : undefined;
+		const keyMatch = adjustmentOptions.key.match( /^[a-f\d]{32}$/ );
+		const apiKey = keyMatch ? keyMatch[ 0 ] : undefined;
+
+		// Make sure that the PWS ID and API key look valid.
+		if ( !pwsId ) {
+			res.send("Error: PWS ID does not appear to be valid.");
+			return;
+		}
+		if ( !apiKey ) {
+			res.send("Error: PWS API key does not appear to be valid.");
 			return;
 		}
 
-		wateringData = await weatherProvider.getWateringData( coordinates );
+		pws = { id: pwsId, apiKey: apiKey };
 	}
 
-	let scale = -1,	rainDelay = -1;
-
-	if ( adjustmentMethod === ADJUSTMENT_METHOD.ZIMMERMAN ) {
-		scale = calculateZimmermanWateringScale( adjustmentOptions, wateringData );
-	}
-
-	if (wateringData) {
-		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-		if (checkWeatherRestriction(req.params[0], wateringData)) {
-			scale = 0;
-		}
-
-		// If any weather adjustment is being used, check the rain status
-		if ( adjustmentMethod > ADJUSTMENT_METHOD.MANUAL && wateringData.raining ) {
-
-			// If it is raining and the user has weather-based rain delay as the adjustment method then apply the specified delay
-			if ( adjustmentMethod === ADJUSTMENT_METHOD.RAIN_DELAY ) {
-
-				rainDelay = ( adjustmentOptions && adjustmentOptions.hasOwnProperty( "d" ) ) ? adjustmentOptions.d : 24;
-			} else {
-				// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
-				// For any other adjustment method, apply a scale of 0 (as the scale will revert when the rain stops)
-				// scale = 0;
-			}
-		}
-	}
+	const weatherProvider = pws ? PWS_WEATHER_PROVIDER : WEATHER_PROVIDER;
 
 	const data = {
-		scale:		scale,
-		rd:			rainDelay,
+		scale:		undefined,
+		rd:			undefined,
 		tz:			getTimezone( timeData.timezone, undefined ),
 		sunrise:	timeData.sunrise,
 		sunset:		timeData.sunset,
 		eip:		ipToInt( remoteAddress ),
-		rawData:	undefined
+		rawData:	undefined,
+		error:		undefined
 	};
 
-	if ( adjustmentMethod > ADJUSTMENT_METHOD.MANUAL ) {
-		data.rawData = {
-			h: wateringData ? Math.round( wateringData.humidity * 100) / 100 : null,
-			p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
-			t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
-			raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
-		};
+	let cachedScale: CachedScale;
+	if ( weatherProvider.shouldCacheWateringScale() ) {
+		cachedScale = cache.getWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions );
+	}
+
+	if ( cachedScale ) {
+		// Use the cached data if it exists.
+		data.scale = cachedScale.scale;
+		data.rawData = cachedScale.rawData;
+		data.rd = cachedScale.rainDelay;
+	} else {
+		// Calculate the watering scale if it wasn't found in the cache.
+		let adjustmentMethodResponse: AdjustmentMethodResponse;
+		try {
+			adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
+				adjustmentOptions, coordinates, weatherProvider, pws
+			);
+		} catch ( err ) {
+			if ( typeof err != "string" ) {
+				/* If an error occurs under expected circumstances (e.g. required optional fields from a weather API are
+				missing), an AdjustmentOption must throw a string. If a non-string error is caught, it is likely an Error
+				thrown by the JS engine due to unexpected circumstances. The user should not be shown the error message
+				since it may contain sensitive information. */
+				res.send( "Error: an unexpected error occurred." );
+				console.error( `An unexpected error occurred for ${ req.url }: `, err );
+			} else {
+				res.send( "Error: " + err );
+			}
+
+			return;
+		}
+
+		data.scale = adjustmentMethodResponse.scale;
+		data.error = adjustmentMethodResponse.errorMessage;
+		data.rd = adjustmentMethodResponse.rainDelay;
+		data.rawData = adjustmentMethodResponse.rawData;
+
+		if ( checkRestrictions ) {
+			let wateringData: BaseWateringData = adjustmentMethodResponse.wateringData;
+			// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
+			if ( checkRestrictions && !wateringData ) {
+				try {
+					wateringData = await weatherProvider.getWateringData( coordinates );
+				} catch ( err ) {
+					res.send( "Error: " + err );
+					return;
+				}
+			}
+
+			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
+			if ( checkWeatherRestriction( req.params[ 0 ], wateringData ) ) {
+				data.scale = 0;
+			}
+		}
+
+		// Cache the watering scale if caching is enabled and no error occurred.
+		if ( weatherProvider.shouldCacheWateringScale() && !data.error ) {
+			cache.storeWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions, {
+				scale: data.scale,
+				rawData: data.rawData,
+				rainDelay: data.rd
+			} );
+		}
 	}
 
 	// Return the response to the client in the requested format
 	if ( outputFormat === "json" ) {
 		res.json( data );
 	} else {
-		res.send(	"&scale="		+	data.scale +
-			"&rd="			+	data.rd +
-			"&tz="			+	data.tz +
-			"&sunrise="		+	data.sunrise +
-			"&sunset="		+	data.sunset +
-			"&eip="			+	data.eip +
-			( data.rawData ? "&rawData=" + JSON.stringify( data.rawData ) : "" )
-		);
-	}
+		// Return the data formatted as a URL query string.
+		let formatted = "";
+		for ( const key in data ) {
+			// Skip inherited properties.
+			if ( !data.hasOwnProperty( key ) ) {
+				continue;
+			}
 
+			let value = data[ key ];
+			switch ( typeof value ) {
+				case "undefined":
+					// Skip undefined properties.
+					continue;
+				case "object":
+					// Convert objects to JSON.
+					value = JSON.stringify( value );
+					// Fallthrough.
+				case "string":
+					/* URL encode strings. Since the OS firmware uses a primitive version of query string parsing and
+					decoding, only some characters need to be escaped and only spaces ("+" or "%20") will be decoded. */
+					value = value.replace( / /g, "+" ).replace( /\n/g, "\\n" ).replace( /&/g, "AMPERSAND" );
+					break;
+			}
+
+			formatted += `&${ key }=${ value }`;
+		}
+		res.send( formatted );
+	}
 };
 
 /**
  * Makes an HTTP/HTTPS GET request to the specified URL and returns the response body.
  * @param url The URL to fetch.
  * @return A Promise that will be resolved the with response body if the request succeeds, or will be rejected with an
- * Error if the request fails.
+ * error if the request fails or returns a non-200 status code. This error may contain information about the HTTP
+ * request or, response including API keys and other sensitive information.
  */
 async function httpRequest( url: string ): Promise< string > {
 	return new Promise< any >( ( resolve, reject ) => {
@@ -343,6 +371,11 @@ async function httpRequest( url: string ): Promise< string > {
 		};
 
 		( isHttps ? https : http ).get( options, ( response ) => {
+			if ( response.statusCode !== 200 ) {
+				reject( `Received ${ response.statusCode } status code for URL '${ url }'.` );
+				return;
+			}
+
 			let data = "";
 
 			// Reassemble the data as it comes in
@@ -368,7 +401,7 @@ async function httpRequest( url: string ): Promise< string > {
  * @param obj The object to check.
  * @return A boolean indicating if the object has numeric values for all of the specified keys.
  */
-function validateValues( keys: string[], obj: object ): boolean {
+export function validateValues( keys: string[], obj: object ): boolean {
 	let key: string;
 
 	// Return false if the object is null/undefined.

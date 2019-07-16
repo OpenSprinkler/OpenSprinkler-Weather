@@ -1,6 +1,7 @@
 import * as express	from "express";
 import { CronJob } from "cron";
-import { GeoCoordinates, WateringData, WeatherProvider } from "../../types";
+import { GeoCoordinates, ZimmermanWateringData } from "../../types";
+import { WeatherProvider } from "./WeatherProvider";
 
 const count = { temp: 0, humidity: 0 };
 
@@ -43,22 +44,25 @@ export const captureWUStream = function( req: express.Request, res: express.Resp
 	res.send( "success\n" );
 };
 
-export const getLocalWateringData = function(): WateringData {
-	const result: WateringData = {
-		...yesterday as WateringData,
-		// Use today's weather if we dont have information for yesterday yet (i.e. on startup)
-		...today,
-		// PWS report "buckets" so consider it still raining if last bucket was less than an hour ago
-		raining: last_bucket !== undefined ? ( ( Date.now() - +last_bucket ) / 1000 / 60 / 60 < 1 ) : undefined,
-		weatherProvider: "local"
+export default class LocalWeatherProvider extends WeatherProvider {
+
+	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
+		const result: ZimmermanWateringData = {
+			...yesterday as ZimmermanWateringData,
+			// Use today's weather if we dont have information for yesterday yet (i.e. on startup)
+			...today,
+			// PWS report "buckets" so consider it still raining if last bucket was less than an hour ago
+			raining: last_bucket !== undefined ? ( ( Date.now() - +last_bucket ) / 1000 / 60 / 60 < 1 ) : undefined,
+			weatherProvider: "local"
+		};
+
+		if ( "precip" in yesterday && "precip" in today ) {
+			result.precip = yesterday.precip + today.precip;
+		}
+
+		return result;
 	};
-
-	if ( "precip" in yesterday && "precip" in today ) {
-		result.precip = yesterday.precip + today.precip;
-	}
-
-	return result;
-};
+}
 
 new CronJob( "0 0 0 * * *", function() {
 
@@ -74,10 +78,3 @@ interface PWSStatus {
 	humidity?: number;
 	precip?: number;
 }
-
-const LocalWeatherProvider: WeatherProvider = {
-	getWateringData: async function ( coordinates: GeoCoordinates ) {
-		return getLocalWateringData();
-	}
-};
-export default LocalWeatherProvider;
