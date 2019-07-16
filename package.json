@@ -1,7 +1,7 @@
 {
   "name": "os-weather-service",
   "description": "OpenSprinkler Weather Service",
-  "version": "1.0.4",
+  "version": "2.0.0",
   "repository": "https://github.com/OpenSprinkler/Weather-Weather",
   "scripts": {
     "test": "mocha --exit --require ts-node/register **/*.spec.ts",
