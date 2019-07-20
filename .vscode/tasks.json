@@ -13,6 +13,12 @@
             "label": "development",
             "isBackground": true,
             "problemMatcher": []
+        },
+        {
+            "label": "NPM Compile",
+            "type": "npm",
+            "script": "compile",
+            "problemMatcher": []
         }
     ]
 }

@@ -10,3 +10,4 @@ baselineEToData/*.bin
 baselineEToData/*.png
 baselineEToData/*.tif
 baselineEToData/dataPreparer[.exe]
+observations.json

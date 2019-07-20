@@ -1,81 +1,155 @@
 import * as express	from "express";
-import { CronJob } from "cron";
-import { GeoCoordinates, ZimmermanWateringData } from "../../types";
+import * as moment from "moment";
+import * as fs from "fs";
+
+import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
+import { EToData } from "../adjustmentMethods/EToAdjustmentMethod";
+import { CodedError, ErrorCode } from "../../errors";
 
-const count = { temp: 0, humidity: 0 };
+var queue: Array<Observation> = [],
+	lastRainEpoch = 0,
+	lastRainCount: number;
 
-let	today: PWSStatus = {},
-	yesterday: PWSStatus = {},
-	last_bucket: Date,
-	current_date: Date = new Date();
+function getMeasurement(req: express.Request, key: string): number {
+	let value: number;
 
-function sameDay(d1: Date, d2: Date): boolean {
-	return d1.getFullYear() === d2.getFullYear() &&
-			d1.getMonth() === d2.getMonth() &&
-			d1.getDate() === d2.getDate();
+	return ( key in req.query ) && !isNaN( value = parseFloat( req.query[key] ) ) && ( value !== -9999.0 ) ? value : undefined;
 }
 
-export const captureWUStream = function( req: express.Request, res: express.Response ) {
-	let prev: number, curr: number;
+export const captureWUStream = async function( req: express.Request, res: express.Response ) {
+	let rainCount = getMeasurement(req, "dailyrainin");
 
-	if ( !( "dateutc" in req.query ) || !sameDay( current_date, new Date( req.query.dateutc + "Z") )) {
-		res.send( "Error: Bad date range\n" );
-		return;
-	}
+	const obs: Observation = {
+		timestamp: req.query.dateutc === "now" ? moment().unix() : moment( req.query.dateutc + "Z" ).unix(),
+		temp: getMeasurement(req, "tempf"),
+		humidity: getMeasurement(req, "humidity"),
+		windSpeed: getMeasurement(req, "windspeedmph"),
+		solarRadiation: getMeasurement(req, "solarradiation") * 24 / 1000,	// Convert to kWh/m^2 per day
+		precip: rainCount < lastRainCount ? rainCount : rainCount - lastRainCount,
+	};
 
-	if ( ( "tempf" in req.query ) && !isNaN( curr = parseFloat( req.query.tempf ) ) && curr !== -9999.0 ) {
-		prev = ( "temp" in today ) ? today.temp : 0;
-		today.temp = ( prev * count.temp + curr ) / ( ++count.temp );
-	}
-	if ( ( "humidity" in req.query ) && !isNaN( curr = parseFloat( req.query.humidity ) ) && curr !== -9999.0 ) {
-		prev = ( "humidity" in today ) ? today.humidity : 0;
-		today.humidity = ( prev * count.humidity + curr ) / ( ++count.humidity );
-	}
-	if ( ( "dailyrainin" in req.query ) && !isNaN( curr = parseFloat( req.query.dailyrainin ) ) && curr !== -9999.0 ) {
-		today.precip = curr;
-	}
-	if ( ( "rainin" in req.query ) && !isNaN( curr = parseFloat( req.query.rainin ) ) && curr > 0 ) {
-		last_bucket = new Date();
-	}
+	lastRainEpoch = getMeasurement(req, "rainin") > 0 ? obs.timestamp : lastRainEpoch;
+	lastRainCount = isNaN(rainCount) ? lastRainCount : rainCount;
 
-	console.log( "OpenSprinkler Weather Observation: %s", JSON.stringify( req.query ) );
+	queue.unshift(obs);
 
 	res.send( "success\n" );
 };
 
 export default class LocalWeatherProvider extends WeatherProvider {
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
-		const result: ZimmermanWateringData = {
-			// Use today's weather if we don't have information for yesterday yet (i.e. on startup)
-			...today,
-			// Use yesterday's weather updated every midnight, if available after startup
-			...yesterday as ZimmermanWateringData,
-			// PWS report "buckets" so consider it still raining if last bucket was less than an hour ago
-			raining: last_bucket !== undefined ? ( ( Date.now() - +last_bucket ) / 1000 / 60 / 60 < 1 ) : undefined,
-			weatherProvider: "local"
+	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
+		queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
+
+		if ( queue.length == 0 ) {
+			console.error( "There is insufficient data to support Weather response from local PWS." );
+			throw "There is insufficient data to support Weather response from local PWS.";
+		}
+
+		const weather: WeatherData = {
+			weatherProvider: "local",
+			temp: Math.floor( queue[ 0 ].temp ) || undefined,
+			minTemp: undefined,
+			maxTemp: undefined,
+			humidity: Math.floor( queue[ 0 ].humidity ) || undefined ,
+			wind: Math.floor( queue[ 0 ].windSpeed * 10 ) / 10 || undefined,
+			precip: Math.floor( queue.reduce( ( sum, obs ) => sum + ( obs.precip || 0 ), 0) * 100 ) / 100,
+			description: "",
+			icon: "01d",
+			region: undefined,
+			city: undefined,
+			forecast: []
 		};
 
-		if ( "precip" in yesterday && "precip" in today ) {
-			result.precip = yesterday.precip + today.precip;
+		return weather;
+	}
+
+	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
+
+		queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
+
+		if ( queue.length == 0 || queue[ 0 ].timestamp - queue[ queue.length - 1 ].timestamp < 23*60*60 ) {
+			console.error( "There is insufficient data to support Zimmerman calculation from local PWS." );
+			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
+
+		let cTemp = 0, cHumidity = 0, cPrecip = 0;
+		const result: ZimmermanWateringData = {
+			weatherProvider: "local",
+			temp: queue.reduce( ( sum, obs ) => !isNaN( obs.temp ) && ++cTemp ? sum + obs.temp : sum, 0) / cTemp,
+			humidity: queue.reduce( ( sum, obs ) => !isNaN( obs.humidity ) && ++cHumidity ? sum + obs.humidity : sum, 0) / cHumidity,
+			precip: queue.reduce( ( sum, obs ) => !isNaN( obs.precip ) && ++cPrecip ? sum + obs.precip : sum, 0),
+			raining: ( ( moment().unix() - lastRainEpoch ) / 60 / 60 < 1 ),
+		};
+
+		if ( !( cTemp && cHumidity && cPrecip ) ) {
+			console.error( "There is insufficient data to support Zimmerman calculation from local PWS." );
+			throw new CodedError( ErrorCode.InsufficientWeatherData );
+		}
+
+		return result;
+	};
+
+	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+
+		queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
+
+		if ( queue.length == 0 || queue[ 0 ].timestamp - queue[ queue.length - 1 ].timestamp < 23*60*60 ) {
+				console.error( "There is insufficient data to support ETo calculation from local PWS." );
+				throw new CodedError( ErrorCode.InsufficientWeatherData );
+		}
+
+		let cSolar = 0, cWind = 0, cPrecip = 0;
+		const result: EToData = {
+			weatherProvider: "local",
+			periodStartTime: Math.floor( queue[ queue.length - 1 ].timestamp ),
+			minTemp: queue.reduce( (min, obs) => ( min > obs.temp ) ? obs.temp : min, Infinity ),
+			maxTemp: queue.reduce( (max, obs) => ( max < obs.temp ) ? obs.temp : max, -Infinity ),
+			minHumidity: queue.reduce( (min, obs) => ( min > obs.humidity ) ? obs.humidity : min, Infinity ),
+			maxHumidity: queue.reduce( (max, obs) => ( max < obs.humidity ) ? obs.humidity : max, -Infinity ),
+			solarRadiation: queue.reduce( (sum, obs) => !isNaN( obs.solarRadiation ) && ++cSolar ? sum + obs.solarRadiation : sum, 0) / cSolar,
+			windSpeed: queue.reduce( (sum, obs) => !isNaN( obs.windSpeed ) && ++cWind ? sum + obs.windSpeed : sum, 0) / cWind,
+			precip: queue.reduce( (sum, obs) => !isNaN( obs.precip ) && ++cPrecip ? sum + obs.precip : sum, 0 ),
+		};
+
+		if ( [ result.minTemp, result.minHumidity, -result.maxTemp, -result.maxHumidity ].includes( Infinity ) ||
+			!( cSolar && cWind && cPrecip ) ) {
+				console.error( "There is insufficient data to support ETo calculation from local PWS." );
+				throw new CodedError( ErrorCode.InsufficientWeatherData );
+			}
 
 		return result;
 	};
 }
 
-new CronJob( "0 0 0 * * *", function() {
+function saveQueue() {
+	queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
+	try {
+		fs.writeFileSync( "observations.json" , JSON.stringify( queue ), "utf8" );
+	} catch ( err ) {
+		console.error( "Error saving historical observations to local storage.", err );
+	}
+}
 
-	yesterday = Object.assign( {}, today );
-	today = Object.assign( {} );
-	count.temp = 0; count.humidity = 0;
-	current_date = new Date();
-}, null, true );
+if ( process.env.WEATHER_PROVIDER === "local" && process.env.LOCAL_PERSISTENCE ) {
+	if ( fs.existsSync( "observations.json" ) ) {
+		try {
+			queue = JSON.parse( fs.readFileSync( "observations.json", "utf8" ) );
+			queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
+		} catch ( err ) {
+			console.error( "Error reading historical observations from local storage.", err );
+			queue = [];
+		}
+	}
+	setInterval( saveQueue, 1000 * 60 * 30 );
+}
 
-
-interface PWSStatus {
-	temp?: number;
-	humidity?: number;
-	precip?: number;
+interface Observation {
+	timestamp: number;
+	temp: number;
+	humidity: number;
+	windSpeed: number;
+	solarRadiation: number;
+	precip: number;
 }

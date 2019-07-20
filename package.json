@@ -7,6 +7,7 @@
     "test": "mocha --exit --require ts-node/register **/*.spec.ts",
     "start": "node js/server",
     "dev": "node scripts/serve",
+    "debug": "node --inspect=9229 js/server",
     "bundle": "npm run compile && zip weather.zip -r js package.json package-lock.json",
     "deploy": "npm run bundle && eb deploy",
     "compile": "tsc"
