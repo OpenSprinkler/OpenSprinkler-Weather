@@ -1,5 +1,6 @@
 import { BaseWateringData, GeoCoordinates, PWS } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
+import { ErrorCode } from "../../errors";
 
 
 export interface AdjustmentMethod {
@@ -14,7 +15,7 @@ export interface AdjustmentMethod {
 	 * of this method does not have PWS support, this parameter may be ignored and coordinates may be used instead.
 	 * @return A Promise that will be resolved with the result of the calculation, or rejected with an error message if
 	 * the watering scale cannot be calculated.
-	 * @throws An error message can be thrown if an error occurs while calculating the watering scale.
+	 * @throws A CodedError may be thrown if an error occurs while calculating the watering scale.
 	 */
 	calculateWateringScale(
 		adjustmentOptions: AdjustmentOptions,
@@ -43,7 +44,6 @@ export interface AdjustmentMethodResponse {
 	 * watering.
 	 */
 	rainDelay?: number;
-	// TODO consider removing this field and breaking backwards compatibility to handle all errors consistently.
 	/**
 	 * An message to send to the OS firmware to indicate that an error occurred while calculating the watering
 	 * scale and the returned scale either defaulted to some reasonable value or was calculated with incomplete data.
@@ -51,7 +51,9 @@ export interface AdjustmentMethodResponse {
 	 * but newer firmware versions may be able to alert the user that an error occurred and/or default to a
 	 * user-configured watering scale instead of using the one returned by the AdjustmentMethod.
 	 */
-	errorMessage?: string;
+	errMessage?: string;
+	/** A code describing the type of error that occurred (if one occurred). */
+	errCode?: ErrorCode;
 	/** The data that was used to calculate the watering scale, or undefined if no data was used. */
 	wateringData: BaseWateringData;
 }

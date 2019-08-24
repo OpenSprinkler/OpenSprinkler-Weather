@@ -13,6 +13,8 @@ import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
 import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
+import { CodedError, ErrorCode, makeCodedError } from "../errors";
+
 const WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
 const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
 
@@ -39,16 +41,16 @@ const cache = new WateringScaleCache();
  * Resolves a location description to geographic coordinates.
  * @param location A partial zip/city/country or a coordinate pair.
  * @return A promise that will be resolved with the coordinates of the best match for the specified location, or
- * rejected with an error message if unable to resolve the location.
+ * rejected with a CodedError if unable to resolve the location.
  */
 export async function resolveCoordinates( location: string ): Promise< GeoCoordinates > {
 
 	if ( !location ) {
-		throw "No location specified";
+		throw new CodedError( ErrorCode.InvalidLocationFormat, "No location specified" );
 	}
 
 	if ( filters.pws.test( location ) ) {
-		throw "PWS ID must be specified in the pws parameter.";
+		throw new CodedError( ErrorCode.InvalidLocationFormat, "PWS ID must be specified in the pws adjustment option." );
 	} else if ( filters.gps.test( location ) ) {
 		const split: string[] = location.split( "," );
 		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
@@ -62,7 +64,7 @@ export async function resolveCoordinates( location: string ): Promise< GeoCoordi
 			data = await httpJSONRequest( url );
 		} catch (err) {
 			// If the request fails, indicate no data was found.
-			throw "An API error occurred while attempting to resolve location";
+			throw new CodedError( ErrorCode.LocationServiceApiError, "An API error occurred while attempting to resolve location" );
 		}
 
 		// Check if the data is valid
@@ -73,7 +75,7 @@ export async function resolveCoordinates( location: string ): Promise< GeoCoordi
 		} else {
 
 			// Otherwise, indicate no data was found
-			throw "No match found for specified location";
+			throw new CodedError( ErrorCode.NoLocationFound, "No match found for specified location" );
 		}
 	}
 }
@@ -194,7 +196,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	remoteAddress = remoteAddress.split( "," )[ 0 ];
 
 	if ( !adjustmentMethod ) {
-		res.send( "Error: Unknown AdjustmentMethod ID" );
+		sendWateringData( res, { errCode: ErrorCode.InvalidAdjustmentMethod, errMessage: "Invalid AdjustmentMethod ID" } );
 		return;
 	}
 
@@ -207,9 +209,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 		// Reconstruct JSON string from deformed controller output
 		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
 	} catch ( err ) {
-
-		// If the JSON is not valid then abort the claculation
-		res.send(`Error: Unable to parse options (${err})`);
+		// If the JSON is not valid then abort the calculation
+		sendWateringData( res, { errCode: ErrorCode.MalformedAdjustmentOptions, errMessage: `Unable to parse options (${ err })` } );
 		return;
 	}
 
@@ -217,8 +218,13 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let coordinates: GeoCoordinates;
 	try {
 		coordinates = await resolveCoordinates( location );
-	} catch (err) {
-		res.send(`Error: Unable to resolve location (${err})`);
+	} catch ( err ) {
+		let codedError: CodedError = makeCodedError( err );
+		if ( codedError.errCode === ErrorCode.UnexpectedError ) {
+			console.error( `An unexpected error occurred during location resolution for "${ req.url }": `, err );
+		}
+
+		sendWateringData( res, { errCode: codedError.errCode, errMessage: `Unable to resolve location "${ location }" (${ codedError.message })` } );
 		return;
 	}
 
@@ -235,11 +241,11 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 		// Make sure that the PWS ID and API key look valid.
 		if ( !pwsId ) {
-			res.send("Error: PWS ID does not appear to be valid.");
+			sendWateringData( res, { errCode: ErrorCode.InvalidPwsId, errMessage: "PWS ID does not appear to be valid" } );
 			return;
 		}
 		if ( !apiKey ) {
-			res.send("Error: PWS API key does not appear to be valid.");
+			sendWateringData( res, { errCode: ErrorCode.InvalidPwsApiKey, errMessage: "PWS API key does not appear to be valid" } );
 			return;
 		}
 
@@ -256,7 +262,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sunset:		timeData.sunset,
 		eip:		ipToInt( remoteAddress ),
 		rawData:	undefined,
-		error:		undefined
+		errMessage:	undefined
 	};
 
 	let cachedScale: CachedScale;
@@ -277,22 +283,17 @@ export const getWateringData = async function( req: express.Request, res: expres
 				adjustmentOptions, coordinates, weatherProvider, pws
 			);
 		} catch ( err ) {
-			if ( typeof err != "string" ) {
-				/* If an error occurs under expected circumstances (e.g. required optional fields from a weather API are
-				missing), an AdjustmentOption must throw a string. If a non-string error is caught, it is likely an Error
-				thrown by the JS engine due to unexpected circumstances. The user should not be shown the error message
-				since it may contain sensitive information. */
-				res.send( "Error: an unexpected error occurred." );
-				console.error( `An unexpected error occurred for ${ req.url }: `, err );
-			} else {
-				res.send( "Error: " + err );
+			let codedError: CodedError = makeCodedError( err );
+			if ( codedError.errCode === ErrorCode.UnexpectedError ) {
+				console.error( `An unexpected error occurred during watering scale calculation for "${ req.url }": `, err );
 			}
 
+			sendWateringData( res, { errCode: codedError.errCode, errMessage: codedError.message } );
 			return;
 		}
 
 		data.scale = adjustmentMethodResponse.scale;
-		data.error = adjustmentMethodResponse.errorMessage;
+		data.errMessage = adjustmentMethodResponse.errMessage;
 		data.rd = adjustmentMethodResponse.rainDelay;
 		data.rawData = adjustmentMethodResponse.rawData;
 
@@ -303,7 +304,12 @@ export const getWateringData = async function( req: express.Request, res: expres
 				try {
 					wateringData = await weatherProvider.getWateringData( coordinates );
 				} catch ( err ) {
-					res.send( "Error: " + err );
+					let codedError: CodedError = makeCodedError( err );
+					if ( codedError.errCode === ErrorCode.UnexpectedError ) {
+						console.error( `An unexpected error occurred during restriction checks for "${ req.url }": `, err );
+					}
+
+					sendWateringData( res, { errCode: codedError.errCode, errMessage: codedError.message } );
 					return;
 				}
 			}
@@ -315,7 +321,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 
 		// Cache the watering scale if caching is enabled and no error occurred.
-		if ( weatherProvider.shouldCacheWateringScale() && !data.error ) {
+		if ( weatherProvider.shouldCacheWateringScale() && !data.errMessage ) {
 			cache.storeWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions, {
 				scale: data.scale,
 				rawData: data.rawData,
@@ -324,8 +330,17 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 	}
 
-	// Return the response to the client in the requested format
-	if ( outputFormat === "json" ) {
+	sendWateringData( res, data, outputFormat === "json" );
+};
+
+/**
+ * Sends a response to an HTTP request with a 200 status code.
+ * @param res The Express Response object to send the response through.
+ * @param data An object containing key/value pairs that should be formatted in the response body.
+ * @param useJson Indicates if the response body should use a JSON format instead of a format similar to URL query strings.
+ */
+function sendWateringData( res: express.Response, data: object, useJson: boolean = false ) {
+	if ( useJson ) {
 		res.json( data );
 	} else {
 		// Return the data formatted as a URL query string.
@@ -344,7 +359,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 				case "object":
 					// Convert objects to JSON.
 					value = JSON.stringify( value );
-					// Fallthrough.
+				// Fallthrough.
 				case "string":
 					/* URL encode strings. Since the OS firmware uses a primitive version of query string parsing and
 					decoding, only some characters need to be escaped and only spaces ("+" or "%20") will be decoded. */
@@ -356,7 +371,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 		res.send( formatted );
 	}
-};
+}
 
 /**
  * Makes an HTTP/HTTPS GET request to the specified URL and returns the response body.

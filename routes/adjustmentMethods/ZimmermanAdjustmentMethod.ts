@@ -2,6 +2,7 @@ import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from ".
 import { GeoCoordinates, PWS, ZimmermanWateringData } from "../../types";
 import { validateValues } from "../weather";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
+import { ErrorCode } from "../../errors";
 
 
 /**
@@ -41,7 +42,8 @@ async function calculateZimmermanWateringScale(
 		return {
 			scale: 100,
 			rawData: rawData,
-			errorMessage: "Necessary field(s) were missing from ZimmermanWateringData.",
+			errCode: ErrorCode.MissingWeatherField,
+			errMessage: "Necessary field(s) were missing from ZimmermanWateringData.",
 			wateringData: wateringData
 		};
 	}
