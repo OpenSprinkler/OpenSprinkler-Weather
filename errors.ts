@@ -1,6 +1,8 @@
 export enum ErrorCode {
-	/** An error was not properly handled and assigned a more specific error code. */
-	UnexpectedError = 0,
+	/** No error occurred. This code should be included with all successful responses because the firmware expects some
+	 * code to be present.
+	 */
+	NoError = 0,
 
 	/** The watering scale could not be calculated due to a problem with the weather information. */
 	BadWeatherData = 1,
@@ -46,7 +48,10 @@ export enum ErrorCode {
 	/** The adjustment options could not be parsed. */
 	MalformedAdjustmentOptions = 50,
 	/** A required adjustment option was not provided. */
-	MissingAdjustmentOption = 51
+	MissingAdjustmentOption = 51,
+
+	/** An error was not properly handled and assigned a more specific error code. */
+	UnexpectedError = 99
 }
 
 /** An error with a numeric code that can be used to identify the type of error. */

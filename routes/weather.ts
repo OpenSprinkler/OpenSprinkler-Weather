@@ -262,7 +262,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sunset:		timeData.sunset,
 		eip:		ipToInt( remoteAddress ),
 		rawData:	undefined,
-		errMessage:	undefined
+		errMessage:	undefined,
+		errCode:	0
 	};
 
 	let cachedScale: CachedScale;
@@ -293,6 +294,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 
 		data.scale = adjustmentMethodResponse.scale;
+		data.errCode = adjustmentMethodResponse.errCode || 0;
 		data.errMessage = adjustmentMethodResponse.errMessage;
 		data.rd = adjustmentMethodResponse.rainDelay;
 		data.rawData = adjustmentMethodResponse.rawData;
