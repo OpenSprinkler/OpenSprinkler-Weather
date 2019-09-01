@@ -13,7 +13,7 @@ export class WeatherProvider {
 	 * does not support this method).
 	 */
 	getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData > {
-		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod, "Selected WeatherProvider does not support getWateringData" );
+		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
 	}
 
 	/**
@@ -34,7 +34,7 @@ export class WeatherProvider {
 	 * CodedError if an error occurs while retrieving the EToData (or the WeatherProvider does not support this method).
 	 */
 	getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
-		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod, "Selected WeatherProvider does not support getEToData" );
+		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
 	};
 
 	/**

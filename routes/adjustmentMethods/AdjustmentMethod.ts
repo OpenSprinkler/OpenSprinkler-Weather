@@ -44,14 +44,6 @@ export interface AdjustmentMethodResponse {
 	 * watering.
 	 */
 	rainDelay?: number;
-	/**
-	 * An message to send to the OS firmware to indicate that an error occurred while calculating the watering
-	 * scale and the returned scale either defaulted to some reasonable value or was calculated with incomplete data.
-	 * Older firmware versions will ignore this field (they will silently swallow the error and use the returned scale),
-	 * but newer firmware versions may be able to alert the user that an error occurred and/or default to a
-	 * user-configured watering scale instead of using the one returned by the AdjustmentMethod.
-	 */
-	errMessage?: string;
 	/** A code describing the type of error that occurred (if one occurred). */
 	errCode?: ErrorCode;
 	/** The data that was used to calculate the watering scale, or undefined if no data was used. */

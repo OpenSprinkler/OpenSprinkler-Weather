@@ -59,9 +59,8 @@ export class CodedError {
 	public readonly errCode: ErrorCode;
 	public readonly message: string;
 
-	public constructor( errCode: ErrorCode, message: string ) {
+	public constructor( errCode: ErrorCode ) {
 		this.errCode = errCode;
-		this.message = message;
 	}
 }
 
@@ -79,7 +78,6 @@ export function makeCodedError( err: any ): CodedError {
 	if ( err instanceof CodedError ) {
 		return err;
 	} else {
-		// Include the current timestamp in the error message so the full error can easily be found in the logs.
-		return new CodedError( ErrorCode.UnexpectedError, "Unexpected error occurred at timestamp " + Date.now() );
+		return new CodedError( ErrorCode.UnexpectedError );
 	}
 }

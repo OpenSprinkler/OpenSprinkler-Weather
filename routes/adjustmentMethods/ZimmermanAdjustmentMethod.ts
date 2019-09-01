@@ -43,7 +43,6 @@ async function calculateZimmermanWateringScale(
 			scale: 100,
 			rawData: rawData,
 			errCode: ErrorCode.MissingWeatherField,
-			errMessage: "Necessary field(s) were missing from ZimmermanWateringData.",
 			wateringData: wateringData
 		};
 	}

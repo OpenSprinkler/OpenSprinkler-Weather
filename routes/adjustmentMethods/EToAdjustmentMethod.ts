@@ -18,7 +18,7 @@ async function calculateEToWateringScale(
 ): Promise< AdjustmentMethodResponse > {
 
 	if ( pws ) {
-		throw new CodedError( ErrorCode.PwsNotSupported, "ETo adjustment method does not support personal weather stations through WUnderground." );
+		throw new CodedError( ErrorCode.PwsNotSupported );
 	}
 
 	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
@@ -41,7 +41,7 @@ async function calculateEToWateringScale(
 	if ( adjustmentOptions && "baseETo" in adjustmentOptions ) {
 		baseETo = adjustmentOptions.baseETo
 	} else {
-		throw new CodedError( ErrorCode.MissingAdjustmentOption, "A baseline potential ETo must be provided." );
+		throw new CodedError( ErrorCode.MissingAdjustmentOption );
 	}
 
 	if ( adjustmentOptions && "elevation" in adjustmentOptions ) {
