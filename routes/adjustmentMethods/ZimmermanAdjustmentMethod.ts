@@ -2,7 +2,7 @@ import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from ".
 import { GeoCoordinates, PWS, ZimmermanWateringData } from "../../types";
 import { validateValues } from "../weather";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
-import { ErrorCode } from "../../errors";
+import { CodedError, ErrorCode } from "../../errors";
 
 
 /**
@@ -39,12 +39,7 @@ async function calculateZimmermanWateringScale(
 	// Check to make sure valid data exists for all factors
 	if ( !validateValues( [ "temp", "humidity", "precip" ], wateringData ) ) {
 		// Default to a scale of 100% if fields are missing.
-		return {
-			scale: 100,
-			rawData: rawData,
-			errCode: ErrorCode.MissingWeatherField,
-			wateringData: wateringData
-		};
+		throw new CodedError( ErrorCode.MissingWeatherField );
 	}
 
 	let humidityBase = 30, tempBase = 70, precipBase = 0;

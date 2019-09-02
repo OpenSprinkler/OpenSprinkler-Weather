@@ -1,6 +1,5 @@
 import { BaseWateringData, GeoCoordinates, PWS } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
-import { ErrorCode } from "../../errors";
 
 
 export interface AdjustmentMethod {
@@ -44,8 +43,6 @@ export interface AdjustmentMethodResponse {
 	 * watering.
 	 */
 	rainDelay?: number;
-	/** A code describing the type of error that occurred (if one occurred). */
-	errCode?: ErrorCode;
 	/** The data that was used to calculate the watering scale, or undefined if no data was used. */
 	wateringData: BaseWateringData;
 }
