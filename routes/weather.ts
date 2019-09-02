@@ -219,12 +219,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	try {
 		coordinates = await resolveCoordinates( location );
 	} catch ( err ) {
-		let codedError: CodedError = makeCodedError( err );
-		if ( codedError.errCode === ErrorCode.UnexpectedError ) {
-			console.error( `An unexpected error occurred during location resolution for "${ req.url }": `, err );
-		}
-
-		sendWateringError( res, codedError );
+		sendWateringError( res, makeCodedError( err ) );
 		return;
 	}
 
@@ -283,12 +278,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 				adjustmentOptions, coordinates, weatherProvider, pws
 			);
 		} catch ( err ) {
-			let codedError: CodedError = makeCodedError( err );
-			if ( codedError.errCode === ErrorCode.UnexpectedError ) {
-				console.error( `An unexpected error occurred during watering scale calculation for "${ req.url }": `, err );
-			}
-
-			sendWateringError( res, codedError );
+			sendWateringError( res, makeCodedError( err ) );
 			return;
 		}
 
@@ -303,12 +293,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 				try {
 					wateringData = await weatherProvider.getWateringData( coordinates );
 				} catch ( err ) {
-					let codedError: CodedError = makeCodedError( err );
-					if ( codedError.errCode === ErrorCode.UnexpectedError ) {
-						console.error( `An unexpected error occurred during restriction checks for "${ req.url }": `, err );
-					}
-
-					sendWateringError( res, codedError );
+					sendWateringError( res, makeCodedError( err ) );
 					return;
 				}
 			}
@@ -339,6 +324,10 @@ export const getWateringData = async function( req: express.Request, res: expres
  * @param useJson Indicates if the response body should use a JSON format instead of a format similar to URL query strings.
  */
 function sendWateringError( res: express.Response, error: CodedError, useJson: boolean = false ) {
+	if ( error.errCode === ErrorCode.UnexpectedError ) {
+		console.error( `An unexpected error occurred:`, error );
+	}
+
 	sendWateringData( res, { errCode: error.errCode, scale: 100 } );
 }
 

@@ -55,11 +55,11 @@ export enum ErrorCode {
 }
 
 /** An error with a numeric code that can be used to identify the type of error. */
-export class CodedError {
+export class CodedError extends Error {
 	public readonly errCode: ErrorCode;
-	public readonly message: string;
 
-	public constructor( errCode: ErrorCode ) {
+	public constructor( errCode: ErrorCode, message?: string ) {
+		super( message );
 		this.errCode = errCode;
 	}
 }
