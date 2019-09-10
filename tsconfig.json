@@ -8,6 +8,7 @@
     "skipLibCheck": true
   },
   "include": [
+    "errors.ts",
     "server.ts",
     "types.ts",
     "routes/**/*"

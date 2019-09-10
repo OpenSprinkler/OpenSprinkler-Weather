@@ -1,12 +1,13 @@
 import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
 import { httpJSONRequest } from "../weather";
+import { CodedError, ErrorCode } from "../../errors";
 
 export default class WUnderground extends WeatherProvider {
 
 	async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData > {
 		if ( !pws ) {
-			throw "WUnderground WeatherProvider requires a PWS to be specified.";
+			throw new CodedError( ErrorCode.NoPwsProvided );
 		}
 
 		const url = `https://api.weather.com/v2/pws/observations/hourly/7day?stationId=${ pws.id }&format=json&units=e&apiKey=${ pws.apiKey }`;
@@ -15,7 +16,7 @@ export default class WUnderground extends WeatherProvider {
 			data = await httpJSONRequest( url );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from WUnderground:", err );
-			throw "An error occurred while retrieving weather information from WUnderground."
+			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
 		// Take the 24 most recent observations.
@@ -23,7 +24,7 @@ export default class WUnderground extends WeatherProvider {
 
 		// Fail if not enough data is available.
 		if ( samples.length !== 24 ) {
-			throw "Insufficient data was returned by WUnderground.";
+			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
 		const totals = { temp: 0, humidity: 0, precip: 0 };

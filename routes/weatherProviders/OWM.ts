@@ -3,6 +3,7 @@ import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import * as moment from "moment";
+import { CodedError, ErrorCode } from "../../errors";
 
 export default class OWMWeatherProvider extends WeatherProvider {
 
@@ -25,12 +26,12 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			forecast = await httpJSONRequest( forecastUrl );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from OWM:", err );
-			throw "An error occurred while retrieving weather information from OWM."
+			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
 		// Indicate watering data could not be retrieved if the forecast data is incomplete.
 		if ( !forecast || !forecast.list ) {
-			throw "Necessary field(s) were missing from weather information returned by OWM.";
+			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
 		let totalTemp = 0,
@@ -111,12 +112,12 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			forecast = await httpJSONRequest( forecastUrl );
 		} catch (err) {
 			console.error( "Error retrieving ETo information from OWM:", err );
-			throw "An error occurred while retrieving ETo information from OWM."
+			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
 		// Indicate ETo data could not be retrieved if the forecast data is incomplete.
 		if ( !forecast || !forecast.list || forecast.list.length < 8 ) {
-			throw "Insufficient data available from OWM."
+			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
 		// Take a sample over 24 hours.
