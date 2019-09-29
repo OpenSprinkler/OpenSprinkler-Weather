@@ -4,6 +4,21 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Launch via NPM",
+            "cwd": "${workspaceRoot}",
+            "runtimeExecutable": "npm",
+            "windows": {
+                "runtimeExecutable": "npm.cmd"
+            },
+            "runtimeArgs": [
+                "run-script", "debug"
+            ],
+            "port": 9229,
+            "preLaunchTask": "NPM Compile"
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Mocha Tests",
             "program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
             "args": [
