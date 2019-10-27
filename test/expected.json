@@ -2,6 +2,9 @@
 	"noWeather": {
 		"01002": {
 			"tz": 32,
+			"rawData": {
+				"weatherProvider": "Manual"
+			},
 			"sunrise": 332,
 			"sunset": 1203,
 			"eip": 2130706433,
@@ -19,7 +22,8 @@
 				"h": 98.5,
 				"p": 1.09,
 				"t": 70.8,
-				"raining": 1
+				"raining": 1,
+				"weatherProvider": "OWM"
 			},
 			"errCode": 0
 		}
