@@ -7,6 +7,9 @@ import { AdjustmentMethod, AdjustmentMethodResponse } from "./AdjustmentMethod";
 async function calculateManualWateringScale( ): Promise< AdjustmentMethodResponse > {
 	return {
 		scale: undefined,
+		rawData: {
+			weatherProvider: "Manual",
+		},
 		wateringData: undefined
 	}
 }
