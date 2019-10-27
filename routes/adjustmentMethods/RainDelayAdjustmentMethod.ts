@@ -12,7 +12,10 @@ async function calculateRainDelayWateringScale( adjustmentOptions: RainDelayAdju
 	const d = adjustmentOptions.hasOwnProperty( "d" ) ? adjustmentOptions.d : 24;
 	return {
 		scale: undefined,
-		rawData: { raining: raining ? 1 : 0 },
+		rawData: {
+			weatherProvider: wateringData.weatherProvider,
+			raining: raining ? 1 : 0,
+			},
 		rainDelay: raining ? d : undefined,
 		wateringData: wateringData
 	}
