@@ -28,10 +28,12 @@ export default class WUnderground extends WeatherProvider {
 		}
 
 		const totals = { temp: 0, humidity: 0, precip: 0 };
+		let lastPrecip = samples[0].imperial.precipTotal;
 		for ( const sample of samples ) {
 			totals.temp += sample.imperial.tempAvg;
 			totals.humidity += sample.humidityAvg;
-			totals.precip += sample.imperial.precipRate;
+			totals.precip += ( sample.imperial.precipTotal - lastPrecip > 0 ) ? sample.imperial.precipTotal - lastPrecip : 0;
+			lastPrecip = sample.imperial.precipTotal
 		}
 
 		return {
