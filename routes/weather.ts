@@ -210,7 +210,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
 	} catch ( err ) {
 		// If the JSON is not valid then abort the calculation
-		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ) );
+		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ), adjustmentMethod != ManualAdjustmentMethod );
 		return;
 	}
 
@@ -219,7 +219,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	try {
 		coordinates = await resolveCoordinates( location );
 	} catch ( err ) {
-		sendWateringError( res, makeCodedError( err ) );
+		sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
 		return;
 	}
 
@@ -236,11 +236,11 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 		// Make sure that the PWS ID and API key look valid.
 		if ( !pwsId ) {
-			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsId ) );
+			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsId ), adjustmentMethod != ManualAdjustmentMethod );
 			return;
 		}
 		if ( !apiKey ) {
-			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsApiKey ) );
+			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsApiKey ), adjustmentMethod != ManualAdjustmentMethod );
 			return;
 		}
 
@@ -278,7 +278,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 				adjustmentOptions, coordinates, weatherProvider, pws
 			);
 		} catch ( err ) {
-			sendWateringError( res, makeCodedError( err ) );
+			sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
 			return;
 		}
 
@@ -293,7 +293,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 				try {
 					wateringData = await weatherProvider.getWateringData( coordinates );
 				} catch ( err ) {
-					sendWateringError( res, makeCodedError( err ) );
+					sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
 					return;
 				}
 			}
@@ -318,17 +318,20 @@ export const getWateringData = async function( req: express.Request, res: expres
 };
 
 /**
- * Sends a response to a watering scale request with an error code and a default watering scale of 100%.
+ * Sends a response to a watering scale request with an error code.
  * @param res The Express Response object to send the response through.
  * @param error The error code to send in the response body.
+ * @param resetScale Indicates if the `scale` field in the response should be set to 100. If this parameter is set to false,
+ * the field will be omitted. Newer firmware versions may ignore the value of this field since they will detect an error
+ * occurred, but older firmware versions will still update the watering scale accordingly.
  * @param useJson Indicates if the response body should use a JSON format instead of a format similar to URL query strings.
  */
-function sendWateringError( res: express.Response, error: CodedError, useJson: boolean = false ) {
+function sendWateringError( res: express.Response, error: CodedError, resetScale: boolean = true, useJson: boolean = false ) {
 	if ( error.errCode === ErrorCode.UnexpectedError ) {
 		console.error( `An unexpected error occurred:`, error );
 	}
 
-	sendWateringData( res, { errCode: error.errCode, scale: 100 } );
+	sendWateringData( res, { errCode: error.errCode, scale: resetScale ? 100 : undefined } );
 }
 
 /**
