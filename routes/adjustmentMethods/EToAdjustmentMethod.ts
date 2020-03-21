@@ -54,7 +54,7 @@ async function calculateEToWateringScale(
 	return {
 		scale: scale,
 		rawData: {
-			weatherProvider: etoData.weatherProvider,
+			wp: etoData.weatherProvider,
 			eto: Math.round( eto * 1000) / 1000,
 			radiation: Math.round( etoData.solarRadiation * 100) / 100,
 			minT: Math.round( etoData.minTemp ),

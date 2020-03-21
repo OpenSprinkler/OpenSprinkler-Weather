@@ -60,7 +60,7 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 		}
 
 		return {
-			weatherProvider: "DarkSky",
+			weatherProvider: "DS",
 			temp: totals.temp / 24,
 			humidity: totals.humidity / 24 * 100,
 			precip: totals.precip,
@@ -147,7 +147,7 @@ export default class DarkSkyWeatherProvider extends WeatherProvider {
 		}
 
 		return {
-			weatherProvider: "DarkSky",
+			weatherProvider: "DS",
 			periodStartTime: historicData.hourly.data[ 0 ].time,
 			minTemp: historicData.daily.data[ 0 ].temperatureMin,
 			maxTemp: historicData.daily.data[ 0 ].temperatureMax,

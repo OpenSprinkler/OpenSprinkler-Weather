@@ -8,7 +8,7 @@ async function calculateManualWateringScale( ): Promise< AdjustmentMethodRespons
 	return {
 		scale: undefined,
 		rawData: {
-			weatherProvider: "Manual",
+			wp: "Manual",
 		},
 		wateringData: undefined
 	}
