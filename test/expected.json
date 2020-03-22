@@ -3,7 +3,7 @@
 		"01002": {
 			"tz": 32,
 			"rawData": {
-				"weatherProvider": "Manual"
+				"wp": "Manual"
 			},
 			"sunrise": 332,
 			"sunset": 1203,
@@ -23,7 +23,7 @@
 				"p": 1.09,
 				"t": 70.8,
 				"raining": 1,
-				"weatherProvider": "OWM"
+				"wp": "OWM"
 			},
 			"errCode": 0
 		}

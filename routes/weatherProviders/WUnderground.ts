@@ -37,7 +37,7 @@ export default class WUnderground extends WeatherProvider {
 		}
 
 		return {
-			weatherProvider: "WUnderground",
+			weatherProvider: "WU",
 			temp: totals.temp / samples.length,
 			humidity: totals.humidity / samples.length,
 			precip: totals.precip,
