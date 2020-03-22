@@ -18,7 +18,7 @@ async function calculateRainDelayWateringScale(
 	return {
 		scale: undefined,
 		rawData: {
-			weatherProvider: wateringData.weatherProvider,
+			wp: wateringData.weatherProvider,
 			raining: raining ? 1 : 0,
 			},
 		rainDelay: raining ? d : undefined,
