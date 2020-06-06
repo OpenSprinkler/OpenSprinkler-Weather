@@ -14,9 +14,11 @@ import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMe
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
 import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode, makeCodedError } from "../errors";
+import { Geocoder } from "./geocoders/Geocoder";
 
 const WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
 const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
+const GEOCODER: Geocoder = new ( require("./geocoders/" + ( process.env.GEOCODER || "WUnderground" ) ).default )();
 
 // Define regex filters to match against location
 const filters = {
@@ -55,28 +57,7 @@ export async function resolveCoordinates( location: string ): Promise< GeoCoordi
 		const split: string[] = location.split( "," );
 		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
 	} else {
-		// Generate URL for autocomplete request
-		const url = "http://autocomplete.wunderground.com/aq?h=0&query=" +
-			encodeURIComponent( location );
-
-		let data;
-		try {
-			data = await httpJSONRequest( url );
-		} catch (err) {
-			// If the request fails, indicate no data was found.
-			throw new CodedError( ErrorCode.LocationServiceApiError );
-		}
-
-		// Check if the data is valid
-		if ( typeof data.RESULTS === "object" && data.RESULTS.length && data.RESULTS[ 0 ].tz !== "MISSING" ) {
-
-			// If it is, reply with an array containing the GPS coordinates
-			return [ parseFloat( data.RESULTS[ 0 ].lat ), parseFloat( data.RESULTS[ 0 ].lon ) ];
-		} else {
-
-			// Otherwise, indicate no data was found
-			throw new CodedError( ErrorCode.NoLocationFound );
-		}
+		return GEOCODER.getLocation( location );
 	}
 }
 
