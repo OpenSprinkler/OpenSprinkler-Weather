@@ -57,7 +57,7 @@ export async function resolveCoordinates( location: string ): Promise< GeoCoordi
 		const split: string[] = location.split( "," );
 		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
 	} else {
-		return GEOCODER.geocodeLocation( location );
+		return GEOCODER.getLocation( location );
 	}
 }
 
