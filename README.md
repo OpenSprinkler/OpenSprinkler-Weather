@@ -60,3 +60,24 @@ For more information on the "WeeWX Solution" click [here](docs/weewx.md)
 
 - Davis Vantage: a solution for this PWS has been kindly provided by @rmloeb [here](docs/davis-vantage.md)
 - Netatmo: instructions for configuring this PWS have been greatfully provided by @franzstein [here](docs/netatmo.md)
+
+## Docker
+
+It is possible to build a self-contained docker image from this repository.  It can then be used to run the service
+without installing any prerequisites or setting up systemd.
+
+### Building the Docker image
+```shell script
+./build-docker.sh  # run with -h for other options
+```
+The above will generate baselineEtoData (if not already done) and then build a complete opensprinkler-weather docker image.
+
+### Running the Docker image
+```shell script
+docker create --name=osweather -p 3000:3000 --restart unless-stopped opensprinkler-weather
+docker start osweather
+
+# Instead of the above, use this for testing/troubleshooting by running it in the foreground:
+docker run --rm -it -p 3000:3000 opensprinkler-weather
+```
+Note: to expose a different port, change `-p 3000:3000` to, eg `-p12345:3000` 
