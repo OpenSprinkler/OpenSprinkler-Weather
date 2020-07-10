@@ -27,6 +27,7 @@ export default class GoogleMaps extends Geocoder {
 		}
 
 		if ( !data.results.length ) {
+			console.log( `No results found for location "${ location }"` );
 			throw new CodedError( ErrorCode.NoLocationFound );
 		}
 
