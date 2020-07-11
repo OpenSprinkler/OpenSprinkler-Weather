@@ -1,6 +1,7 @@
 import fs = require("fs");
 
 import { GeoCoordinates } from "../../types";
+import { CodedError, ErrorCode } from "../../errors";
 
 export abstract class Geocoder {
 
@@ -39,11 +40,26 @@ export abstract class Geocoder {
 	 */
 	public async getLocation( location: string ): Promise<GeoCoordinates> {
 		if ( this.cache.has( location ) ) {
-			return this.cache.get( location );
+			const coords: GeoCoordinates = this.cache.get( location );
+			if ( coords == null ) {
+				// Throw an error if there are no results for this location.
+				throw new CodedError( ErrorCode.NoLocationFound );
+			} else {
+				return coords;
+			}
 		}
 
-		const coords: GeoCoordinates = await this.geocodeLocation( location );
-		this.cache.set( location, coords );
-		return coords;
+		try {
+			const coords: GeoCoordinates = await this.geocodeLocation( location );
+			this.cache.set( location, coords );
+			return coords;
+		} catch ( ex ) {
+			if ( ex instanceof CodedError && ex.errCode == ErrorCode.NoLocationFound ) {
+				// Store in the cache the fact that this location has no results.
+				this.cache.set( location, null );
+			}
+
+			throw ex;
+		}
 	}
 }
