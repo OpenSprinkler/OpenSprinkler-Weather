@@ -17,6 +17,8 @@ local <weather-service IP> weatherstation.wunderground.com
 ```
 Note: you must be running in administrator mode to make this change. On Windows 10 the HOSTS file is in `C:/Windows/System32/drivers/etc`. The easiest way to do this is to open a Command Prompt in Admin mode, navigate to `C:/Windows/System32/drivers/etc`, then execute "notepad.exe hosts", add the three entries, save, exit, and close the command window. The change should take effect immediately, but you may need to reboot the Windows machine to be sure.
 
+WARNING (7/30/2020): recent changes to Windows Defender apparently cause the HOSTS file to be cleared.  In order to prevent this you must list the HOSTS file to be ignored (Settings|Windows Security|Virus & threat protection|(scroll down)Exclusions|C:\Windows\System32\drivers\etc\hosts)
+
 In the Weatherlink application you should see "Wunderground settings" in the File menu. You can ignore the StationID and Password settings (or just enter a single blank character). Set the Update Interval to 5 minutes, which should be more than sufficient for the purpose of the Zimmerman water level calculation.
 
 On the machine running weather-server, edit the weather-server `.env` file to add a line `"PWS=WU"`. Stop and restart weather-service.
