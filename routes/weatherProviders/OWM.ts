@@ -260,12 +260,6 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			period3h.clouds.all = Math.floor(period3h.clouds.all / 3);
 
 			period3h.dt = hourly[0].dt;
-
-			// Started this and then realized it wasn't used so just left it in
-			let date = new Date(period3h.dt * 1000);
-			let month = date.getMonth() + 1;
-			let day = date.getDate();
-			period3h.dt_txt = date.getFullYear() + "-" + ("0" + month.toString()).substring(month > 9 ? 1 : 0) + "-" + ("0" + day.toString()).substring(day > 9 ? 1 : 0) + " " + date.toTimeString().substring(0, 8);
 		}
 	}
 
