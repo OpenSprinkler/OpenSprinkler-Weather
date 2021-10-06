@@ -236,7 +236,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			dt_txt: ""
 		};
 
-		if (hourly && hourly.length > 0 && hourly[2]?.dt) {
+		if (hourly && hourly.length > 2 && hourly[2].dt) {
 
 			// Could add some more data here if needed, I decided to just minimize the translation work
 			// Also some of the fields aren't availible in the new call so not worth trying to do a full translation
