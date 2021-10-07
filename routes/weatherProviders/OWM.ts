@@ -25,12 +25,12 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		let forecast;
 		let hourlyForecast;
 		try {
+
 			hourlyForecast = await httpJSONRequest(forecastUrl);
 
 			// The new API call only offers 48 hours of hourly forecast data which is fine because we only use 24 hours
 			// just need to translate the data into blocks of 3 hours and then use as normal.
-			// Could probably shortcut this if you knew the following calculations better but less chance of screwing 
-			// up the calculation just by bundling the hourly data into 3 hour blocks so I went that route
+			// Could probably skip this but less chance of changing the output this way
 			if (hourlyForecast && hourlyForecast.hourly) {
 				forecast = this.get3hForecast(hourlyForecast.hourly, 24);
 			}
@@ -121,7 +121,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 	async getEToData(coordinates: GeoCoordinates): Promise<EToData> {
 		// The OWM API changed what you get on the free subscription so need to adjust the call and translate the data.
 		const OWM_API_KEY = process.env.OWM_API_KEY,
-			forecastUrl = `https://api.openweathermap.org/data/2.5/onecall?exclude=current,minutely,daily,alerts&appid=${ this.API_KEY }&units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }`;
+			forecastUrl = "https://api.openweathermap.org/data/2.5/onecall?exclude=current,minutely,daily,alerts&appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[0] + "&lon=" + coordinates[1];
 
 		// Perform the HTTP request to retrieve the weather data
 		let forecast;
@@ -129,10 +129,8 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		try {
 			hourlyForecast = await httpJSONRequest(forecastUrl);
 
-			// The new API call only offers 48 hours of hourly forecast data which is fine because we only use 24 hours
-			// just need to translate the data into blocks of 3 hours and then use as normal.
-			// Could probably shortcut this if you knew the following calculations better but less chance of screwing 
-			// up the calculation just by bundling the hourly data into 3 hour blocks so I went that route
+			// translating the hourly into a 3h forecast again could probably ditch the translation
+			// but to be safe just sticking with the 3h translation
 			if (hourlyForecast && hourlyForecast.hourly) {
 				forecast = this.get3hForecast(hourlyForecast.hourly, 24);
 			}
@@ -192,10 +190,10 @@ export default class OWMWeatherProvider extends WeatherProvider {
 	}
 
 	// Expects an array of at least 3 hours of forecast data from the API's onecall method
-	// Returns the equivilent of the 3 hour object from the previous call from the 5 day forecast API call
-	public getPeriod3hObject(hourly: any[]) {
-
-		// Should probably define this in a class somewhere but it isn't done with the existing API calls so not bothering
+	// Returns an aggregated object for the first 3 hours of the hourly array, should be equivalent to the 
+	// 3 hour object from the 5 day forecast
+	getPeriod3hObject(hourly: any[]) {
+		
 		let period3h = {
 			dt: 0,
 			main: {
@@ -238,8 +236,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 
 		if (hourly && hourly.length > 2 && hourly[2].dt) {
 
-			// Could add some more data here if needed, I decided to just minimize the translation work
-			// Also some of the fields aren't availible in the new call so not worth trying to do a full translation
+			// Some of the fields aren't availible in the new call so not worth trying to do a full translation
 			for (let index = 0; index < 3; index++) {
 				let hour = hourly[index];
 				
@@ -252,20 +249,21 @@ export default class OWMWeatherProvider extends WeatherProvider {
 				period3h.clouds.all += hour.clouds;
 			}
 
-			// Some of the decisions could be questionable but I decided to go with the numbers that would err on the side of more
-			// rather than less
-			period3h.main.temp = Math.ceil(period3h.main.temp / 3);
+			// Defaulting to floor to err on the side of more watering
+			period3h.main.temp = period3h.main.temp / 3;
 			period3h.main.humidity = Math.floor(period3h.main.humidity / 3);
-			period3h.wind.speed = Math.ceil(period3h.wind.speed / 3);
+			period3h.wind.speed = period3h.wind.speed / 3;
 			period3h.clouds.all = Math.floor(period3h.clouds.all / 3);
 
 			period3h.dt = hourly[0].dt;
 		}
+
+		return period3h;
 	}
 
 	// Expects an array of hourly forecast data from the API's onecall method
-	// Returns a minimally equivilent object to the previous 5 day forecast API call
-	public get3hForecast(hourly: any[], hours: number = 24) {
+	// Returns a minimally equivalent object to the previous 5 day forecast API call
+	get3hForecast(hourly: any[], hours: number = 24) {
 
 		let results = { list: [] };
 
@@ -281,6 +279,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			}
 		}
 
-		return results;
+		// returning null should give a better error message if there no data from the service
+		return results.list.length > 0 ? results : null;
 	}
 }
