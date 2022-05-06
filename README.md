@@ -13,8 +13,8 @@ The production version runs on Amazon Elastic Beanstalk (AWS EB) and therefore t
 [changelog]: https://github.com/OpenSprinkler/OpenSprinkler-Weather/releases
 
 
-## New weather provider: DWD (Deutscher Wetter Dienst=German Weather Service)**
-- !!only usable for german locations!! -
+## New weather provider: DWD (Deutscher Wetter Dienst=German Weather Service)
+**!!only usable for german locations!!**
 This provider uses https://brightSky.dev for querying data for a given location.
 Just define 
 WEATHER_PROVIDER=DWD
