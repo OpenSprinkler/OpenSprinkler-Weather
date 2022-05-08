@@ -13,7 +13,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 	}
 
 	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
-		const yesterdayTimestamp: string = moment().subtract( 1, "day" ).format("YYYY-MM-DD");
+		const yesterdayTimestamp: string = moment().subtract( 1, "day" ).format();
 
 		console.log("DWD getWateringData request for coordinates: %s", coordinates);
 
@@ -176,7 +176,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 		console.log("DWD getEToData request for coordinates: %s", coordinates);
 		
-		const timestamp: string = moment().subtract( 1, "day" ).format("YYYY-MM-DD");
+		const timestamp: string = moment().subtract( 1, "day" ).format();
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ timestamp }`;
  
 		let historicData;
