@@ -33,7 +33,7 @@ export class WeatherProvider {
 	 * @return A Promise that will be resolved with the EToData if it is successfully retrieved, or rejected with a
 	 * CodedError if an error occurs while retrieving the EToData (or the WeatherProvider does not support this method).
 	 */
-	getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+	getEToData( coordinates: GeoCoordinates, pws?: PWS  ): Promise< EToData > {
 		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
 	};
 

@@ -1,6 +1,9 @@
+import * as moment from "moment-timezone";
+
 import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
 import { httpJSONRequest } from "../weather";
+import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 
 export default class WUnderground extends WeatherProvider {
@@ -9,6 +12,8 @@ export default class WUnderground extends WeatherProvider {
 		if ( !pws ) {
 			throw new CodedError( ErrorCode.NoPwsProvided );
 		}
+
+		console.log("WU getWateringData request for coordinates: %s", coordinates);
 
 		const url = `https://api.weather.com/v2/pws/observations/hourly/7day?stationId=${ pws.id }&format=json&units=e&apiKey=${ pws.apiKey }`;
 		let data;
@@ -43,5 +48,110 @@ export default class WUnderground extends WeatherProvider {
 			precip: totals.precip,
 			raining: samples[ samples.length - 1 ].imperial.precipRate > 0
 		}
+	}
+
+	public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData > {
+		if ( !pws ) {
+			throw new CodedError( ErrorCode.NoPwsProvided );
+		}
+
+		console.log("WU getEToData request for coordinates: %s %s", coordinates, pws.id);
+		
+		const timestamp: string = moment().subtract( 1, "day" ).format("YYYYMMDD");
+		const historicUrl = `https://api.weather.com/v2/pws/history/all?stationId=${ pws.id }&format=json&units=e&date=${ timestamp }&apiKey=${ pws.apiKey }`;
+
+		let historicData;
+		try {
+			historicData = await httpJSONRequest( historicUrl );
+		} catch (err) {
+			throw new CodedError( ErrorCode.WeatherApiError );
+		}
+
+		if ( !historicData || !historicData.observations ) {
+			throw "Necessary field(s) were missing from weather information returned by Wunderground.";
+		}
+
+		let minHumidity: number = undefined, maxHumidity: number = undefined;
+		let minTemp: number = undefined, maxTemp: number = undefined, precip: number = 0;
+		let wind: number = 0, solar: number = 0;
+		for ( const hour of historicData.observations ) {
+
+			minTemp = minTemp < hour.imperial.tempLow ? minTemp : hour.imperial.tempLow;
+			maxTemp = maxTemp > hour.imperial.tempHigh ? maxTemp : hour.imperial.tempHigh;
+
+			if (hour.imperial.precipTotal != null)
+				precip += hour.imperial.precipTotal;
+
+			if (hour.imperial.windspeedAvg != null && hour.imperial.windspeedAvg > wind)
+				wind = hour.imperial.windspeedAvg;
+
+			if (hour.solarRadiationHigh != null)
+				solar += hour.solarRadiationHigh;
+
+			minHumidity = minHumidity < hour.humidityLow ? minHumidity : hour.humidityLow;
+			maxHumidity = maxHumidity > hour.humidityHigh ? maxHumidity : hour.humidityHigh;
+		}
+
+		solar = solar / historicData.observations.length * 24 / 1000; //Watts/m2 in 24h -->KWh/m2
+		const result : EToData = {
+			weatherProvider: "WU",
+			periodStartTime: historicData.observations[ 0 ].epoch,
+			minTemp: minTemp,
+			maxTemp: maxTemp,
+			minHumidity: minHumidity,
+			maxHumidity: maxHumidity,
+			solarRadiation: solar,
+			// Assume wind speed measurements are taken at 2 meters.
+			windSpeed: wind,
+			precip: precip,
+		}
+		console.log("WU 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s",
+			(this.inch2mm(precip)).toPrecision(3), 
+			solar.toPrecision(3), 
+			(this.F2C(minTemp)).toPrecision(3), (this.F2C(maxTemp)).toPrecision(3), minHumidity, maxHumidity, (this.mph2kmh(wind)).toPrecision(4));
+		return result;
+	}
+
+	public shouldCacheWateringScale(): boolean {
+		return false;
+	}
+
+	private getOWMIconCode(icon: string) {
+		switch(icon) {
+			case "partly-cloudy-night":
+				return "02n";
+			case "partly-cloudy-day":
+				return "02d";
+			case "cloudy":
+				return "03d";
+			case "fog":
+			case "wind":
+				return "50d";
+			case "sleet":
+			case "snow":
+				return "13d";
+			case "rain":
+				return "10d";
+			case "clear-night":
+				return "01n";
+			case "clear-day":
+			default:
+				return "01d";
+		}
+	}
+	
+	// Fahrenheit to Grad Celcius:
+	private F2C(fahrenheit: number): number {
+		return (fahrenheit-32) / 1.8;
+	}
+	
+	//mph to kmh:
+	private mph2kmh(mph : number): number {
+		return mph * 1.609344;
+	}
+	
+	//inch to mm:
+	private inch2mm(inch : number): number {
+		return inch * 25.4;
 	}
 }

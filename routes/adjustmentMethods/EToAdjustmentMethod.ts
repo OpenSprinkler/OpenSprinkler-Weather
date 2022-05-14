@@ -17,9 +17,9 @@ async function calculateEToWateringScale(
 	pws?: PWS
 ): Promise< AdjustmentMethodResponse > {
 
-	if ( pws ) {
-		throw new CodedError( ErrorCode.PwsNotSupported );
-	}
+	//if ( pws ) {
+	//	throw new CodedError( ErrorCode.PwsNotSupported );
+	//}
 
 	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
 	/*
@@ -32,7 +32,7 @@ async function calculateEToWateringScale(
 	 */
 
 	// This will throw a CodedError if ETo data cannot be retrieved.
-	const etoData: EToData = await weatherProvider.getEToData( coordinates );
+	const etoData: EToData = await weatherProvider.getEToData( coordinates, );
 
 	let baseETo: number;
 	// Default elevation is based on data from https://www.pnas.org/content/95/24/14009.
