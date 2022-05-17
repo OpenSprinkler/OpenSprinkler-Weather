@@ -32,7 +32,7 @@ async function calculateEToWateringScale(
 	 */
 
 	// This will throw a CodedError if ETo data cannot be retrieved.
-	const etoData: EToData = await weatherProvider.getEToData( coordinates, );
+	const etoData: EToData = await weatherProvider.getEToData( coordinates, pws );
 
 	let baseETo: number;
 	// Default elevation is based on data from https://www.pnas.org/content/95/24/14009.
