@@ -57,30 +57,40 @@ export default class WUnderground extends WeatherProvider {
 
 		console.log("WU getEToData request for coordinates: %s %s", coordinates, pws.id);
 		
-		const timestamp: string = moment().subtract( 1, "day" ).format("YYYYMMDD");
-		const historicUrl = `https://api.weather.com/v2/pws/history/all?stationId=${ pws.id }&format=json&units=e&date=${ timestamp }&apiKey=${ pws.apiKey }`;
+		//We need the date from the last 24h, not bound to day boundary!
+		//So we take the values from 2 days: today+yesterday
+		const fromDate = moment().subtract( 1, "day" );
+		const fromDateStr: string = fromDate.format("YYYYMMDD");
+		const toDate = moment();
+		const toDateStr = toDate.format("YYYYMMDD");
+		const historicUrl1 = `https://api.weather.com/v2/pws/history/all?stationId=${ pws.id }&format=json&units=e&date=${ fromDateStr }&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
+		const historicUrl2 = `https://api.weather.com/v2/pws/history/all?stationId=${ pws.id }&format=json&units=e&date=${ toDateStr }&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
 
-		let historicData;
+		let historicData1, historicData2;
 		try {
-			historicData = await httpJSONRequest( historicUrl );
+			historicData1 = await httpJSONRequest( historicUrl1 );
+			historicData2 = await httpJSONRequest( historicUrl2 );
 		} catch (err) {
 			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
-		if ( !historicData || !historicData.observations ) {
+		if ( !historicData1 || !historicData1.observations || !historicData2 || !historicData2.observations) {
 			throw "Necessary field(s) were missing from weather information returned by Wunderground.";
 		}
 
 		let minHumidity: number = undefined, maxHumidity: number = undefined;
-		let minTemp: number = undefined, maxTemp: number = undefined, precip: number = 0;
+		let minTemp: number = undefined, maxTemp: number = undefined
+		let precip: number = 0, precip1: number = 0, precip2: number = 0;
 		let wind: number = 0, solar: number = 0;
-		for ( const hour of historicData.observations ) {
+		let n : number = 0;
+		for ( const hour of historicData1.observations ) {
+			if (moment(hour.obsTimeUtc) < fromDate)
+				continue;
 
 			minTemp = minTemp < hour.imperial.tempLow ? minTemp : hour.imperial.tempLow;
 			maxTemp = maxTemp > hour.imperial.tempHigh ? maxTemp : hour.imperial.tempHigh;
 
-			if (hour.imperial.precipTotal != null)
-				precip += hour.imperial.precipTotal;
+			precip1 = hour.imperial.precipTotal;
 
 			if (hour.imperial.windspeedAvg != null && hour.imperial.windspeedAvg > wind)
 				wind = hour.imperial.windspeedAvg;
@@ -90,12 +100,32 @@ export default class WUnderground extends WeatherProvider {
 
 			minHumidity = minHumidity < hour.humidityLow ? minHumidity : hour.humidityLow;
 			maxHumidity = maxHumidity > hour.humidityHigh ? maxHumidity : hour.humidityHigh;
+			n++;
 		}
 
-		solar = solar / historicData.observations.length * 24 / 1000; //Watts/m2 in 24h -->KWh/m2
+		for ( const hour of historicData2.observations ) {
+			minTemp = minTemp < hour.imperial.tempLow ? minTemp : hour.imperial.tempLow;
+			maxTemp = maxTemp > hour.imperial.tempHigh ? maxTemp : hour.imperial.tempHigh;
+
+			precip2 = hour.imperial.precipTotal;
+
+			if (hour.imperial.windspeedAvg != null && hour.imperial.windspeedAvg > wind)
+				wind = hour.imperial.windspeedAvg;
+
+			if (hour.solarRadiationHigh != null)
+				solar += hour.solarRadiationHigh;
+
+			minHumidity = minHumidity < hour.humidityLow ? minHumidity : hour.humidityLow;
+			maxHumidity = maxHumidity > hour.humidityHigh ? maxHumidity : hour.humidityHigh;
+			n++;
+		}
+
+		solar = solar / n * 24 / 1000; //Watts/m2 in 24h -->KWh/m2
+		precip = precip1 + precip2;
+		
 		const result : EToData = {
 			weatherProvider: "WU",
-			periodStartTime: historicData.observations[ 0 ].epoch,
+			periodStartTime: fromDate.unix(),
 			minTemp: minTemp,
 			maxTemp: maxTemp,
 			minHumidity: minHumidity,
@@ -105,10 +135,10 @@ export default class WUnderground extends WeatherProvider {
 			windSpeed: wind,
 			precip: precip,
 		}
-		console.log("WU 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s",
+		console.log("WU 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s n:%s",
 			(this.inch2mm(precip)).toPrecision(3), 
 			solar.toPrecision(3), 
-			(this.F2C(minTemp)).toPrecision(3), (this.F2C(maxTemp)).toPrecision(3), minHumidity, maxHumidity, (this.mph2kmh(wind)).toPrecision(4));
+			(this.F2C(minTemp)).toPrecision(3), (this.F2C(maxTemp)).toPrecision(3), minHumidity, maxHumidity, (this.mph2kmh(wind)).toPrecision(4), n);
 		return result;
 	}
 
