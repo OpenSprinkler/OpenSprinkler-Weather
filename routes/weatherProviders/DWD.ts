@@ -20,6 +20,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		//const yesterdayUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?exclude=currently,minutely,daily,alerts,flags`;
 		const yesterdayUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ yesterdayTimestamp }`;
 
+		//console.log("1: %s", yesterdayUrl);
 		
 		let yesterdayData;
 		try {
@@ -33,13 +34,13 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
-		const samples = [
-			...yesterdayData.weather
-		];
+		const samples = yesterdayData.weather;
+
+		//console.log("2: %s", samples.len);
 
 		// Fail if not enough data is available.
 		// There will only be 23 samples on the day that daylight saving time begins.
-		if ( samples.length !== 24 && samples.length !== 23 ) {
+		if ( samples.length < 23 ) {
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
@@ -56,20 +57,21 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			// This field may be missing from the response if it is snowing.
 			totals.precip += sample.precipitation || 0;
 		}
-	
+
 		const result : ZimmermanWateringData = {
 			weatherProvider: "DWD",
 			temp: this.C2F(totals.temp / samples.length),
 			humidity: totals.humidity / samples.length,
 			precip: this.mm2inch(totals.precip),
-			raining: samples[ samples.length - 1 ].precipitation > 0,
+			raining: samples[ samples.length - 1 ].precipitation > 0
 		}
-		//console.log("DWD getWateringData result: %s", result);
+
 		console.log("DWD 1: temp:%s humidity:%s precip:%s raining:%s", 
 			totals.temp / samples.length,
 			totals.humidity / samples.length,
 			totals.precip,
 			samples[ samples.length - 1 ].precipitation > 0);
+
 		return result;
 	}
 

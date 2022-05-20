@@ -36,12 +36,14 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 
 		let maxIndex: number = 0;
 
-		const totals = { temp: 0, humidity: 0, precip: 0 };
+		const totals = { temp: 0, humidity: 0, precip: 0, raining: false };
 		const now: number = moment().unix();
+
 		for (let index = 0;  index < yesterdayData.hourly.time.length; index++ ) {
 			if (yesterdayData.hourly.time[index] > now) 
 			{
 				maxIndex = index-1;
+				totals.raining = yesterdayData.hourly.precipitation[maxIndex] > 0 || yesterdayData.hourly.precipitation[index] > 0;
 				break;
 			}
 			totals.temp += yesterdayData.hourly.temperature_2m[index];
@@ -54,7 +56,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			temp: totals.temp / maxIndex,
 			humidity: totals.humidity / maxIndex,
 			precip: totals.precip,
-			raining: yesterdayData.hourly.precipitation[maxIndex] > 0
+			raining: totals.raining
 		}
 		console.log("OM 1: temp:%s humidity:%s precip:%s raining:%s", 
 			this.F2C(result.temp),
