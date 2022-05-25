@@ -141,10 +141,12 @@ export default class WUnderground extends WeatherProvider {
 			windSpeed: wind,
 			precip: precip,
 		}
+
 		console.log("WU 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s n:%s nig:%s",
 			(this.inch2mm(precip)).toPrecision(3), 
 			solar.toPrecision(3), 
 			(this.F2C(minTemp)).toPrecision(3), (this.F2C(maxTemp)).toPrecision(3), minHumidity, maxHumidity, (this.mph2kmh(wind)).toPrecision(4), n, nig);
+
 		return result;
 	}
 
