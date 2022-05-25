@@ -65,6 +65,8 @@ export default class WUnderground extends WeatherProvider {
 		const toDateStr = toDate.format("YYYYMMDD");
 		const historicUrl1 = `https://api.weather.com/v2/pws/history/all?stationId=${ pws.id }&format=json&units=e&date=${ fromDateStr }&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
 		const historicUrl2 = `https://api.weather.com/v2/pws/history/all?stationId=${ pws.id }&format=json&units=e&date=${ toDateStr }&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
+		console.log(historicUrl1);
+		console.log(historicUrl2);
 
 		let historicData1, historicData2;
 		try {
@@ -80,12 +82,16 @@ export default class WUnderground extends WeatherProvider {
 
 		let minHumidity: number = undefined, maxHumidity: number = undefined;
 		let minTemp: number = undefined, maxTemp: number = undefined
-		let precip: number = 0, precip1: number = 0, precip2: number = 0;
+		let precip: number = 0, precip0: number = 0, precip1: number = 0, precip2: number = 0;
 		let wind: number = 0, solar: number = 0;
-		let n : number = 0;
+		let n : number = 0, nig : number = 0;
+
 		for ( const hour of historicData1.observations ) {
-			if (moment(hour.obsTimeUtc) < fromDate)
+			if (moment(hour.obsTimeUtc).unix() < fromDate.unix()) {
+				precip0 = hour.imperial.precipTotal;
+				nig++;
 				continue;
+			}
 
 			minTemp = minTemp < hour.imperial.tempLow ? minTemp : hour.imperial.tempLow;
 			maxTemp = maxTemp > hour.imperial.tempHigh ? maxTemp : hour.imperial.tempHigh;
@@ -121,7 +127,7 @@ export default class WUnderground extends WeatherProvider {
 		}
 
 		solar = solar / n * 24 / 1000; //Watts/m2 in 24h -->KWh/m2
-		precip = precip1 + precip2;
+		precip = precip1 + precip2 - precip0;
 		
 		const result : EToData = {
 			weatherProvider: "WU",
@@ -135,10 +141,10 @@ export default class WUnderground extends WeatherProvider {
 			windSpeed: wind,
 			precip: precip,
 		}
-		console.log("WU 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s n:%s",
+		console.log("WU 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s n:%s nig:%s",
 			(this.inch2mm(precip)).toPrecision(3), 
 			solar.toPrecision(3), 
-			(this.F2C(minTemp)).toPrecision(3), (this.F2C(maxTemp)).toPrecision(3), minHumidity, maxHumidity, (this.mph2kmh(wind)).toPrecision(4), n);
+			(this.F2C(minTemp)).toPrecision(3), (this.F2C(maxTemp)).toPrecision(3), minHumidity, maxHumidity, (this.mph2kmh(wind)).toPrecision(4), n, nig);
 		return result;
 	}
 
