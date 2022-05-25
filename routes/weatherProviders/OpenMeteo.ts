@@ -254,7 +254,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	
 	//mm to inch:
 	private mm2inch(mm : number): number {
-		return mm / 25.4;
+		return mm / 2.54;
 	}
 
 	// Fahrenheit to Grad Celcius:
@@ -269,6 +269,6 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		
 	//inch to mm:
 	private inch2mm(inch : number): number {
-		return inch * 25.4;
+		return inch * 2.54;
 	}
 }
