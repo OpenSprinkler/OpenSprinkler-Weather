@@ -286,6 +286,6 @@ export default class DWDWeatherProvider extends WeatherProvider {
 	
 	//mm to inch:
 	private mm2inch(mm : number): number {
-		return mm / 2.54;
+		return mm / 25.4;
 	}
 }

@@ -182,6 +182,6 @@ export default class WUnderground extends WeatherProvider {
 	
 	//inch to mm:
 	private inch2mm(inch : number): number {
-		return inch * 2.54;
+		return inch * 25.4;
 	}
 }
