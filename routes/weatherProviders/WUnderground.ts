@@ -64,7 +64,8 @@ export default class WUnderground extends WeatherProvider {
 		const toDate = moment();
 		const toDateStr = toDate.format("YYYYMMDD");
 		const historicUrl1 = `https://api.weather.com/v2/pws/history/all?stationId=${ pws.id }&format=json&units=e&date=${ fromDateStr }&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
-		const historicUrl2 = `https://api.weather.com/v2/pws/history/all?stationId=${ pws.id }&format=json&units=e&date=${ toDateStr }&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
+		//const historicUrl2 = `https://api.weather.com/v2/pws/history/all?stationId=${ pws.id }&format=json&units=e&date=${ toDateStr }&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
+		const historicUrl2 = `https://api.weather.com/v2/pws/observations/all/1day?stationId=${ pws.id }&format=json&units=e&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
 		console.log(historicUrl1);
 		console.log(historicUrl2);
 
@@ -85,9 +86,10 @@ export default class WUnderground extends WeatherProvider {
 		let precip: number = 0, precip0: number = 0, precip1: number = 0, precip2: number = 0;
 		let wind: number = 0, solar: number = 0;
 		let n : number = 0, nig : number = 0;
+		const fromEpoch = fromDate.unix();
 
 		for ( const hour of historicData1.observations ) {
-			if (moment(hour.obsTimeUtc).unix() < fromDate.unix()) {
+			if (hour.epoch < fromEpoch) {
 				precip0 = hour.imperial.precipTotal;
 				nig++;
 				continue;
