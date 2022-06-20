@@ -28,3 +28,5 @@ Actual readings from your PWS should now be flowing to weather-service. Make sur
 **Testing**
 
 To immediately observe the data feed, open Davis WeatherLink, click on File | Wunderground Settings, then click the "Test" box.
+
+Note: this procedure does not work if you are using an OSPI (Open Sprinkler running on a Raspberry Pi), because OSPI requires that the OpenSprinkler-Weather-Service use port 3000 and the HOSTS file redirection does not support a port specification.
