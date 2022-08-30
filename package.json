@@ -19,7 +19,7 @@
     "express": "^4.16.4",
     "geo-tz": "^5.0.4",
     "mockdate": "^2.0.2",
-    "moment-timezone": "^0.5.25",
+    "moment-timezone": "^0.5.35",
     "node-cache": "^4.2.0",
     "suncalc": "^1.8.0"
   },
