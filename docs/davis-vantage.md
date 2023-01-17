@@ -29,4 +29,4 @@ Actual readings from your PWS should now be flowing to weather-service. Make sur
 
 To immediately observe the data feed, open Davis WeatherLink, click on File | Wunderground Settings, then click the "Test" box.
 
-Note: this procedure does not work if you are using an OSPI (Open Sprinkler running on a Raspberry Pi), because OSPI requires that the OpenSprinkler-Weather-Service use port 3000 and the HOSTS file redirection does not support a port specification.
+Note: this procedure does not work if you are using an OSPI (Open Sprinkler running on a Raspberry Pi), because OSPI requires that the OpenSprinkler-Weather-Service use port 3000 and the HOSTS file redirection does not support a port specification.  If you are running the weather-server on a system that supports iptables, you can work around this by using iptables to redirect port 80 to port 3000 on the server host.  See https://o7planning.org/11363/redirect-port-80-443-on-ubuntu-using-iptables for guidance on how to do this.
