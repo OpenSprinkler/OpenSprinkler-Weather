@@ -12,6 +12,28 @@ The production version runs on Amazon Elastic Beanstalk (AWS EB) and therefore t
 [help]: http://support.opensprinkler.com
 [changelog]: https://github.com/OpenSprinkler/OpenSprinkler-Weather/releases
 
+
+## New weather provider: DWD (Deutscher Wetter Dienst=German Weather Service)
+**!!only usable for german locations!!**
+This provider uses https://brightSky.dev for querying data for a given location.
+Just define 
+WEATHER_PROVIDER=DWD
+in your .env File
+
+**supports also ETO !**
+
+
+## New weather provider: OpenMeteo (https://open-meteo.com/en)
+**WORLDWIDE WEATHER SERVICE**
+Open-Meteo combines local (2 km resolution) and global (11 km) weather models from national weather services. For every location on earth, the best forecast is available.
+National weather services include Deutscher Wetter Dienst (DWD), National Oceanic and Atmospheric Administration (NOAA), Meteofrance and Koninklijk Nederlands Meteorologisch Instituut.
+Just define
+WEATHER_PROVIDER=OpenMeteo
+in your .env File
+
+**supports also ETO !**
+
+
 ## File Detail
 
 **server.js** is the primary file launching the API daemon.
