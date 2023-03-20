@@ -18,6 +18,7 @@
     "dotenv": "^8.0.0",
     "express": "^4.16.4",
     "geo-tz": "^5.0.4",
+    "jsonwebtoken": "^9.0.0",
     "mockdate": "^2.0.2",
     "moment-timezone": "^0.5.25",
     "node-cache": "^4.2.0",
