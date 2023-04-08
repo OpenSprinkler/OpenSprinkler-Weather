@@ -5,7 +5,8 @@
     "noEmitOnError": true,
     "outDir": "js/",
     "sourceMap": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "resolveJsonModule": true
   },
   "include": [
     "errors.ts",
