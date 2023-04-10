@@ -160,6 +160,8 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			maxHumidity = maxHumidity > hour.humidity ? maxHumidity : hour.humidity;
 		}
 
+		let windSpeed = ( historicData.forecastDaily.days[ 0 ].daytimeForecast.windSpeed + historicData.forecastDaily.days[ 0 ].overnightForecast.windSpeed ) / 2;
+		
 		return {
 			weatherProvider: "Apple",
 			periodStartTime: moment(historicData.forecastHourly.hours[ 0 ].forecastStart).unix(),
@@ -169,7 +171,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			maxHumidity: maxHumidity * 100,
 			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
 			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: this.kphToMph( historicData.forecastDaily.days[ 0 ].windSpeed ),
+			windSpeed: this.kphToMph( windSpeed ),
 			precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ 0 ].precipIntensity || 0 ) * 24
 		};
 	}
