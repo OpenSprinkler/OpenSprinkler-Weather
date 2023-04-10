@@ -17,7 +17,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	}
 
 	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
-		console.log("OM getWateringData request for coordinates: %s", coordinates);
+		//console.log("OM getWateringData request for coordinates: %s", coordinates);
 
 		const yesterdayUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation&temperature_unit=fahrenheit&precipitation_unit=inch&timeformat=unixtime&past_days=1`;
 		//console.log(yesterdayUrl);
@@ -58,17 +58,17 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			precip: totals.precip,
 			raining: totals.raining
 		}
-		console.log("OM 1: temp:%s humidity:%s precip:%s raining:%s", 
+		/*console.log("OM 1: temp:%s humidity:%s precip:%s raining:%s", 
 			this.F2C(result.temp),
 			result.humidity,
 			this.inch2mm(result.precip),
-			result.raining);
+			result.raining);*/
 		return result;
 	}
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 
-		console.log("OM getWeatherData request for coordinates: %s", coordinates);
+		//console.log("OM getWeatherData request for coordinates: %s", coordinates);
 		
 		const currentDate: number = moment().unix();
 		const timezone = geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
@@ -114,16 +114,16 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			} );
 		}
 
-		console.log("OM 2: temp:%s humidity:%s wind:%s",
+		/*console.log("OM 2: temp:%s humidity:%s wind:%s",
 			this.F2C(weather.temp),
 			weather.humidity,
-			this.mph2kmh(weather.wind));
+			this.mph2kmh(weather.wind));*/
 
 		return weather;
 	}
 
 	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
-		console.log("OM getEToData request for coordinates: %s", coordinates);
+		//console.log("OM getEToData request for coordinates: %s", coordinates);
 		
 		const timestamp: string = moment().subtract( 1, "day" ).format();
 		const timezone = geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
@@ -178,15 +178,15 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			windSpeed: wind,
 			precip: precip,
 		}
-		console.log("OM 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s from:%s maxIdx:%s",
+		/*console.log("OM 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s from:%s maxIdx:%s",
 			precip.toPrecision(3), 
 			solar.toPrecision(3), 
-			this.F2C(minTemp), this.F2C(maxTemp), minHumidity, maxHumidity, this.mph2kmh(wind), moment.unix(historicData.hourly.time[0]).format(), maxIndex);
+			this.F2C(minTemp), this.F2C(maxTemp), minHumidity, maxHumidity, this.mph2kmh(wind), moment.unix(historicData.hourly.time[0]).format(), maxIndex);*/
 		return result;
 	}
 
 	public shouldCacheWateringScale(): boolean {
-		return false;
+		return true;
 	}
 
 	/**
@@ -208,10 +208,10 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			case 51:
 			case 53:
 			case 55:
-				return "50d"; //Drizzle: Light, moderate, and dense intensity
+				return "09d"; //Drizzle: Light, moderate, and dense intensity
 			case 56:
 			case 57:
-				return "50d"; //Freezing Drizzle: Light and dense intensity
+				return "09d"; //Freezing Drizzle: Light and dense intensity
 			case 61:
 			case 63:
 			case 65:
@@ -233,10 +233,10 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			case 86:
 				return "13d"; //Snow showers slight and heavy
 			case 95:
-				return "50d"; //Thunderstorm: Slight or moderate
+				return "11d"; //Thunderstorm: Slight or moderate
 			case 96:
 			case 99:
-				return "13d"; // Thunderstorm with slight and heavy hail
+				return "11d"; // Thunderstorm with slight and heavy hail
 			default:
 				return "01d";
 		}
