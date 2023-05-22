@@ -172,7 +172,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
 			// Assume wind speed measurements are taken at 2 meters.
 			windSpeed: this.kphToMph( windSpeed ),
-			precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ 0 ].precipIntensity || 0 ) * 24
+			precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ 0 ].precipitationAmount || 0 )
 		};
 	}
 
