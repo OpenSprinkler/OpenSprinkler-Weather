@@ -3,7 +3,7 @@ import * as http from "http";
 import * as https from "https";
 import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
-import * as geoTZ from "geo-tz";
+import { find } from "geo-tz";
 
 import { BaseWateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
@@ -84,7 +84,7 @@ export async function httpJSONRequest(url: string, headers?, body?): Promise< an
  * @return The TimeData for the specified coordinates.
  */
 function getTimeData( coordinates: GeoCoordinates ): TimeData {
-	const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
+	const timezone = moment().tz( find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
 	const tzOffset: number = getTimezone( timezone, true );
 
 	// Calculate sunrise and sunset since Weather Underground does not provide it
@@ -129,7 +129,7 @@ function checkWeatherRestriction( adjustmentValue: number, weather: BaseWatering
 }
 
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
-	const location: string = getParameter(req.query.loc);
+	const location: string = getParameter(req.query.loc as string);
 
 	let coordinates: GeoCoordinates;
 	try {
@@ -164,12 +164,13 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
-	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ req.params[ 0 ] & ~( 1 << 7 ) ],
-		checkRestrictions: boolean			= ( ( req.params[ 0 ] >> 7 ) & 1 ) > 0,
-		adjustmentOptionsString: string		= getParameter(req.query.wto),
-		location: string | GeoCoordinates	= getParameter(req.query.loc),
-		outputFormat: string				= getParameter(req.query.format),
-		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
+	let adjustmentMethodId = Number(req.params[0]);
+	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ adjustmentMethodId & ~( 1 << 7 ) ],
+		checkRestrictions: boolean			= ( ( adjustmentMethodId >> 7 ) & 1 ) > 0,
+		adjustmentOptionsString: string		= getParameter(req.query.wto as string),
+		location: string | GeoCoordinates	= getParameter(req.query.loc as string),
+		outputFormat: string				= getParameter(req.query.format as string),
+		remoteAddress: string				= getParameter(req.header("x-forwarded-for")) || req.connection.remoteAddress,
 		adjustmentOptions: AdjustmentOptions;
 
 	// X-Forwarded-For header may contain more than one IP address and therefore
@@ -243,7 +244,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	let cachedScale: CachedScale;
 	if ( weatherProvider.shouldCacheWateringScale() ) {
-		cachedScale = cache.getWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions );
+		cachedScale = cache.getWateringScale( adjustmentMethodId, coordinates, pws, adjustmentOptions );
 	}
 
 	if ( cachedScale ) {
@@ -280,14 +281,14 @@ export const getWateringData = async function( req: express.Request, res: expres
 			}
 
 			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-			if ( checkWeatherRestriction( req.params[ 0 ], wateringData ) ) {
+			if ( checkWeatherRestriction( adjustmentMethodId, wateringData ) ) {
 				data.scale = 0;
 			}
 		}
 
 		// Cache the watering scale if caching is enabled and no error occurred.
 		if ( weatherProvider.shouldCacheWateringScale() ) {
-			cache.storeWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions, {
+			cache.storeWateringScale( adjustmentMethodId, coordinates, pws, adjustmentOptions, {
 				scale: data.scale,
 				rawData: data.rawData,
 				rainDelay: data.rd

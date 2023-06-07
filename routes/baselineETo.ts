@@ -17,7 +17,7 @@ readFileHeader().then( ( fileMeta ) => {
 } );
 
 export const getBaselineETo = async function( req: express.Request, res: express.Response ) {
-	const location: string	= getParameter( req.query.loc );
+	const location: string	= getParameter( req.query.loc as string );
 
 	// Error if the file meta was not read (either the file is still being read or an error occurred and it could not be read).
 	if ( !FILE_META ) {
@@ -94,7 +94,7 @@ async function calculateAverageDailyETo( coordinates: GeoCoordinates ): Promise<
  */
 function getByteAtOffset( offset: number ): Promise< number > {
 	return new Promise( ( resolve, reject ) => {
-		const stream = fs.createReadStream( DATA_FILE, { start: offset, end: offset } );
+		const stream = fs.createReadStream( DATA_FILE, { start: offset, end: offset, encoding: null } );
 
 		stream.on( "error", ( err ) => {
 			reject( err );
@@ -102,7 +102,7 @@ function getByteAtOffset( offset: number ): Promise< number > {
 
 		// There's no need to wait for the "end" event since the "data" event will contain the single byte being read.
 		stream.on( "data", ( data ) => {
-			resolve( data[ 0 ] );
+			resolve( data[ 0 ] as number);
 		} );
 	} );
 }

@@ -14,7 +14,7 @@ var queue: Array<Observation> = [],
 function getMeasurement(req: express.Request, key: string): number {
 	let value: number;
 
-	return ( key in req.query ) && !isNaN( value = parseFloat( req.query[key] ) ) && ( value !== -9999.0 ) ? value : undefined;
+	return ( key in req.query ) && !isNaN( value = parseFloat( req.query[key] as string ) ) && ( value !== -9999.0 ) ? value : undefined;
 }
 
 export const captureWUStream = async function( req: express.Request, res: express.Response ) {

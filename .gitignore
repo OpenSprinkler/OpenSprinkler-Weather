@@ -4,6 +4,7 @@ node_modules
 coverage/*
 npm-debug.log
 .idea
+yarn.lock
 js
 weather.zip
 baselineEToData/*.bin
