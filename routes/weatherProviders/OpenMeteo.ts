@@ -93,13 +93,8 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			temp: current.current_weather.temperature,
 			humidity: 0,
 			wind: current.current_weather.windspeed,
-<<<<<<< HEAD
-			description: "",
-			icon: this.getWMOIconCode(current.current_weather.weathercode),
-=======
 			description: this.getWMOIconCode(current.current_weather.weathercode).desc,
 			icon: this.getWMOIconCode(current.current_weather.weathercode).icon,
->>>>>>> dec097103a4b3ad1723befde7dbb026d0ce53e6f
 
 			region: "",
 			city: "",
@@ -114,13 +109,8 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				temp_min: current.daily.temperature_2m_min[day],
 				temp_max: current.daily.temperature_2m_max[day],
 				date: current.daily.time[day],
-<<<<<<< HEAD
-				icon: this.getWMOIconCode( current.daily.weathercode[day] ),
-				description: "",
-=======
 				icon: this.getWMOIconCode( current.daily.weathercode[day] ).icon,
 				description: this.getWMOIconCode( current.daily.weathercode[day] ).desc,
->>>>>>> dec097103a4b3ad1723befde7dbb026d0ce53e6f
 			} );
 		}
 
@@ -207,50 +197,6 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	private getWMOIconCode(code: number) {
 		switch(code) {
 			case 0: 
-<<<<<<< HEAD
-				return "01d"; //Clear Sky
-			case 1:
-			case 2:
-			case 3:
-				return "02d"; //Mainly clear, partly cloudy, and overcast
-			case 45:
-			case 48:
-				return "50d"; //Fog and depositing rime fog
-			case 51:
-			case 53:
-			case 55:
-				return "50d"; //Drizzle: Light, moderate, and dense intensity
-			case 56:
-			case 57:
-				return "50d"; //Freezing Drizzle: Light and dense intensity
-			case 61:
-			case 63:
-			case 65:
-				return "10d"; //Rain: Slight, moderate and heavy intensity
-			case 66:
-			case 67:
-				return "10d"; //Freezing Rain: Light and heavy intensity
-			case 71:
-			case 73:
-			case 75:
-				return "13d"; //Snow fall: Slight, moderate, and heavy intensity
-			case 77:
-				return "13d"; //Snow grains
-			case 80:
-			case 81:
-			case 82:
-				return "10d"; //Rain showers: Slight, moderate, and violent
-			case 85:
-			case 86:
-				return "13d"; //Snow showers slight and heavy
-			case 95:
-				return "50d"; //Thunderstorm: Slight or moderate
-			case 96:
-			case 99:
-				return "13d"; // Thunderstorm with slight and heavy hail
-			default:
-				return "01d";
-=======
 				//0 	Clear sky
 				return {"icon": "01d", desc: "Clear Sky"};
 			case 1:
@@ -321,7 +267,6 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				return {"icon": "13d", desc: "Thunderstorm: heavy hail"};
 			default:
 				return {"icon": "01d", desc: "Clear sky"};
->>>>>>> dec097103a4b3ad1723befde7dbb026d0ce53e6f
 		}
 	}
 	
