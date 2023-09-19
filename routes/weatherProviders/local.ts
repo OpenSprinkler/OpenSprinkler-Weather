@@ -38,7 +38,8 @@ export const captureWUStream = async function( req: express.Request, res: expres
 };
 
 export default class LocalWeatherProvider extends WeatherProvider {
-
+    public static observationsFile: string = ( process.env.PERSISTENCE_LOCATION ? process.env.PERSISTENCE_LOCATION + "/observations.json" : "observations.json");
+    
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 		queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
 
@@ -126,16 +127,16 @@ export default class LocalWeatherProvider extends WeatherProvider {
 function saveQueue() {
 	queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
 	try {
-		fs.writeFileSync( "observations.json" , JSON.stringify( queue ), "utf8" );
+		fs.writeFileSync( LocalWeatherProvider.observationsFile , JSON.stringify( queue ), "utf8" );
 	} catch ( err ) {
 		console.error( "Error saving historical observations to local storage.", err );
 	}
 }
 
-if ( process.env.WEATHER_PROVIDER === "local" && process.env.LOCAL_PERSISTENCE ) {
-	if ( fs.existsSync( "observations.json" ) ) {
+if ( process.env.WEATHER_PROVIDER === "local" && (process.env.LOCAL_PERSISTENCE || process.env.PERSISTENCE_LOCATION) ) {
+	if ( fs.existsSync( LocalWeatherProvider.observationsFile ) ) {
 		try {
-			queue = JSON.parse( fs.readFileSync( "observations.json", "utf8" ) );
+			queue = JSON.parse( fs.readFileSync( LocalWeatherProvider.observationsFile, "utf8" ) );
 			queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
 		} catch ( err ) {
 			console.error( "Error reading historical observations from local storage.", err );
