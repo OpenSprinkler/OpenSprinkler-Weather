@@ -1,6 +1,7 @@
 import * as express	from "express";
 import * as moment from "moment";
 import * as fs from "fs";
+import fetch from "node-fetch";
 
 import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
@@ -176,7 +177,7 @@ export async function pollWeatherlink(weatherLinkUrl: string) {
 	const DayMs = HourMs*24
 
   const response = await fetch(weatherLinkUrl);
-  const { data }: WeatherlinkResponse = await response.json();
+  const { data } = (await response.json()) as WeatherlinkResponse;
 
 	const weatherStation = data.conditions.find(device => device.data_structure_type === 1) as DavisWeatherStationData | undefined
 

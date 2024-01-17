@@ -22,6 +22,7 @@
     "mockdate": "^2.0.2",
     "moment-timezone": "^0.5.25",
     "node-cache": "^4.2.0",
+    "node-fetch": "^3.3.2",
     "suncalc": "^1.8.0"
   },
   "devDependencies": {
