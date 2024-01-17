@@ -40,6 +40,7 @@ if ( pws === "weatherlink" ) {
 		console.log("Starting polling from Weatherlink Live at " + weatherLinkUrl)
 		// Poll the current weather conditions every minute.
 		const MinuteMs = 60*1000
+		local.pollWeatherlink(weatherLinkUrl);
 		setInterval(() => local.pollWeatherlink(weatherLinkUrl), MinuteMs);
 	}	
 }

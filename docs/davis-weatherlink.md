@@ -56,6 +56,14 @@ WEATHERLINK_URL=http://weatherlinklive-719e35.local/v1/current_conditions
 LOCAL_PERSISTENCE=1
 ```
 
+
+NOTE: On a Raspberry Pi, I couldn't get mDNS to work. So I'm using the IP address instead.
+```sh
+sudo apt-get install avahi-browse
+avahi-browse _weatherlinklive._tcp -r
+```
+
+
 There's a convenient script for adding this server to systemd:
 
 ```sh
