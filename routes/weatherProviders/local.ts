@@ -1,7 +1,7 @@
 import * as express	from "express";
 import * as moment from "moment";
 import * as fs from "fs";
-import fetch from "node-fetch";
+import fetch from "isomorphic-fetch";
 
 import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";

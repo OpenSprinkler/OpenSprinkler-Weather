@@ -8,12 +8,16 @@ import * as weather from "./routes/weather";
 import * as local from "./routes/weatherProviders/local";
 import * as baselineETo from "./routes/baselineETo";
 import * as packageJson from "./package.json";
+const morgan = require("morgan");
 
 let	host	= process.env.HOST || "127.0.0.1",
 	port	= parseInt( process.env.PORT ) || 3000;
 
 export let pws = process.env.PWS || "none";
 export const app = express();
+
+// Request logging.
+app.use(morgan("tiny"));
 
 // Handle requests matching /weatherID.py where ID corresponds to the
 // weather adjustment method selector.
