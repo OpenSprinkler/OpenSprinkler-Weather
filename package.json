@@ -21,6 +21,7 @@
     "jsonwebtoken": "^9.0.0",
     "mockdate": "^2.0.2",
     "moment-timezone": "^0.5.25",
+    "morgan": "^1.10.0",
     "node-cache": "^4.2.0",
     "suncalc": "^1.8.0"
   },

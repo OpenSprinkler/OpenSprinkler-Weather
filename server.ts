@@ -8,12 +8,16 @@ import * as weather from "./routes/weather";
 import * as local from "./routes/weatherProviders/local";
 import * as baselineETo from "./routes/baselineETo";
 import * as packageJson from "./package.json";
+const morgan = require("morgan");
 
 let	host	= process.env.HOST || "127.0.0.1",
 	port	= parseInt( process.env.PORT ) || 3000;
 
 export let pws = process.env.PWS || "none";
 export const app = express();
+
+// Request logging.
+app.use(morgan("tiny"));
 
 // Handle requests matching /weatherID.py where ID corresponds to the
 // weather adjustment method selector.
@@ -28,6 +32,17 @@ app.get( /weatherData/, cors(), weather.getWeatherData );
 // Endpoint to stream Weather Underground data from local PWS
 if ( pws === "WU" ) {
 	app.get( "/weatherstation/updateweatherstation.php", local.captureWUStream );
+}
+if ( pws === "weatherlink" ) {
+	const weatherLinkUrl = process.env.WEATHERLINK_URL;
+	if (!weatherLinkUrl) console.error("Missing WEATHERLINK_URL.")
+  else {
+		console.log("Starting polling from Weatherlink Live at " + weatherLinkUrl)
+		// Poll the current weather conditions every minute.
+		const MinuteMs = 60*1000
+		local.pollWeatherlink(weatherLinkUrl);
+		setInterval(() => local.pollWeatherlink(weatherLinkUrl), MinuteMs);
+	}	
 }
 
 app.get( "/", function( req, res ) {
