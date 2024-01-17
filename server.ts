@@ -33,6 +33,7 @@ if ( pws === "weatherlink" ) {
 	const weatherLinkUrl = process.env.WEATHERLINK_URL;
 	if (!weatherLinkUrl) console.error("Missing WEATHERLINK_URL.")
   else {
+		console.log("Starting polling from Weatherlink Live at " + weatherLinkUrl)
 		// Poll the current weather conditions every minute.
 		const MinuteMs = 60*1000
 		setInterval(() => local.pollWeatherlink(weatherLinkUrl), MinuteMs);
