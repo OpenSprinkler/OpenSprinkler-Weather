@@ -37,6 +37,174 @@ export const captureWUStream = async function( req: express.Request, res: expres
 	res.send( "success\n" );
 };
 
+type DavisWeatherStationData = {
+  /** logical sensor ID **(no unit)** */
+	lsid: number;
+  /** data structure type **(no unit)** */
+	data_structure_type: 1;
+  /** transmitter ID **(no unit)** */
+	txid: number;
+  /** most recent valid temperature **(°F)** */
+	temp: number;
+  /** most recent valid humidity **(%RH)** */
+	hum: number;
+  /** **(°F)** */
+	dew_point: number;
+  /** **(°F)** */
+	wet_bulb: number | null;
+  /** **(°F)** */
+	heat_index: number;
+  /** **(°F)** */
+	wind_chill: number;
+  /** **(°F)** */
+	thw_index: number;
+  /** **(°F)** */
+	thsw_index: number;
+  /** most recent valid wind speed **(mph)** */
+	wind_speed_last: number;
+  /** most recent valid wind direction **(°degree)** */
+	wind_dir_last: number | null;
+  /** average wind speed over last 1 min **(mph)** */
+	wind_speed_avg_last_1_min: number;
+  /** scalar average wind direction over last 1 min **(°degree)** */
+	wind_dir_scalar_avg_last_1_min: number;
+  /** average wind speed over last 2 min **(mph)** */
+	wind_speed_avg_last_2_min: number;
+  /** scalar average wind direction over last 2 min **(°degree)** */
+	wind_dir_scalar_avg_last_2_min: number;
+  /** maximum wind speed over last 2 min **(mph)** */
+	wind_speed_hi_last_2_min: number;
+  /** gust wind direction over last 2 min **(°degree)** */
+	wind_dir_at_hi_speed_last_2_min: number;
+  /** average wind speed over last 10 min **(mph)** */
+	wind_speed_avg_last_10_min: number;
+  /** scalar average wind direction over last 10 min **(°degree)** */
+	wind_dir_scalar_avg_last_10_min: number;
+  /** maximum wind speed over last 10 min **(mph)** */
+	wind_speed_hi_last_10_min: number;
+  /** gust wind direction over last 10 min **(°degree)** */
+	wind_dir_at_hi_speed_last_10_min: number;
+  /** rain collector type/size **(0: Reserved, 1: 0.01", 2: 0.2 mm, 3:  0.1 mm, 4: 0.001")** */
+	rain_size: number;
+  /** most recent valid rain rate **(counts/hour)** */
+	rain_rate_last: number;
+  /** highest rain rate over last 1 min **(counts/hour)** */
+	rain_rate_hi: number | null;
+  /** total rain count over last 15 min **(counts)** */
+	rainfall_last_15_min: number | null;
+  /** highest rain rate over last 15 min **(counts/hour)** */
+	rain_rate_hi_last_15_min: number;
+  /** total rain count for last 60 min **(counts)** */
+	rainfall_last_60_min: number | null;
+  /** total rain count for last 24 hours **(counts)** */
+	rainfall_last_24_hr: number | null;
+  /** total rain count since last 24 hour long break in rain **(counts)** */
+	rain_storm: number | null;
+  /** UNIX timestamp of current rain storm start **(seconds)** */
+	rain_storm_start_at: number | null;
+  /** most recent solar radiation **(W/m²)** */
+	solar_rad: number;
+  /** most recent UV index **(Index)** */
+	uv_index: number;
+  /** configured radio receiver state **(no unit)** */
+	rx_state: number;
+  /** transmitter battery status flag **(no unit)** */
+	trans_battery_flag: number;
+  /** total rain count since local midnight **(counts)** */
+	rainfall_daily: number;
+  /** total rain count since first of month at local midnight **(counts)** */
+	rainfall_monthly: number;
+  /** total rain count since first of user-chosen month at local midnight **(counts)** */
+	rainfall_year: number;
+  /** total rain count since last 24 hour long break in rain **(counts)** */
+	rain_storm_last: number | null;
+  /** UNIX timestamp of last rain storm start **(sec)** */
+	rain_storm_last_start_at: number | null;
+  /** UNIX timestamp of last rain storm end **(sec)** */
+	rain_storm_last_end_at: number | null;
+};
+
+type WeatherlinkLiveData = {
+	// Apparently the Weatherlink Live has indoor sensors.
+	data_structure_type: 4;
+	lsid: number; // 690482;
+	temp_in: number // 70.8;
+	hum_in: number // 45.6;
+	dew_point_in: number // 48.8;
+	heat_index_in: number // 69.0;
+}
+
+/**
+ * Comments are examples of data found from a Vantage Pro2 Plus Sensor Suite (SKU 6328) and a WeatherLink Live.
+ * Note that your Davis weather station may not have all of these sensors.
+ */
+type WeatherlinkResponse = {
+  data: {
+    did: string; // "001D0A719E35";
+    ts: number; // 1705448784;
+    conditions: Array<
+      | DavisWeatherStationData
+      | WeatherlinkLiveData
+			// Not sure why this is separate.
+      | {
+        lsid: number // 690481;
+        data_structure_type: 3
+        bar_sea_level: number // 30.067;
+        bar_trend: number // -0.021;
+        bar_absolute: number // 29.898;
+      }
+    >;
+  };
+  error: null;
+};
+
+/** Assuming this is polled every minute. */
+export async function pollWeatherlink(weatherLinkUrl: string) {
+  const response = await fetch(weatherLinkUrl);
+  const { data }: WeatherlinkResponse = await response.json();
+
+
+	const weatherStation = data.conditions.find(device => device.data_structure_type === 1) as DavisWeatherStationData | undefined
+
+	if (!weatherStation) {
+		console.error("Could not find Davis weather station data from Weatherlink Live.")
+		return
+	}
+
+	const currentTempF = weatherStation.temp;
+	const currentPercentRelativeHumidity = weatherStation.hum;
+	const averageWindspeedLastMinuteMph =
+    weatherStation.wind_speed_avg_last_1_min;
+
+	let solarRadiation = weatherStation.solar_rad / 1000; // kW/m^2
+	const MinuteMs = 1000*60
+	const HourMs = MinuteMs*60
+	const DayMs = HourMs*24
+	solarRadiation = solarRadiation * (MinuteMs / DayMs); // Assumed this is called every minute.
+
+	const rainCupSizeInches: number = {
+    1: 0.01, // 0.01 inch
+    2: 0.0079, // 0.2 mm
+    3: 0.0039, // 0.1 mm
+    4: 0.001, // 0.001 in
+  }[weatherStation.rain_size];
+
+	const rainInchesLastMinute =
+    (rainCupSizeInches * weatherStation.rainfall_last_15_min) / 15;
+
+	const observation: Observation = {
+    timestamp: moment().unix(),
+    temp: currentTempF, 
+    humidity: currentPercentRelativeHumidity, 
+    windSpeed: averageWindspeedLastMinuteMph, 
+    solarRadiation: solarRadiation, 
+    precip: rainInchesLastMinute,
+  };
+
+  queue.unshift(observation);
+}
+
+
 export default class LocalWeatherProvider extends WeatherProvider {
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
@@ -146,10 +314,19 @@ if ( process.env.WEATHER_PROVIDER === "local" && process.env.LOCAL_PERSISTENCE )
 }
 
 interface Observation {
-	timestamp: number;
-	temp: number;
-	humidity: number;
-	windSpeed: number;
-	solarRadiation: number;
-	precip: number;
+  timestamp: number;
+  /** Temp in °F */
+  temp: number;
+  /** Percent relative humidity */
+  humidity: number;
+  /** Measured at 2m off the ground in mph */
+  windSpeed: number;
+  /**
+   * `kW*hr/m^2 * interval/day`
+   * These numebrs will be summed up over a 24hr period to give kW*hr/m^2/day which means
+	 * that you need to divide by the rate at which you're sampling.
+   */
+  solarRadiation: number;
+	/** How many inches of rain over the last interval. */
+  precip: number;
 }

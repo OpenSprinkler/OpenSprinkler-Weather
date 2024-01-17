@@ -29,6 +29,15 @@ app.get( /weatherData/, cors(), weather.getWeatherData );
 if ( pws === "WU" ) {
 	app.get( "/weatherstation/updateweatherstation.php", local.captureWUStream );
 }
+if ( pws === "weatherlink" ) {
+	const weatherLinkUrl = process.env.WEATHERLINK_URL;
+	if (!weatherLinkUrl) console.error("Missing WEATHERLINK_URL.")
+  else {
+		// Poll the current weather conditions every minute.
+		const MinuteMs = 60*1000
+		setInterval(() => local.pollWeatherlink(weatherLinkUrl), MinuteMs);
+	}	
+}
 
 app.get( "/", function( req, res ) {
 	res.send( packageJson.description + " v" + packageJson.version );
