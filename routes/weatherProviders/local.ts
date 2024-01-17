@@ -158,11 +158,27 @@ type WeatherlinkResponse = {
   error: null;
 };
 
-/** Assuming this is polled every minute. */
+
+let lastPollMs: number | null = null
+
 export async function pollWeatherlink(weatherLinkUrl: string) {
+	if (lastPollMs === null) {
+		lastPollMs = Date.now()
+		return
+	}
+	const nowMs = Date.now()
+	// This interval is used to computing rates correctly.
+	const intervalMs = nowMs - lastPollMs
+	lastPollMs = nowMs
+
+	const MinuteMs = 1000*60
+	const HourMs = MinuteMs*60
+	const DayMs = HourMs*24
+	const ratePerMinute = intervalMs / MinuteMs
+
+
   const response = await fetch(weatherLinkUrl);
   const { data }: WeatherlinkResponse = await response.json();
-
 
 	const weatherStation = data.conditions.find(device => device.data_structure_type === 1) as DavisWeatherStationData | undefined
 
@@ -177,10 +193,7 @@ export async function pollWeatherlink(weatherLinkUrl: string) {
     weatherStation.wind_speed_avg_last_1_min;
 
 	let solarRadiation = weatherStation.solar_rad / 1000; // kW/m^2
-	const MinuteMs = 1000*60
-	const HourMs = MinuteMs*60
-	const DayMs = HourMs*24
-	solarRadiation = solarRadiation * (MinuteMs / DayMs); // Assumed this is called every minute.
+	solarRadiation = solarRadiation * (intervalMs / DayMs); // Assumed this is called every minute.
 
 	const rainCupSizeInches: number = {
     1: 0.01, // 0.01 inch
@@ -190,7 +203,7 @@ export async function pollWeatherlink(weatherLinkUrl: string) {
   }[weatherStation.rain_size];
 
 	const rainInchesLastMinute =
-    (rainCupSizeInches * weatherStation.rainfall_last_15_min) / 15;
+    (rainCupSizeInches * weatherStation.rainfall_last_15_min) * intervalMs / (15*MinuteMs);
 
 	const observation: Observation = {
     timestamp: moment().unix(),
