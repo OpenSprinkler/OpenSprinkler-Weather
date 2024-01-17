@@ -1,6 +1,8 @@
 # Local Davis Weather Station with WeatherLink Live
 
-You need to buy a WeatherLink Live device – this is the only device that has a local API.
+Requirements:
+- [Vantage Pro2 Plus Sensor Suite](https://www.davisinstruments.com/products/wireless-vantage-pro2-plus-with-24-hr-fan-aspirated-radiation-shield-and-weatherlink-console) (SKU 6328). You need the following measurements: temperature, humidity, wind speed, precipitation, and solar radiation. Most of their models don't come with solar radiation sensor so you need to make sure to get that.
+- [Weatherlink Live](https://www.davisinstruments.com/products/weatherlink-live?variant=39617718976673&currency=USD&utm_medium=product_sync&utm_source=google&utm_content=sag_organic&utm_campaign=sag_organic&gad_source=1&gclid=CjwKCAiAkp6tBhB5EiwANTCx1ORqO0aQGdqdeWBrxudZRSOuJgnZB14WHbw0hMWwIGcsXRFd2jPMwhoCVX8QAvD_BwE) (SKU 6100). This is the only device that has a local api. The weatherlink console does not have a local API as of this writing (January 2024).
 
 You can read more about the API here: https://weatherlink.github.io/weatherlink-live-local-api/
 
