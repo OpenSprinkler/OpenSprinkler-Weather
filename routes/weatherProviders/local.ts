@@ -174,8 +174,6 @@ export async function pollWeatherlink(weatherLinkUrl: string) {
 	const MinuteMs = 1000*60
 	const HourMs = MinuteMs*60
 	const DayMs = HourMs*24
-	const ratePerMinute = intervalMs / MinuteMs
-
 
   const response = await fetch(weatherLinkUrl);
   const { data }: WeatherlinkResponse = await response.json();
@@ -193,7 +191,11 @@ export async function pollWeatherlink(weatherLinkUrl: string) {
     weatherStation.wind_speed_avg_last_1_min;
 
 	let solarRadiation = weatherStation.solar_rad / 1000; // kW/m^2
-	solarRadiation = solarRadiation * (intervalMs / DayMs); // Assumed this is called every minute.
+	const samplesPerHour = HourMs / intervalMs; // samples/hr, 60 for every minute
+	solarRadiation = solarRadiation / samplesPerHour; // kWh/m^2 / sample
+	const samplesPerDay = DayMs / intervalMs // samples/day, 24*60 for every minute.
+	solarRadiation = solarRadiation * samplesPerDay; // kWh/m^2 / day
+	// Net math we did here is `solar_rad/1000/60*24*60` = `solar_rad/1000*24` which is same as captureWUStream.
 
 	const rainCupSizeInches: number = {
     1: 0.01, // 0.01 inch
@@ -207,10 +209,10 @@ export async function pollWeatherlink(weatherLinkUrl: string) {
 
 	const observation: Observation = {
     timestamp: moment().unix(),
-    temp: currentTempF, 
-    humidity: currentPercentRelativeHumidity, 
-    windSpeed: averageWindspeedLastMinuteMph, 
-    solarRadiation: solarRadiation, 
+    temp: currentTempF,
+    humidity: currentPercentRelativeHumidity,
+    windSpeed: averageWindspeedLastMinuteMph,
+    solarRadiation: solarRadiation,
     precip: rainInchesLastMinute,
   };
 
