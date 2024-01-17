@@ -320,6 +320,7 @@ if ( process.env.WEATHER_PROVIDER === "local" && process.env.LOCAL_PERSISTENCE )
 		try {
 			queue = JSON.parse( fs.readFileSync( "observations.json", "utf8" ) );
 			queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
+			console.log("Loaded historical local observations from storage.")
 		} catch ( err ) {
 			console.error( "Error reading historical observations from local storage.", err );
 			queue = [];
