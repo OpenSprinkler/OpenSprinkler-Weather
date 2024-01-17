@@ -1,7 +1,8 @@
 import * as express	from "express";
 import * as moment from "moment";
 import * as fs from "fs";
-import fetch from "isomorphic-fetch";
+import * as http from "http";
+import * as url from "url";
 
 import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
@@ -176,8 +177,8 @@ export async function pollWeatherlink(weatherLinkUrl: string) {
 	const HourMs = MinuteMs*60
 	const DayMs = HourMs*24
 
-  const response = await fetch(weatherLinkUrl);
-  const { data } = (await response.json()) as WeatherlinkResponse;
+  const text = await fetch(weatherLinkUrl);
+  const { data } = JSON.parse(text) as WeatherlinkResponse;
 
 	const weatherStation = data.conditions.find(device => device.data_structure_type === 1) as DavisWeatherStationData | undefined
 
@@ -347,3 +348,39 @@ interface Observation {
 	/** How many inches of rain over the last interval. */
   precip: number;
 }
+
+
+function fetch(urlString: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(urlString);
+
+    const options = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || 80,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: "GET",
+    };
+
+    const req = http.request(options, (res) => {
+      let data = "";
+
+      // A chunk of data has been received.
+      res.on("data", (chunk) => {
+        data += chunk;
+      });
+
+      // The whole response has been received.
+      res.on("end", () => {
+        resolve(data);
+      });
+    });
+
+    req.on("error", (error) => {
+      reject(error);
+    });
+
+    // End the request
+    req.end();
+  });
+}
+
