@@ -252,7 +252,7 @@ export default class LocalWeatherProvider extends WeatherProvider {
 
 		queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
 
-		if ( queue.length == 0 || queue[ 0 ].timestamp - queue[ queue.length - 1 ].timestamp < 23*60*60 ) {
+		if ( queue.length == 0 ) {
 			console.error( "There is insufficient data to support Zimmerman calculation from local PWS." );
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
@@ -267,7 +267,7 @@ export default class LocalWeatherProvider extends WeatherProvider {
 		};
 
 		if ( !( cTemp && cHumidity && cPrecip ) ) {
-			console.error( "There is insufficient data to support Zimmerman calculation from local PWS." );
+			console.error( "There is insufficient data to support Zimmerman calculation from local PWS.", result );
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
@@ -298,7 +298,7 @@ export default class LocalWeatherProvider extends WeatherProvider {
 
 		if ( [ result.minTemp, result.minHumidity, -result.maxTemp, -result.maxHumidity ].includes( Infinity ) ||
 			!( cSolar && cWind && cPrecip ) ) {
-				console.error( "There is insufficient data to support ETo calculation from local PWS." );
+				console.error( "There is insufficient data to support ETo calculation from local PWS.", result);
 				throw new CodedError( ErrorCode.InsufficientWeatherData );
 			}
 
