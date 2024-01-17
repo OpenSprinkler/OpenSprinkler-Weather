@@ -25,10 +25,19 @@ This is showiung that my weatherlink live instance name as `weatherlinklive-719e
 
 Now that you have the Weatherlink Live figured out, you need to host this OpenSprinkler-Weather server somewhere on the same local network. A Raspberry Pi 4 works great. After you ssh into your Pi, follow the [local installation instructions](./local-installation.md).
 
-Here's an abbreviated version:
+Here's an abbreviated version.
+
+Download dependencies for your raspberry pi.
 
 ```sh
-git clone git@github.com:OpenSprinkler/OpenSprinkler-Weather.git
+sudo apt-get update
+sudo apt-get install git nodejs npm
+```
+
+Install the weather server.
+
+```sh
+git clone https://github.com/OpenSprinkler/OpenSprinkler-Weather.git
 cd OpenSprinkler-Weather
 npm install
 npm run compile
@@ -48,7 +57,8 @@ LOCAL_PERSISTENCE=1
 There's a convenient script for adding this server to systemd:
 
 ```sh
-npx add-to-systemd weather "$(which npm) start" --cwd `pwd` --restart 10
+sudo npm i add-to-systemd
+sudo add-to-systemd weather "$(which npm) start" --cwd `pwd` --restart 10
 ```
 
 Boot it up!
@@ -56,10 +66,16 @@ Boot it up!
 sudo systemctl enable weather.service
 sudo systemctl start weather.service
 systemctl status weather.service
+
+# View logs
+journalctl -u weather.service
 ```
+
+Don't worry about the error regarding `Baseline_ETo_Data.bin` file not existing. You can just set the baseline value yourself.
 
 Check that its working:
 ```sh
 curl http://localhost:3344
 ```
 
+Now just wait 24 hours for the observational data to accumulate before going to http://<opensprinkler_ip>:80/su to set the weather url.
