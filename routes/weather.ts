@@ -68,9 +68,9 @@ export async function resolveCoordinates( location: string ): Promise< GeoCoordi
  * with an error if the request or JSON parsing fails. This error may contain information about the HTTP request or,
  * response including API keys and other sensitive information.
  */
-export async function httpJSONRequest(url: string ): Promise< any > {
+export async function httpJSONRequest(url: string, headers?, body?): Promise< any > {
 	try {
-		const data: string = await httpRequest(url);
+		const data: string = await httpRequest(url, headers, body);
 		return JSON.parse(data);
 	} catch (err) {
 		// Reject the promise if there was an error making the request or parsing the JSON.
@@ -362,19 +362,27 @@ function sendWateringData( res: express.Response, data: object, useJson: boolean
  * error if the request fails or returns a non-200 status code. This error may contain information about the HTTP
  * request or, response including API keys and other sensitive information.
  */
-async function httpRequest( url: string ): Promise< string > {
+async function httpRequest( url: string, headers?, body? ): Promise< string > {
 	return new Promise< any >( ( resolve, reject ) => {
 
 		const splitUrl: string[] = url.match( filters.url );
 		const isHttps = url.startsWith("https");
 
+        if (body) {
+            headers = headers || {};
+            headers['Content-Type'] = 'application/json';
+            headers['Content-Length'] = Buffer.byteLength(body);
+        }
+
 		const options = {
 			host: splitUrl[ 1 ],
 			port: splitUrl[ 2 ] || ( isHttps ? 443 : 80 ),
-			path: splitUrl[ 3 ]
+			path: splitUrl[ 3 ],
+            method: 'GET',
+            headers
 		};
 
-		( isHttps ? https : http ).get( options, ( response ) => {
+		const request = ( isHttps ? https : http ).request( options, ( response ) => {
 			if ( response.statusCode !== 200 ) {
 				reject( `Received ${ response.statusCode } status code for URL '${ url }'.` );
 				return;
@@ -396,6 +404,12 @@ async function httpRequest( url: string ): Promise< string > {
 			// If the HTTP request fails, reject the promise
 			reject( err );
 		} );
+
+        if (body) {
+            request.write(body);
+        }
+
+        request.end();
 	} );
 }
 
