@@ -72,6 +72,12 @@ WEATHER_PROVIDER=local
 PWS=WU
 ```
 
+* **Step 5d:** If you registered for the Apple WeatherKit API then also add these two lines to the .env file:
+```
+WEATHER_PROVIDER=Apple
+WEATHERKIT_API_KEY=<YOUR APPLE WEATHERKIT KEY>
+```
+
 **Step 6:** Setup the Weather Server to start whenever the Raspberry Pi boots up using the built-in service manager:
 
 ```

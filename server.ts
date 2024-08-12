@@ -7,6 +7,7 @@ import * as cors from "cors";
 import * as weather from "./routes/weather";
 import * as local from "./routes/weatherProviders/local";
 import * as baselineETo from "./routes/baselineETo";
+import * as packageJson from "./package.json";
 
 let	host	= process.env.HOST || "127.0.0.1",
 	port	= parseInt( process.env.PORT ) || 3000;
@@ -30,7 +31,7 @@ if ( pws === "WU" ) {
 }
 
 app.get( "/", function( req, res ) {
-	res.send( process.env.npm_package_description + " v" + process.env.npm_package_version );
+	res.send( packageJson.description + " v" + packageJson.version );
 } );
 
 // Handle requests matching /baselineETo
@@ -45,9 +46,9 @@ app.use( function( req, res ) {
 
 // Start listening on the service port
 app.listen( port, host, function() {
-	console.log( "%s now listening on %s:%d", process.env.npm_package_description, host, port );
+	console.log( "%s now listening on %s:%d", packageJson.description, host, port );
 
 	if (pws !== "none" ) {
-		console.log( "%s now listening for local weather stream", process.env.npm_package_description );
+		console.log( "%s now listening for local weather stream", packageJson.description );
 	}
 } );

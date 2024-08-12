@@ -16,7 +16,7 @@ The production version runs on Amazon Elastic Beanstalk (AWS EB) and therefore t
 ## New weather provider: DWD (Deutscher Wetter Dienst=German Weather Service)
 **!!only usable for german locations!!**
 This provider uses https://brightSky.dev for querying data for a given location.
-Just define 
+Just define
 WEATHER_PROVIDER=DWD
 in your .env File
 
@@ -43,7 +43,7 @@ in your .env File
 ---
 ## Installating a Local Weather Service
 
-If you would like to choose between different Weather Providers (currently OpenWeatherMap and DarkSky are supported) or use your local PWS to provide the weather information used by OpenSprinkler then you can install and configure the Weather Service on a device within your own local network.
+If you would like to choose between different Weather Providers (currently OpenWeatherMap, DarkSky and Apple WeatherKit are supported) or use your local PWS to provide the weather information used by OpenSprinkler then you can install and configure the Weather Service on a device within your own local network.
 
 You will need a 24x7 "always on" machine to host the service (this can be a Windows or Linux machine or even a Raspberry Pi device) provided it supports the `Node.js` environment.
 
@@ -102,4 +102,4 @@ docker start osweather
 # Instead of the above, use this for testing/troubleshooting by running it in the foreground:
 docker run --rm -it -p 3000:3000 opensprinkler-weather
 ```
-Note: to expose a different port, change `-p 3000:3000` to, eg `-p12345:3000` 
+Note: to expose a different port, change `-p 3000:3000` to, eg `-p12345:3000`
