@@ -16,7 +16,14 @@ import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
 
-const WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
+const WEATHER_PROVIDERS: { [method: string] : WeatherProvider} = {
+	"apple": new ( require("./weatherProviders/Apple" ).default )(),
+	"owm": new ( require("./weatherProviders/OWM" ).default )(),
+	"openmeteo": new ( require("./weatherProviders/OpenMeteo" ).default )(),
+	"dwd": new ( require("./weatherProviders/DWD" ).default )(),
+	"wu": new ( require("./weatherProviders/WUnderground" ).default )(),
+  };
+
 const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
 const GEOCODER: Geocoder = new ( require("./geocoders/" + ( process.env.GEOCODER || "WUnderground" ) ).default )();
 
@@ -139,6 +146,14 @@ export const getWeatherData = async function( req: express.Request, res: express
 		return;
 	}
 
+	let WEATHER_PROVIDER: WeatherProvider;
+	const provider: string = getParameter(req.query.provider);
+	console.log(WEATHER_PROVIDERS[provider]);
+ 	 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
+  	  WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
+  	} else {
+   	 WEATHER_PROVIDER = WEATHER_PROVIDERS['apple'];
+  	}
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
 	let weatherData: WeatherData;
@@ -228,7 +243,19 @@ export const getWateringData = async function( req: express.Request, res: expres
 		pws = { id: pwsId, apiKey: apiKey };
 	}
 
-	const weatherProvider = pws ? PWS_WEATHER_PROVIDER : WEATHER_PROVIDER;
+	let weatherProvider: WeatherProvider;
+	if( pws ){
+		weatherProvider = PWS_WEATHER_PROVIDER;
+	}else{
+		const provider: string = getParameter(req.query.provider);
+		console.log(WEATHER_PROVIDERS[provider]);
+ 		 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
+  		  weatherProvider = WEATHER_PROVIDERS[provider];
+  		} else {
+   		 weatherProvider = WEATHER_PROVIDERS['apple'];
+  		}
+	}
+
 
 	const data = {
 		scale:		undefined,

@@ -75,4 +75,4 @@ export interface ZimmermanWateringData extends BaseWateringData {
 }
 
 export type WeatherProviderId = "OWM" | "PirateWeather" | "local" | "mock" | "WUnderground" | "DWD" | "OpenMeteo" | "AccuWeather" | "Apple";
-export type WeatherProviderShortId = "OWM" | "PW" | "local" | "mock" | "WU" | "DWD" | "OM" | "AW" | "Apple";
+export type WeatherProviderShortId = "OWM" | "PW" | "local" | "mock" | "WU" | "DWD" | "OpenMeteo" | "AW" | "Apple";
