@@ -3,6 +3,7 @@ import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import * as moment from "moment";
+import * as geoTZ from "geo-tz";
 import { CodedError, ErrorCode } from "../../errors";
 
 export default class OWMWeatherProvider extends WeatherProvider {
@@ -19,21 +20,21 @@ export default class OWMWeatherProvider extends WeatherProvider {
 
 	public async getWateringData(coordinates: GeoCoordinates): Promise<ZimmermanWateringData> {
 		// The OWM free API options changed so need to use the new API method
-		const forecastUrl = `https://api.openweathermap.org/data/2.5/onecall?exclude=current,minutely,daily,alerts&appid=${ this.API_KEY }&units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }`;
+		//Get previous date by using UTC
+		const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
+		let time = Date.now();
+		time -= (86400000 + timezone * 3600);
+		const date = new Date(time);
+		let day = this.pad(date.getUTCDate());
+		let month = this.pad(date.getUTCMonth() + 1);
+		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ this.API_KEY }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${date.getUTCFullYear()}-${month}-${day}`;
+		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ this.API_KEY }`;
 
 		// Perform the HTTP request to retrieve the weather data
-		let forecast;
-		let hourlyForecast;
+		let yesterdayData, todayData;
 		try {
-
-			hourlyForecast = await httpJSONRequest(forecastUrl);
-
-			// The new API call only offers 48 hours of hourly forecast data which is fine because we only use 24 hours
-			// just need to translate the data into blocks of 3 hours and then use as normal.
-			// Could probably skip this but less chance of changing the output this way
-			if (hourlyForecast && hourlyForecast.hourly) {
-				forecast = this.get3hForecast(hourlyForecast.hourly, 24);
-			}
+			yesterdayData = await httpJSONRequest(yesterdayUrl);
+			todayData = await httpJSONRequest(todayUrl);
 
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from OWM:", err );
@@ -41,245 +42,134 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		}
 
 		// Indicate watering data could not be retrieved if the forecast data is incomplete.
-		if ( !forecast || !forecast.list ) {
+		if ( !yesterdayData || !todayData ) {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
-		let totalTemp = 0,
-			totalHumidity = 0,
-			totalPrecip = 0;
+		let temp = yesterdayData.temperature;
 
-		const periods = Math.min( forecast.list.length, 8 );
-		for ( let index = 0; index < periods; index++ ) {
-			totalTemp += parseFloat( forecast.list[ index ].main.temp );
-			totalHumidity += parseInt( forecast.list[ index ].main.humidity );
-			totalPrecip += ( forecast.list[ index ].rain ? parseFloat( forecast.list[ index ].rain[ "3h" ] || 0 ) : 0 );
-		}
+		let totalTemp = temp.min + temp.max + temp.afternoon + temp.night + temp.evening + temp.morning;
 
 		return {
 			weatherProvider: "OWM",
-			temp: totalTemp / periods,
-			humidity: totalHumidity / periods,
-			precip: totalPrecip / 25.4,
-			raining: ( forecast.list[ 0 ].rain ? ( parseFloat( forecast.list[ 0 ].rain[ "3h" ] || 0 ) > 0 ) : false )
+			temp: totalTemp / 6,
+			humidity: (yesterdayData.humidity.afternoon + todayData.current.humidity) / 2,
+			precip: yesterdayData.precipitation.total / 25.4,
+			raining: (todayData.current.weather.main === "Rain")
 		};
 	}
 
 	public async getWeatherData(coordinates: GeoCoordinates): Promise<WeatherData> {
 		// The OWM free API options changed so need to use the new API method
-		const currentUrl = `https://api.openweathermap.org/data/2.5/weather?appid=${ this.API_KEY }&units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }`,
-			forecastDailyUrl = `https://api.openweathermap.org/data/2.5/onecall?exclude=current,minutely,hourly,alerts&appid=${ this.API_KEY }&units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }`;
+		const weatherDataUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,alerts&appid=${ this.API_KEY }`
 
-		let current, forecast;
+		let weatherData;
 		try {
-			forecast = await httpJSONRequest(forecastDailyUrl);
-			current = await httpJSONRequest(currentUrl);
-			if (forecast) {
-				forecast.list = forecast.daily;
-				forecast.city = { name: current.name, region: current.sys.country };
-			}
+			weatherData = await httpJSONRequest(weatherDataUrl);
+
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from OWM:", err );
 			throw "An error occurred while retrieving weather information from OWM."
 		}
 
-		// Indicate watering data could not be retrieved if the forecast data is incomplete.
-		if (!current || !current.main || !current.wind || !current.weather || !forecast || !forecast.list) {
+		// Indicate weather data could not be retrieved if the forecast data is incomplete.
+		if (!weatherData || !weatherData.current || !weatherData.daily) {
 			throw "Necessary field(s) were missing from weather information returned by OWM.";
 		}
 
 		const weather: WeatherData = {
 			weatherProvider: "OWM",
-			temp: parseInt(current.main.temp),
-			humidity: parseInt(current.main.humidity),
-			wind: parseInt(current.wind.speed),
-			description: current.weather[0].description,
-			icon: current.weather[0].icon,
+			temp: weatherData.current.temp,
+			humidity: weatherData.current.humidity,
+			wind: weatherData.current.wind_speed,
+			description: weatherData.current.weather[0].description,
+			icon: weatherData.current.weather[0].icon,
 
-			region: forecast.city.country,
-			city: forecast.city.name,
-			minTemp: parseInt(forecast.list[0].temp.min),
-			maxTemp: parseInt(forecast.list[0].temp.max),
-			precip: (forecast.list[0].rain ? parseFloat(forecast.list[0].rain || 0) : 0) / 25.4,
+			region: "",
+			city: "",
+			minTemp: weatherData.daily[0].temp.min,
+			maxTemp: weatherData.daily[0].temp.max,
+			precip: (weatherData.daily[0].rain ? weatherData.daily[0].rain : 0) / 25.4,
 			forecast: []
 		};
 
-		for (let index = 0; index < forecast.list.length; index++) {
+		for (let index = 0; index < weatherData.daily.length; index++) {
 			weather.forecast.push({
-				temp_min: parseInt(forecast.list[index].temp.min),
-				temp_max: parseInt(forecast.list[index].temp.max),
-				date: parseInt(forecast.list[index].dt),
-				icon: forecast.list[index].weather[0].icon,
-				description: forecast.list[index].weather[0].description
+				temp_min: weatherData.daily[index].temp.min,
+				temp_max: weatherData.daily[index].temp.max,
+				date: weatherData.daily[index].dt,
+				icon: weatherData.daily[index].weather[0].icon,
+				description: weatherData.daily[index].weather[0].description
 			});
 		}
 
 		return weather;
 	}
 
-	// Uses a rolling window since forecast data from further in the future (i.e. the next full day) would be less accurate.
 	async getEToData(coordinates: GeoCoordinates): Promise<EToData> {
 		// The OWM API changed what you get on the free subscription so need to adjust the call and translate the data.
-		const OWM_API_KEY = process.env.OWM_API_KEY,
-			forecastUrl = "https://api.openweathermap.org/data/2.5/onecall?exclude=current,minutely,daily,alerts&appid=" + OWM_API_KEY + "&units=imperial&lat=" + coordinates[0] + "&lon=" + coordinates[1];
+		const OWM_API_KEY = process.env.OWM_API_KEY;
+		//Get previous date by using UTC
+		const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
+		let time = Date.now();
+		time -= (86400000 + timezone * 3600);
+		const date = new Date(time);
+		let day = this.pad(date.getUTCDate());
+		let month = this.pad(date.getUTCMonth() + 1);
+
+		const historicUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ this.API_KEY }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${date.getUTCFullYear()}-${month}-${day}`;
+		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ this.API_KEY }`;
+
 
 		// Perform the HTTP request to retrieve the weather data
-		let forecast;
-		let hourlyForecast;
+		let historicData, todayData;
 		try {
-			hourlyForecast = await httpJSONRequest(forecastUrl);
-
-			// translating the hourly into a 3h forecast again could probably ditch the translation
-			// but to be safe just sticking with the 3h translation
-			if (hourlyForecast && hourlyForecast.hourly) {
-				forecast = this.get3hForecast(hourlyForecast.hourly, 24);
-			}
+			historicData = await httpJSONRequest(historicUrl);
+			todayData = await httpJSONRequest(todayUrl);
 		} catch (err) {
 			console.error( "Error retrieving ETo information from OWM:", err );
 			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
 		// Indicate ETo data could not be retrieved if the forecast data is incomplete.
-		if ( !forecast || !forecast.list || forecast.list.length < 8 ) {
+		if ( !historicData || !todayData ) {
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
-		// Take a sample over 24 hours.
-		const samples = forecast.list.slice( 0, 8 );
+		let clouds = [historicData.cloud_cover.afternoon, todayData.current.clouds];
 
-		const cloudCoverInfo: CloudCoverInfo[] = samples.map( ( window ): CloudCoverInfo => {
+		const cloudCoverInfo: CloudCoverInfo[] = clouds.map( ( sample ): CloudCoverInfo => {
+			if( sample === undefined ) {
+				return {
+					startTime: moment(),
+					endTime: moment(),
+					cloudCover: 0
+				}
+			}
 			return {
-				startTime: moment.unix( window.dt ),
-				endTime: moment.unix( window.dt ).add( 3, "hours" ),
-				cloudCover: window.clouds.all / 100
-			};
-		} );
-
-		let minTemp: number = undefined, maxTemp: number = undefined;
-		let minHumidity: number = undefined, maxHumidity: number = undefined;
-		// Skip hours where measurements don't exist to prevent result from being NaN.
-		for ( const sample of samples ) {
-			const temp: number = sample.main.temp;
-			if ( temp !== undefined ) {
-				// If minTemp or maxTemp is undefined, these comparisons will yield false.
-				minTemp = minTemp < temp ? minTemp : temp;
-				maxTemp = maxTemp > temp ? maxTemp : temp;
+				startTime: moment(),
+				endTime: moment().add( 1, "hours" ),
+				cloudCover: sample / 100
 			}
-
-			const humidity: number = sample.main.humidity;
-			if ( humidity !== undefined ) {
-				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-				minHumidity = minHumidity < humidity ? minHumidity : humidity;
-				maxHumidity = maxHumidity > humidity ? maxHumidity : humidity;
-			}
-		}
+		})
 
 		return {
 			weatherProvider: "OWM",
-			periodStartTime: samples[ 0 ].dt,
-			minTemp: minTemp,
-			maxTemp: maxTemp,
-			minHumidity: minHumidity,
-			maxHumidity: maxHumidity,
+			periodStartTime: time,
+			minTemp: historicData.temperature.min,
+			maxTemp: historicData.temperature.max,
+			minHumidity: (historicData.humidity.afternoon < todayData.current.humidity ? historicData.humidity.afternoon : todayData.current.humidity),
+			maxHumidity: (historicData.humidity.afternoon > todayData.current.humidity ? historicData.humidity.afternoon : todayData.current.humidity),
 			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
 			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: samples.reduce( ( sum, window ) => sum + ( window.wind.speed || 0 ), 0) / samples.length,
+			// Use current wind speed as previous day only returns max for the day
+			windSpeed: todayData.current.wind_speed,
 			// OWM always returns precip in mm, so it must be converted.
-			precip: samples.reduce( ( sum, window ) => sum + ( window.rain ? window.rain[ "3h" ] || 0 : 0 ), 0) / 25.4
+			precip: historicData.precipitation.total / 25.4
 		};
 	}
 
-	// Expects an array of at least 3 hours of forecast data from the API's onecall method
-	// Returns an aggregated object for the first 3 hours of the hourly array, should be equivalent to the 
-	// 3 hour object from the 5 day forecast
-	getPeriod3hObject(hourly: any[]) {
-		
-		let period3h = {
-			dt: 0,
-			main: {
-				temp: 0.0,
-				feels_like: 0.0,
-				temp_min: 0.0,
-				temp_max: 0.0,
-				pressure: 0,
-				sea_level: 0,
-				grnd_level: 0,
-				humidity: 0,
-				temp_kf: 0.0
-			},
-			weather: [
-				{
-					id: 0,
-					main: "",
-					description: "",
-					icon: ""
-				}
-			],
-			clouds: {
-				all: 0
-			},
-			wind: {
-				speed: 0.0,
-				deg: 0,
-				gust: 0.0
-			},
-			visibility: 0,
-			pop: 0.0,
-			rain: {
-				"3h": 0.0
-			},
-			sys: {
-				pod: ""
-			},
-			dt_txt: ""
-		};
-
-		if (hourly && hourly.length > 2 && hourly[2].dt) {
-
-			// Some of the fields aren't availible in the new call so not worth trying to do a full translation
-			for (let index = 0; index < 3; index++) {
-				let hour = hourly[index];
-				
-				period3h.main.temp += hour.temp;
-				period3h.main.temp_min = period3h.main.temp_min > hour.temp || index == 0 ? hour.temp : period3h.main.temp_min;
-				period3h.main.temp_max = period3h.main.temp_max < hour.temp || index == 0 ? hour.temp : period3h.main.temp_max;
-				period3h.main.humidity += hour.humidity;
-				period3h.wind.speed += hour.wind_speed;
-				period3h.rain["3h"] += hour.rain == null ? 0.0 : hour.rain["1h"];
-				period3h.clouds.all += hour.clouds;
-			}
-
-			// Defaulting to floor to err on the side of more watering
-			period3h.main.temp = period3h.main.temp / 3;
-			period3h.main.humidity = Math.floor(period3h.main.humidity / 3);
-			period3h.wind.speed = period3h.wind.speed / 3;
-			period3h.clouds.all = Math.floor(period3h.clouds.all / 3);
-
-			period3h.dt = hourly[0].dt;
-		}
-
-		return period3h;
-	}
-
-	// Expects an array of hourly forecast data from the API's onecall method
-	// Returns a minimally equivalent object to the previous 5 day forecast API call
-	get3hForecast(hourly: any[], hours: number = 24) {
-
-		let results = { list: [] };
-
-		if (!hourly || hourly.length < 3) {
-			return null;
-		}
-
-		for (let index = 0; index < hours; index++) {
-			let hour = hourly[index];
-
-			if (index % 3 == 0) {
-				results.list.push(this.getPeriod3hObject(hourly.slice(index)));
-			}
-		}
-
-		// returning null should give a better error message if there no data from the service
-		return results.list.length > 0 ? results : null;
+	pad(number: number){
+		return (number<10 ? "0" + number.toString() : number.toString());
 	}
 }

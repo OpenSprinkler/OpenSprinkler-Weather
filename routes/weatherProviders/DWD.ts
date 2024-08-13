@@ -13,14 +13,14 @@ export default class DWDWeatherProvider extends WeatherProvider {
 	}
 
 	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
-		const yesterdayTimestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD[T]hh");
+		const yesterdayTimestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD[T]HH");
 		console.log("DWD getWateringData request for coordinates: %s", coordinates);
 
 		//const yesterdayUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?exclude=currently,minutely,daily,alerts,flags`;
 		const yesterdayUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ yesterdayTimestamp }`;
 
 		//console.log("1: %s", yesterdayUrl);
-		
+
 		let yesterdayData;
 		try {
 			yesterdayData = await httpJSONRequest( yesterdayUrl );
@@ -65,7 +65,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			raining: samples[ samples.length - 1 ].precipitation > 0
 		}
 
-		console.log("DWD 1: temp:%s humidity:%s precip:%s raining:%s", 
+		console.log("DWD 1: temp:%s humidity:%s precip:%s raining:%s",
 			totals.temp / samples.length,
 			totals.humidity / samples.length,
 			totals.precip,
@@ -77,7 +77,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 
 		console.log("DWD getWeatherData request for coordinates: %s", coordinates);
-		
+
 		const currentDate: string = moment().format("YYYY-MM-DD");
 
 		//const forecastUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] }?exclude=minutely,alerts,flags`;
@@ -112,10 +112,10 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		};
 
 		for ( let day = 0; day < 7; day++ ) {
-		
+
 			const date: number = moment().add(day, "day").unix();
 			const dateStr: string = moment().add(day, "day").format("YYYY-MM-DD");
-			
+
 			const forecastUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ dateStr }`;
 
 			let forecast;
@@ -128,7 +128,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			if ( !forecast || !forecast.weather ) {
 				throw "Necessary field(s) were missing from weather information returned by Bright Sky.";
 			}
-			
+
 			let minTemp: number = undefined, maxTemp: number = undefined, precip: number = 0;
 			let condition: string = "dry", icon: string = "", condIdx = 0;
 			const allowed = "dry.fog.rain.sleet.snow.hail.thunderstorm";
@@ -176,11 +176,11 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		//	historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}`;
 
 		console.log("DWD getEToData request for coordinates: %s", coordinates);
-		
-		const timestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD[T]hh");
+
+		const timestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD[T]HH");
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ timestamp }`;
 		console.log(historicUrl);
- 
+
 		let historicData;
 		try {
 			historicData = await httpJSONRequest( historicUrl );
@@ -193,7 +193,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		}
 
 		const cloudCoverInfo: CloudCoverInfo[] = historicData.weather.map( ( hour ): CloudCoverInfo => {
-		
+
 			const result : CloudCoverInfo = {
 				startTime: moment( hour.timestamp ),
 				endTime: moment( hour.timestamp ).add( 1, "hours" ),
@@ -202,7 +202,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			//console.log("CloudCoverInfo: %s", result);
 			return result;
 		} );
-		
+
 
 		let minHumidity: number = undefined, maxHumidity: number = undefined;
 		let minTemp: number = undefined, maxTemp: number = undefined, precip: number = 0;
@@ -214,7 +214,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 			precip += hour.precipitation;
 			wind += hour.wind_speed;
-			
+
 			// Skip hours where humidity measurement does not exist to prevent result from being NaN.
 
 			if ( hour.relative_humidity === undefined || hour.relative_humidity === null) {
@@ -240,8 +240,8 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			precip: this.mm2inch(precip),
 		}
 		console.log("DWD 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s",
-			precip.toPrecision(3), 
-			solar.toPrecision(3), 
+			precip.toPrecision(3),
+			solar.toPrecision(3),
 			minTemp, maxTemp, minHumidity, maxHumidity, wind / historicData.weather.length);
 		return result;
 	}
@@ -273,17 +273,17 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				return "01d";
 		}
 	}
-	
+
 	//Grad Celcius to Fahrenheit:
 	private C2F(celsius: number): number {
 		return celsius * 1.8 + 32;
 	}
-	
+
 	//kmh to mph:
 	private kmh2mph(kmh : number): number {
 		return kmh / 1.609344;
 	}
-	
+
 	//mm to inch:
 	private mm2inch(mm : number): number {
 		return mm / 25.4;

@@ -56,7 +56,7 @@ export default class WUnderground extends WeatherProvider {
 		}
 
 		console.log("WU getEToData request for coordinates: %s %s", coordinates, pws.id);
-		
+
 		//We need the date from the last 24h, not bound to day boundary!
 		//So we take the values from 2 days: today+yesterday
 		const fromDate = moment().subtract( 1, "day" );
@@ -130,7 +130,7 @@ export default class WUnderground extends WeatherProvider {
 
 		solar = solar / n * 24 / 1000; //Watts/m2 in 24h -->KWh/m2
 		precip = precip1 + precip2 - precip0;
-		
+
 		const result : EToData = {
 			weatherProvider: "WU",
 			periodStartTime: fromDate.unix(),
@@ -145,8 +145,8 @@ export default class WUnderground extends WeatherProvider {
 		}
 
 		console.log("WU 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s n:%s nig:%s",
-			(this.inch2mm(precip)).toPrecision(3), 
-			solar.toPrecision(3), 
+			(this.inch2mm(precip)).toPrecision(3),
+			solar.toPrecision(3),
 			(this.F2C(minTemp)).toPrecision(3), (this.F2C(maxTemp)).toPrecision(3), minHumidity, maxHumidity, (this.mph2kmh(wind)).toPrecision(4), n, nig);
 
 		return result;
@@ -179,17 +179,17 @@ export default class WUnderground extends WeatherProvider {
 				return "01d";
 		}
 	}
-	
+
 	// Fahrenheit to Grad Celcius:
 	private F2C(fahrenheit: number): number {
 		return (fahrenheit-32) / 1.8;
 	}
-	
+
 	//mph to kmh:
 	private mph2kmh(mph : number): number {
 		return mph * 1.609344;
 	}
-	
+
 	//inch to mm:
 	private inch2mm(inch : number): number {
 		return inch * 25.4;
