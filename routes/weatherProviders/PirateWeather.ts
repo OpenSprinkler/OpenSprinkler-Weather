@@ -1,6 +1,6 @@
 import * as moment from "moment-timezone";
 
-import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
@@ -8,19 +8,24 @@ import { CodedError, ErrorCode } from "../../errors";
 
 export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
-	private readonly API_KEY: string;
+	private API_KEY: string;
 
 	public constructor() {
 		super();
 		this.API_KEY = process.env.PIRATEWEATHER_API_KEY;
-		if (!this.API_KEY) {
-			throw "PIRATEWEATHER_API_KEY environment variable is not defined.";
-		}
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
+	public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData > {
 		// The Unix timestamp of 24 hours ago.
 		const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
+
+		if(pws && pws.apiKey){
+			this.API_KEY = pws.apiKey;
+		}
+
+		if(!this.API_KEY) {
+			throw "No PirateWeather API key provided.";
+		}
 
 		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1] },${ yesterdayTimestamp }?units=us&exclude=currently,minutely,daily,alerts`;
 
@@ -71,7 +76,15 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		};
 	}
 
-	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
+	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
+		if(pws){
+			this.API_KEY = pws.apiKey;
+		}
+
+		if(!this.API_KEY) {
+			throw "No PirateWeather API key provided.";
+		}
+
 		const forecastUrl = `https://api.pirateweather.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] }?units=us&exclude=minutely,hourly,alerts`;
 
 		let forecast;
@@ -115,9 +128,17 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+	public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData > {
 		// The Unix epoch seconds timestamp of 24 hours ago.
 		const timestamp: number = moment().subtract( 1, "day" ).unix();
+
+		if(pws){
+			this.API_KEY = pws.apiKey;
+		}
+
+		if(!this.API_KEY) {
+			throw "No PirateWeather API key provided.";
+		}
 
 		const historicUrl = `https://api.pirateweather.net/forecast/${ this.API_KEY }/${ coordinates[0] },${ coordinates[1] },${ timestamp }?units=us&exclude=currently,minutely,alerts`;
 

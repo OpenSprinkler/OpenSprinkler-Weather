@@ -17,11 +17,13 @@ import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
 
 const WEATHER_PROVIDERS: { [method: string] : WeatherProvider} = {
-	"apple": new ( require("./weatherProviders/Apple" ).default )(),
-	"owm": new ( require("./weatherProviders/OWM" ).default )(),
-	"openmeteo": new ( require("./weatherProviders/OpenMeteo" ).default )(),
-	"dwd": new ( require("./weatherProviders/DWD" ).default )(),
-	"wu": new ( require("./weatherProviders/WUnderground" ).default )(),
+	"AW": new ( require("./weatherProviders/AccuWeather" ).default )(),
+	"PW": new ( require("./weatherProviders/PirateWeather" ).default )(),
+	"Apple": new ( require("./weatherProviders/Apple" ).default )(),
+	"OWM": new ( require("./weatherProviders/OWM" ).default )(),
+	"OpenMeteo": new ( require("./weatherProviders/OpenMeteo" ).default )(),
+	"DWD": new ( require("./weatherProviders/DWD" ).default )(),
+	"WU": new ( require("./weatherProviders/WUnderground" ).default )(),
   };
 
 const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
@@ -137,6 +139,21 @@ function checkWeatherRestriction( adjustmentValue: number, weather: BaseWatering
 
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
+	let adjustmentOptionsString: string	= getParameter(req.query.wto),
+		adjustmentOptions: AdjustmentOptions;;
+
+	// Parse weather adjustment options
+	try {
+		// Parse data that may be encoded
+		adjustmentOptionsString = decodeURIComponent( adjustmentOptionsString.replace( /\\x/g, "%" ) );
+
+		// Reconstruct JSON string from deformed controller output
+		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
+	} catch ( err ) {
+		// If the JSON is not valid then abort the calculation
+		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ));
+		return;
+	}
 
 	let coordinates: GeoCoordinates;
 	try {
@@ -147,12 +164,12 @@ export const getWeatherData = async function( req: express.Request, res: express
 	}
 
 	let WEATHER_PROVIDER: WeatherProvider;
-	const provider: string = getParameter(req.query.provider);
+	const provider: string = adjustmentOptions.provider;
 	console.log(WEATHER_PROVIDERS[provider]);
  	 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
   	  WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
   	} else {
-   	 WEATHER_PROVIDER = WEATHER_PROVIDERS['apple'];
+   	 WEATHER_PROVIDER = WEATHER_PROVIDERS['Apple'];
   	}
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
@@ -223,7 +240,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	// Parse the PWS information.
 	let pws: PWS | undefined = undefined;
-	if ( adjustmentOptions.pws && adjustmentOptions.key ) {
+	if ( adjustmentOptions.provider === "WU" && adjustmentOptions.pws && adjustmentOptions.key ) {
 
 		const idMatch = adjustmentOptions.pws.match( /^[a-zA-Z\d]+$/ );
 		const pwsId = idMatch ? idMatch[ 0 ] : undefined;
@@ -241,18 +258,20 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 
 		pws = { id: pwsId, apiKey: apiKey };
+	}else if ( adjustmentOptions.key ){
+		pws = {apiKey: adjustmentOptions.key};
 	}
 
 	let weatherProvider: WeatherProvider;
-	if( pws ){
+	if( pws && pws.id ){
 		weatherProvider = PWS_WEATHER_PROVIDER;
 	}else{
-		const provider: string = getParameter(req.query.provider);
+		const provider: string = adjustmentOptions.provider;
 		console.log(WEATHER_PROVIDERS[provider]);
  		 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
   		  weatherProvider = WEATHER_PROVIDERS[provider];
   		} else {
-   		 weatherProvider = WEATHER_PROVIDERS['apple'];
+   		 weatherProvider = WEATHER_PROVIDERS['Apple'];
   		}
 	}
 

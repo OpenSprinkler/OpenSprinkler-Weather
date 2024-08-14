@@ -1,4 +1,4 @@
-import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
@@ -8,17 +8,22 @@ import { CodedError, ErrorCode } from "../../errors";
 
 export default class OWMWeatherProvider extends WeatherProvider {
 
-	private readonly API_KEY: string;
+	private API_KEY: string;
 
 	public constructor() {
 		super();
 		this.API_KEY = process.env.OWM_API_KEY;
-		if (!this.API_KEY) {
-			throw "OWM_API_KEY environment variable is not defined.";
-		}
 	}
 
-	public async getWateringData(coordinates: GeoCoordinates): Promise<ZimmermanWateringData> {
+	public async getWateringData(coordinates: GeoCoordinates, pws?: PWS): Promise<ZimmermanWateringData> {
+		if(pws && pws.apiKey){
+			this.API_KEY = pws.apiKey;
+		}
+
+		if (!this.API_KEY) {
+			throw "No OpenWeatherMap API key provided.";
+		}
+
 		// The OWM free API options changed so need to use the new API method
 		//Get previous date by using UTC
 		const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
@@ -59,7 +64,15 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		};
 	}
 
-	public async getWeatherData(coordinates: GeoCoordinates): Promise<WeatherData> {
+	public async getWeatherData(coordinates: GeoCoordinates, pws?: PWS): Promise<WeatherData> {
+		if(pws && pws.apiKey){
+			this.API_KEY = pws.apiKey;
+		}
+
+		if (!this.API_KEY) {
+			throw "No OpenWeatherMap API key provided.";
+		}
+
 		// The OWM free API options changed so need to use the new API method
 		const weatherDataUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,alerts&appid=${ this.API_KEY }`
 
@@ -106,9 +119,16 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	async getEToData(coordinates: GeoCoordinates): Promise<EToData> {
+	async getEToData(coordinates: GeoCoordinates, pws?: PWS): Promise<EToData> {
+		if(pws && pws.apiKey){
+			this.API_KEY = pws.apiKey;
+		}
+
+		if (!this.API_KEY) {
+			throw "No OpenWeatherMap API key provided.";
+		}
+
 		// The OWM API changed what you get on the free subscription so need to adjust the call and translate the data.
-		const OWM_API_KEY = process.env.OWM_API_KEY;
 		//Get previous date by using UTC
 		const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
 		let time = Date.now();

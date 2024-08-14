@@ -1,6 +1,6 @@
 import * as moment from "moment-timezone";
 
-import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
@@ -8,17 +8,22 @@ import { CodedError, ErrorCode } from "../../errors";
 
 export default class AccuWeatherWeatherProvider extends WeatherProvider {
 
-	private readonly API_KEY: string;
+	private API_KEY: string;
 
 	public constructor() {
 		super();
 		this.API_KEY = process.env.ACCUWEATHER_API_KEY;
-		if (!this.API_KEY) {
-			throw "ACCUWEATHER_API_KEY environment variable is not defined.";
-		}
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
+	public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData > {
+		if(pws && pws.apiKey){
+			this.API_KEY = pws.apiKey;
+		}
+
+		if (!this.API_KEY) {
+			throw "No AccuWeather API key provided.";
+		}
+
 		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ this.API_KEY }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
 
 		let locationData;
@@ -70,7 +75,15 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		};
 	}
 
-	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
+	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
+		if(pws && pws.apiKey){
+			this.API_KEY = pws.apiKey;
+		}
+
+		if (!this.API_KEY) {
+			throw "No AccuWeather API key provided.";
+		}
+
 		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ this.API_KEY }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
 
 		let locationData;
@@ -140,7 +153,15 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+	public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData > {
+		if(pws && pws.apiKey){
+			this.API_KEY = pws.apiKey;
+		}
+
+		if (!this.API_KEY) {
+			throw "No AccuWeather API key provided.";
+		}
+
 		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ this.API_KEY }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
 
 		let locationData;

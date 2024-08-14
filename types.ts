@@ -2,7 +2,7 @@
 export type GeoCoordinates = [number, number];
 
 /** A PWS ID and API key. */
-export type PWS = { id: string, apiKey: string };
+export type PWS = { id?: string, apiKey: string };
 
 export interface TimeData {
     /** The UTC offset, in minutes. This uses POSIX offsets, which are the negation of typically used offsets
