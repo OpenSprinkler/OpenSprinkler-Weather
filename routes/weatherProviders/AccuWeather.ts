@@ -95,32 +95,20 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		//console.log("Location key:" + locationData.Key);
 
 		const currentUrl = `https://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }?apikey=${ this.API_KEY }&details=true`;
+		const forecastUrl = `https://dataservice.accuweather.com/forecasts/v1/daily/5day/${ locationData.Key }?apikey=${ this.API_KEY }&details=true`;
 
-		let currentData;
+		let currentData, forecast;
 		try {
 			currentData = await httpJSONRequest( currentUrl );
-		} catch ( err ) {
-			console.error( "Error retrieving weather information from AccuWeawther:", err );
-			throw "An error occurred while retrieving weather information from AccuWeather."
-		}
-
-		const forecastUrl = `https://dataservice.accuweather.com/forecasts/v1/daily/5day/${ locationData.Key }?apikey=${ this.API_KEY }`;
-
-		let current = currentData[0];
-		if ( !current ) {
-			throw "Necessary field(s) were missing from weather information returned by AccuWeather.";
-		}
-
-		let forecast;
-		try {
 			forecast = await httpJSONRequest( forecastUrl );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from AccuWeawther:", err );
 			throw "An error occurred while retrieving weather information from AccuWeather."
 		}
 
+		let current = currentData[0];
 		let daily = forecast.DailyForecasts;
-		if ( !daily || daily.length < 5 ) {
+		if ( !current || !daily || daily.length < 5) {
 			throw "Necessary field(s) were missing from weather information returned by AccuWeather.";
 		}
 
@@ -129,11 +117,11 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			temp: Math.floor( current.Temperature.Imperial.Value ),
 			humidity: Math.floor( current.RelativeHumidity ),
 			wind: Math.floor( current.Wind.Speed.Imperial.Value ),
-			description: "",
+			description: current.WeatherText,
 			icon: this.getOWMIconCode( current.WeatherIcon ),
 
-			region: "",
-			city: "",
+			region: locationData.Region.EnglishName,
+			city: locationData.EnglishName,
 			minTemp: Math.floor( daily[ 0 ].Temperature.Minimum.Value ),
 			maxTemp: Math.floor( daily[ 0 ].Temperature.Maximum.Value ),
 			precip: daily[ 0 ].Day.PrecipitationIntensity,
@@ -146,7 +134,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 				temp_max: Math.floor( daily[ index ].Temperature.Maximum.Value ),
 				date: daily[ index ].EpochDate,
 				icon: this.getOWMIconCode( daily[ index ].Day.Icon ),
-				description: ""
+				description: daily[ index ].Day.ShortPhrase
 			} );
 		}
 
@@ -170,7 +158,6 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		} catch ( err ) {
 			console.error( "Error retrieving location information from AccuWeather:", err );
 		}
-		//console.log("Location key:" + locationData.Key);
 
 		// The Unix epoch seconds timestamp of 24 hours ago.
 		const timestamp: number = moment().subtract( 1, "day" ).unix();
