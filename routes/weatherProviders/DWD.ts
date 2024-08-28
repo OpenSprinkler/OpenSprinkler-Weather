@@ -176,7 +176,6 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		//	historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}`;
 
 		console.log("DWD getEToData request for coordinates: %s", coordinates);
-
 		const timestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD[T]HH");
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ timestamp }`;
 		console.log(historicUrl);
