@@ -14,7 +14,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
 		const yesterdayTimestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD[T]HH");
-		console.log("DWD getWateringData request for coordinates: %s", coordinates);
+		//console.log("DWD getWateringData request for coordinates: %s", coordinates);
 
 		//const yesterdayUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?exclude=currently,minutely,daily,alerts,flags`;
 		const yesterdayUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ yesterdayTimestamp }`;
@@ -76,7 +76,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 
-		console.log("DWD getWeatherData request for coordinates: %s", coordinates);
+		//console.log("DWD getWeatherData request for coordinates: %s", coordinates);
 
 		const currentDate: string = moment().format("YYYY-MM-DD");
 
@@ -175,10 +175,9 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		//const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
 		//	historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}`;
 
-		console.log("DWD getEToData request for coordinates: %s", coordinates);
+		//console.log("DWD getEToData request for coordinates: %s", coordinates);
 		const timestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD[T]HH");
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ timestamp }`;
-		console.log(historicUrl);
 
 		let historicData;
 		try {

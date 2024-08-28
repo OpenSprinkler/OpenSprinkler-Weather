@@ -165,7 +165,6 @@ export const getWeatherData = async function( req: express.Request, res: express
 
 	let WEATHER_PROVIDER: WeatherProvider;
 	const provider: string = adjustmentOptions.provider;
-	console.log(WEATHER_PROVIDERS[provider]);
  	 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
   	  WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
   	} else {
@@ -267,7 +266,6 @@ export const getWateringData = async function( req: express.Request, res: expres
 		weatherProvider = PWS_WEATHER_PROVIDER;
 	}else{
 		const provider: string = adjustmentOptions.provider;
-		console.log(WEATHER_PROVIDERS[provider]);
  		 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
   		  weatherProvider = WEATHER_PROVIDERS[provider];
   		} else {
