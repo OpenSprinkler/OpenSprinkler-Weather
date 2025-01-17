@@ -227,6 +227,11 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		}
 
 		let solar = approximateSolarRadiation( cloudCoverInfo, coordinates );
+
+		if ( !minTemp || !maxTemp || !minHumidity || !maxHumidity || !solar || !wind || !precip ) {
+			throw "Information missing from BrightSky.";
+		}
+
 		const result : EToData = {
 			weatherProvider: "DWD",
 			periodStartTime: moment( historicData.weather[ 0 ].timestamp).unix(), //"2022-05-02T21:30:00+00:00"
