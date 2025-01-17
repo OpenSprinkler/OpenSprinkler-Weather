@@ -1,7 +1,7 @@
 import * as moment from "moment-timezone";
 
 import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
-import { httpJSONRequest } from "../weather";
+import { httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
@@ -19,15 +19,9 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		// The Unix timestamp of 24 hours ago.
 		const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
 
-		if(pws && pws.apiKey){
-			this.API_KEY = pws.apiKey;
-		}
+		const localKey = keyToUse(this.API_KEY, pws);
 
-		if(!this.API_KEY) {
-			throw new CodedError( ErrorCode.NoAPIKeyProvided );
-		}
-
-		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1] },${ yesterdayTimestamp }?units=us&exclude=currently,minutely,daily,alerts`;
+		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1] },${ yesterdayTimestamp }?units=us&exclude=currently,minutely,daily,alerts`;
 
 		let yesterdayData;
 		try {
@@ -77,15 +71,10 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 	}
 
 	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
-		if(pws){
-			this.API_KEY = pws.apiKey;
-		}
 
-		if(!this.API_KEY) {
-			throw new CodedError( ErrorCode.NoAPIKeyProvided );
-		}
+		const localKey = keyToUse( this.API_KEY, pws);
 
-		const forecastUrl = `https://api.pirateweather.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] }?units=us&exclude=minutely,hourly,alerts`;
+		const forecastUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] }?units=us&exclude=minutely,hourly,alerts`;
 
 		let forecast;
 		try {
@@ -132,15 +121,9 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		// The Unix epoch seconds timestamp of 24 hours ago.
 		const timestamp: number = moment().subtract( 1, "day" ).unix();
 
-		if(pws){
-			this.API_KEY = pws.apiKey;
-		}
+		const localKey = keyToUse(this.API_KEY, pws);
 
-		if(!this.API_KEY) {
-			throw new CodedError( ErrorCode.NoAPIKeyProvided );
-		}
-
-		const historicUrl = `https://api.pirateweather.net/forecast/${ this.API_KEY }/${ coordinates[0] },${ coordinates[1] },${ timestamp }?units=us&exclude=currently,minutely,alerts`;
+		const historicUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[0] },${ coordinates[1] },${ timestamp }?units=us&exclude=currently,minutely,alerts`;
 
 		let historicData;
 		try {

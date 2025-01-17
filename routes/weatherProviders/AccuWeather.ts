@@ -1,7 +1,7 @@
 import * as moment from "moment-timezone";
 
 import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
-import { httpJSONRequest } from "../weather";
+import { httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
@@ -16,15 +16,10 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 	}
 
 	public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData > {
-		if(pws && pws.apiKey){
-			this.API_KEY = pws.apiKey;
-		}
 
-		if (!this.API_KEY) {
-			throw new CodedError( ErrorCode.NoAPIKeyProvided );
-		}
+		const localKey = keyToUse(this.API_KEY, pws);
 
-		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ this.API_KEY }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
+		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
 
 		let locationData;
 		try {
@@ -34,7 +29,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		}
 		//console.log("Location key:" + locationData.Key);
 
-		const yesterdayUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ this.API_KEY }&details=true`;
+		const yesterdayUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
 
 		let yesterdayData;
 		try {
@@ -76,15 +71,10 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 	}
 
 	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
-		if(pws && pws.apiKey){
-			this.API_KEY = pws.apiKey;
-		}
 
-		if (!this.API_KEY) {
-			throw new CodedError( ErrorCode.NoAPIKeyProvided );
-		}
+		const localKey = keyToUse(this.API_KEY, pws);
 
-		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ this.API_KEY }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
+		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
 
 		let locationData;
 		try {
@@ -94,8 +84,8 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		}
 		//console.log("Location key:" + locationData.Key);
 
-		const currentUrl = `https://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }?apikey=${ this.API_KEY }&details=true`;
-		const forecastUrl = `https://dataservice.accuweather.com/forecasts/v1/daily/5day/${ locationData.Key }?apikey=${ this.API_KEY }&details=true`;
+		const currentUrl = `https://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }?apikey=${ localKey }&details=true`;
+		const forecastUrl = `https://dataservice.accuweather.com/forecasts/v1/daily/5day/${ locationData.Key }?apikey=${ localKey }&details=true`;
 
 		let currentData, forecast;
 		try {
@@ -142,15 +132,10 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 	}
 
 	public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData > {
-		if(pws && pws.apiKey){
-			this.API_KEY = pws.apiKey;
-		}
 
-		if (!this.API_KEY) {
-			throw new CodedError( ErrorCode.NoAPIKeyProvided );
-		}
+		const localKey = keyToUse(this.API_KEY, pws);
 
-		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ this.API_KEY }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
+		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
 
 		let locationData;
 		try {
@@ -163,7 +148,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		const timestamp: number = moment().subtract( 1, "day" ).unix();
 
 		const ACCUWEATHER_API_KEY = process.env.ACCUWEATHER_API_KEY,
-			historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ this.API_KEY }&details=true`;
+			historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
 
 		let historicData;
 		try {

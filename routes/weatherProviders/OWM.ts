@@ -1,5 +1,5 @@
 import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
-import { httpJSONRequest } from "../weather";
+import { httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import * as moment from "moment";
@@ -16,13 +16,8 @@ export default class OWMWeatherProvider extends WeatherProvider {
 	}
 
 	public async getWateringData(coordinates: GeoCoordinates, pws?: PWS): Promise<ZimmermanWateringData> {
-		if(pws && pws.apiKey){
-			this.API_KEY = pws.apiKey;
-		}
 
-		if (!this.API_KEY) {
-			throw new CodedError( ErrorCode.NoAPIKeyProvided );
-		}
+		const localKey = keyToUse(this.API_KEY, pws);
 
 		// The OWM free API options changed so need to use the new API method
 		//Get previous date by using UTC
@@ -32,8 +27,8 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		const date = new Date(time);
 		let day = this.pad(date.getUTCDate());
 		let month = this.pad(date.getUTCMonth() + 1);
-		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ this.API_KEY }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${date.getUTCFullYear()}-${month}-${day}`;
-		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ this.API_KEY }`;
+		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${date.getUTCFullYear()}-${month}-${day}`;
+		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ localKey }`;
 
 		// Perform the HTTP request to retrieve the weather data
 		let yesterdayData, todayData;
@@ -65,16 +60,11 @@ export default class OWMWeatherProvider extends WeatherProvider {
 	}
 
 	public async getWeatherData(coordinates: GeoCoordinates, pws?: PWS): Promise<WeatherData> {
-		if(pws && pws.apiKey){
-			this.API_KEY = pws.apiKey;
-		}
 
-		if (!this.API_KEY) {
-			throw new CodedError( ErrorCode.NoAPIKeyProvided );
-		}
+		const localKey = keyToUse(this.API_KEY, pws);
 
 		// The OWM free API options changed so need to use the new API method
-		const weatherDataUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,alerts&appid=${ this.API_KEY }`
+		const weatherDataUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,alerts&appid=${ localKey }`
 
 		let weatherData;
 		try {
@@ -120,13 +110,8 @@ export default class OWMWeatherProvider extends WeatherProvider {
 	}
 
 	async getEToData(coordinates: GeoCoordinates, pws?: PWS): Promise<EToData> {
-		if(pws && pws.apiKey){
-			this.API_KEY = pws.apiKey;
-		}
 
-		if (!this.API_KEY) {
-			throw "No OpenWeatherMap API key provided.";
-		}
+		const localKey = keyToUse(this.API_KEY, pws);
 
 		// The OWM API changed what you get on the free subscription so need to adjust the call and translate the data.
 		//Get previous date by using UTC
@@ -137,8 +122,8 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		let day = this.pad(date.getUTCDate());
 		let month = this.pad(date.getUTCMonth() + 1);
 
-		const historicUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ this.API_KEY }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${date.getUTCFullYear()}-${month}-${day}`;
-		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ this.API_KEY }`;
+		const historicUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${date.getUTCFullYear()}-${month}-${day}`;
+		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ localKey }`;
 
 
 		// Perform the HTTP request to retrieve the weather data

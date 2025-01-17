@@ -546,3 +546,13 @@ export function getParameter( parameter: string | string[] ): string {
 	// Return an empty string if the parameter is undefined.
 	return parameter || "";
 }
+
+export function keyToUse( defaultKey: string, pws: PWS ): string {
+	if(pws && pws.apiKey){
+		return pws.apiKey;
+	}else if(defaultKey){
+		return defaultKey;
+	}else{
+		throw new CodedError( ErrorCode.NoAPIKeyProvided );
+	}
+}

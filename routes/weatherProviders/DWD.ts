@@ -16,7 +16,6 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		const yesterdayTimestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD[T]HH");
 		//console.log("DWD getWateringData request for coordinates: %s", coordinates);
 
-		//const yesterdayUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?exclude=currently,minutely,daily,alerts,flags`;
 		const yesterdayUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ yesterdayTimestamp }`;
 
 		//console.log("1: %s", yesterdayUrl);
@@ -80,7 +79,6 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 		const currentDate: string = moment().format("YYYY-MM-DD");
 
-		//const forecastUrl = `https://api.darksky.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] }?exclude=minutely,alerts,flags`;
 		const currentUrl = `https://api.brightsky.dev/current_weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }`;
 
 		let current;
@@ -242,7 +240,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			precip.toPrecision(3),
 			solar.toPrecision(3),
 			minTemp, maxTemp, minHumidity, maxHumidity, wind / historicData.weather.length);
-		if ( minTemp === undefined || maxTemp === undefined || minHumidity === undefined || !maxHumidity === undefined || solar === undefined || wind === undefined || precip === undefined ) {
+		if ( minTemp === undefined || maxTemp === undefined || minHumidity === undefined || maxHumidity === undefined || solar === undefined || wind === undefined || precip === undefined ) {
 			throw "Information missing from BrightSky.";
 		}
 		return result;
