@@ -24,7 +24,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		}
 
 		if(!this.API_KEY) {
-			throw "No PirateWeather API key provided.";
+			throw new CodedError( ErrorCode.NoAPIKeyProvided );
 		}
 
 		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1] },${ yesterdayTimestamp }?units=us&exclude=currently,minutely,daily,alerts`;
@@ -82,7 +82,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		}
 
 		if(!this.API_KEY) {
-			throw "No PirateWeather API key provided.";
+			throw new CodedError( ErrorCode.NoAPIKeyProvided );
 		}
 
 		const forecastUrl = `https://api.pirateweather.net/forecast/${ this.API_KEY }/${ coordinates[ 0 ] },${ coordinates[ 1 ] }?units=us&exclude=minutely,hourly,alerts`;
@@ -137,7 +137,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		}
 
 		if(!this.API_KEY) {
-			throw "No PirateWeather API key provided.";
+			throw new CodedError( ErrorCode.NoAPIKeyProvided );
 		}
 
 		const historicUrl = `https://api.pirateweather.net/forecast/${ this.API_KEY }/${ coordinates[0] },${ coordinates[1] },${ timestamp }?units=us&exclude=currently,minutely,alerts`;

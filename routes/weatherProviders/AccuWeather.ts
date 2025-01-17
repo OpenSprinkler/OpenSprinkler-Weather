@@ -21,7 +21,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		}
 
 		if (!this.API_KEY) {
-			throw "No AccuWeather API key provided.";
+			throw new CodedError( ErrorCode.NoAPIKeyProvided );
 		}
 
 		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ this.API_KEY }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
@@ -81,7 +81,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		}
 
 		if (!this.API_KEY) {
-			throw "No AccuWeather API key provided.";
+			throw new CodedError( ErrorCode.NoAPIKeyProvided );
 		}
 
 		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ this.API_KEY }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
@@ -147,7 +147,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		}
 
 		if (!this.API_KEY) {
-			throw "No AccuWeather API key provided.";
+			throw new CodedError( ErrorCode.NoAPIKeyProvided );
 		}
 
 		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ this.API_KEY }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;

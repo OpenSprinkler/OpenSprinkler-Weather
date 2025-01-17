@@ -93,8 +93,8 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			temp: current.current_weather.temperature,
 			humidity: 0,
 			wind: current.current_weather.windspeed,
-			description: "",
-			icon: this.getWMOIconCode(current.current_weather.weathercode),
+			description: this.getWMOIconCode(current.current_weather.weathercode).desc,
+			icon: this.getWMOIconCode(current.current_weather.weathercode).icon,
 
 			region: "",
 			city: "",
@@ -109,8 +109,8 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				temp_min: current.daily.temperature_2m_min[day],
 				temp_max: current.daily.temperature_2m_max[day],
 				date: current.daily.time[day],
-				icon: this.getWMOIconCode( current.daily.weathercode[day] ),
-				description: "",
+				icon: this.getWMOIconCode( current.daily.weathercode[day] ).icon,
+				description: this.getWMOIconCode( current.daily.weathercode[day] ).desc,
 			} );
 		}
 
@@ -197,48 +197,76 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	private getWMOIconCode(code: number) {
 		switch(code) {
 			case 0:
-				return "01d"; //Clear Sky
+				//0 	Clear sky
+				return {"icon": "01d", desc: "Clear Sky"};
 			case 1:
+				//1, 2, 3 	Mainly clear, partly cloudy, and overcast
+				return {"icon": "02d", desc: "Mainly cloudy"};
 			case 2:
+				return {"icon": "03d", desc: "Partly cloudy"};
 			case 3:
-				return "02d"; //Mainly clear, partly cloudy, and overcast
+				return {"icon": "04d", desc: "Overcast"};
 			case 45:
+				//45, 48 	Fog and depositing rime fog
+				return {"icon": "50d", desc: "Fog"};
 			case 48:
-				return "50d"; //Fog and depositing rime fog
+				return {"icon": "50d", desc: "Deposing rime fog"};
 			case 51:
+				//51, 53, 55 	Drizzle: Light, moderate, and dense intensity
+				return {"icon": "50d", desc: "Drizzle: light"};
 			case 53:
+				return {"icon": "50d", desc: "Drizzle: moderate"};
 			case 55:
-				return "09d"; //Drizzle: Light, moderate, and dense intensity
+				return {"icon": "50d", desc: "Drizzle: dense"}; // or "09d"?
 			case 56:
+				//56, 57 	Freezing Drizzle: Light and dense intensity
+				return {"icon": "50d", desc: "Freezing Drizzle: light"};
 			case 57:
-				return "09d"; //Freezing Drizzle: Light and dense intensity
+				return {"icon": "50d", desc: "Freezing Drizzle: dense"}; // or "09d"?
 			case 61:
+				//61, 63, 65 	Rain: Slight, moderate and heavy intensity
+				return {"icon": "10d", desc: "Rain: slight"};
 			case 63:
+				return {"icon": "09d", desc: "Rain: moderate"};
 			case 65:
-				return "10d"; //Rain: Slight, moderate and heavy intensity
+				return {"icon": "11d", desc: "Rain: heavy"};
 			case 66:
+				//66, 67 	Freezing Rain: Light and heavy intensity
+				return {"icon": "09d", desc: "Freezing Rain: light"};
 			case 67:
-				return "10d"; //Freezing Rain: Light and heavy intensity
+				return {"icon": "11d", desc: "Freezing Rain: heavy"};
 			case 71:
+				//71, 73, 75 	Snow fall: Slight, moderate, and heavy intensity
+				return {"icon": "13d", desc: "Snow fall: slight"};
 			case 73:
+				return {"icon": "13d", desc: "Snow fall: moderate"};
 			case 75:
-				return "13d"; //Snow fall: Slight, moderate, and heavy intensity
+				return {"icon": "13d", desc: "Snow fall: heavy"};
 			case 77:
-				return "13d"; //Snow grains
+				//77 	Snow grains
+				return {"icon": "13d", desc: "Snow grains"};
 			case 80:
+				//80, 81, 82 	Rain showers: Slight, moderate, and violent
+				return {"icon": "11d", desc: "Rain showers: slight"};
 			case 81:
+				return {"icon": "11d", desc: "Rain showers: moderate"};
 			case 82:
-				return "10d"; //Rain showers: Slight, moderate, and violent
+				return {"icon": "11d", desc: "Rain showers: violent"};
 			case 85:
+				//85, 86 	Snow showers slight and heavy
+				return {"icon": "13d", desc: "Snow showers: slight"};
 			case 86:
-				return "13d"; //Snow showers slight and heavy
+				return {"icon": "13d", desc: "Snow showers: heavy"};
 			case 95:
-				return "11d"; //Thunderstorm: Slight or moderate
+				//95 	Thunderstorm: Slight or moderate
+				return {"icon": "11d", desc: "Thunderstorm: Slight or moderate"};
 			case 96:
+				//96, 99 	Thunderstorm with slight and heavy hail
+				return {"icon": "13d", desc: "Thunderstorm: slight hail"};
 			case 99:
-				return "11d"; // Thunderstorm with slight and heavy hail
+				return {"icon": "13d", desc: "Thunderstorm: heavy hail"}; // or "11d"?
 			default:
-				return "01d";
+				return {"icon": "01d", desc: "Clear sky"};
 		}
 	}
 

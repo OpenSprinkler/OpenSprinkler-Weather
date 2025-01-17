@@ -21,7 +21,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		}
 
 		if (!this.API_KEY) {
-			throw "No OpenWeatherMap API key provided.";
+			throw new CodedError( ErrorCode.NoAPIKeyProvided );
 		}
 
 		// The OWM free API options changed so need to use the new API method
@@ -70,7 +70,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		}
 
 		if (!this.API_KEY) {
-			throw "No OpenWeatherMap API key provided.";
+			throw new CodedError( ErrorCode.NoAPIKeyProvided );
 		}
 
 		// The OWM free API options changed so need to use the new API method
