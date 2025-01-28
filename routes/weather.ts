@@ -164,7 +164,24 @@ export const getWeatherData = async function( req: express.Request, res: express
 	}
 
 	let pws: PWS | undefined = undefined;
-	if ( adjustmentOptions.key ){
+	if ( adjustmentOptions.provider === "WU" && adjustmentOptions.pws && adjustmentOptions.key ) {
+		const idMatch = adjustmentOptions.pws.match( /^[a-zA-Z\d]+$/ );
+		const pwsId = idMatch ? idMatch[ 0 ] : undefined;
+		const keyMatch = adjustmentOptions.key.match( /^[a-f\d]{32}$/ );
+		const apiKey = keyMatch ? keyMatch[ 0 ] : undefined;
+
+		// Make sure that the PWS ID and API key look valid.
+		if ( !pwsId ) {
+			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsId ) );
+			return;
+		}
+		if ( !apiKey ) {
+			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsApiKey ) );
+			return;
+		}
+
+		pws = { id: pwsId, apiKey: apiKey };
+	}else if ( adjustmentOptions.key ){
 		pws = {apiKey: adjustmentOptions.key};
 	}
 

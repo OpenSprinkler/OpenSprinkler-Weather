@@ -50,6 +50,70 @@ export default class WUnderground extends WeatherProvider {
 		}
 	}
 
+	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
+		if ( !pws ) {
+			throw new CodedError( ErrorCode.NoPwsProvided );
+		}
+
+		console.log("WU getWeatherData request for coordinates: %s", coordinates);
+
+		const forecastURL = `https://api.weather.com/v3/wx/forecast/daily/5day?geocode=${ coordinates[ 0 ] },${ coordinates[ 1 ] }&format=json&language=en-US&units=e&apiKey=${ pws.apiKey }`;
+
+		let forecast;
+		try {
+			forecast = await httpJSONRequest( forecastURL );
+		} catch ( err ) {
+			console.error( "Error retrieving weather information from WUnderground:", err );
+			throw new CodedError( ErrorCode.WeatherApiError );
+		}
+
+		const currentURL = `https://api.weather.com/v2/pws/observations/current?stationId=${ pws.id }&format=json&units=e&apiKey=${ pws.apiKey }`;
+
+		let data;
+		try {
+			data = await httpJSONRequest( currentURL );
+		} catch ( err ) {
+			console.error( "Error retrieving weather information from WUnderground:", err );
+			throw new CodedError( ErrorCode.WeatherApiError );
+		}
+
+		const current = data.observations[0];
+
+		const icon = forecast.daypart[0].iconCode[0];
+
+		const maxTemp = forecast.temperatureMax[0];
+
+		const weather: WeatherData = {
+			weatherProvider: "WUnderground",
+			temp: Math.floor( current.imperial.temp ),
+			humidity: Math.floor( current.humidity ),
+			wind: Math.floor( current.imperial.windSpeed ),
+			description: forecast.narrative[0],
+			icon: this.getWUIconCode( (icon === null) ? -1 : icon ), //Null after 3pm
+
+			region: current.country,
+			city: "",
+			minTemp: Math.floor( forecast.temperatureMin[0] ),
+			maxTemp: Math.floor( (maxTemp === null ) ? current.imperial.temp : maxTemp ), //Null after 3pm
+			precip: forecast.qpf[0] + forecast.qpfSnow[0],
+			forecast: []
+		};
+
+		for ( let index = 1; index < forecast.dayOfWeek.length; index++ ) {
+			const sunrise = forecast.sunriseTimeLocal[index];
+			const date = new Date(sunrise);
+			weather.forecast.push( {
+				temp_min: Math.floor( forecast.temperatureMin[index] ),
+				temp_max: Math.floor( forecast.temperatureMax[index] ),
+				date: forecast.sunriseTimeUtc[index],
+				icon: this.getWUIconCode( forecast.daypart[0].iconCode[index] ),
+				description: forecast.narrative[index]
+			} );
+		}
+
+		return weather;
+	}
+
 	public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData > {
 		if ( !pws ) {
 			throw new CodedError( ErrorCode.NoPwsProvided );
@@ -156,28 +220,58 @@ export default class WUnderground extends WeatherProvider {
 		return false;
 	}
 
-	private getOWMIconCode(icon: string) {
-		switch(icon) {
-			case "partly-cloudy-night":
-				return "02n";
-			case "partly-cloudy-day":
-				return "02d";
-			case "cloudy":
-				return "03d";
-			case "fog":
-			case "wind":
-				return "50d";
-			case "sleet":
-			case "snow":
-				return "13d";
-			case "rain":
-				return "10d";
-			case "clear-night":
-				return "01n";
-			case "clear-day":
-			default:
-				return "01d";
-		}
+	private getWUIconCode(code: number) {
+		const mapping = [
+			"50d", // Tornado
+			"09d", // Tropical Storm
+			"09d", // Hurricane
+			"11d", // Strong Storms
+			"11d", // Thunderstorms
+			"13d", // Rain + Snow
+			"13d", // Rain + Sleet
+			"13d", // Wintry Mix
+			"13d", // Freezing Drizzle
+			"09d", // Drizzle
+			"13d", // Freezing Rain
+			"09d", // Showers
+			"09d", // Rain
+			"13d", // Flurries
+			"13d", // Snow Showers
+			"13d", // Blowing/Drifting Snow
+			"13d", // Snow
+			"13d", // Hail
+			"13d", // Sleet
+			"50d", // Blowing Dust/Sand
+			"50d", // Foggy
+			"50d", // Haze
+			"50d", // Smoke
+			"50d", // Breezy
+			"50d", // Windy
+			"13d", // Frigid/Ice Crystals
+			"04d", // Cloudy
+			"03n", // Mostly Cloudy (night)
+			"03d", // Mostly Cloudy (day)
+			"02n", // Partly Cloudy (night)
+			"02d", // Partly Cloudy (day)
+			"01n", // Clear night
+			"01d", // Sunny
+			"02n", // Mostly clear night
+			"02d", // Mostly sunny
+			"13d", // Rain and Hail
+			"01d", // Hot
+			"11d", // Isolated thunderstorms (Day)
+			"11d", // Scattered thunderstorms (Day)
+			"09d", // Scattered showers (Day)
+			"09d", // Heavy rain
+			"13d", // Scattered snow shower (Day)
+			"13d", // Heavy snow
+			"13d", // Blizzard
+			"01d", // Not available
+			"09n", // Scattered showers (Night)
+			"13n", // Scattered snow shower (Night)
+			"09n" // Scattered thunderstorm (Night)
+		];
+		return (code >= 0 && code < mapping.length) ? mapping[code] : "50d";
 	}
 
 	// Fahrenheit to Grad Celcius:
