@@ -99,13 +99,11 @@ export default class WUnderground extends WeatherProvider {
 			forecast: []
 		};
 
-		for ( let index = 1; index < forecast.dayOfWeek.length; index++ ) {
-			const sunrise = forecast.sunriseTimeLocal[index];
-			const date = new Date(sunrise);
+		for ( let index = 0; index < forecast.dayOfWeek.length; index++ ) {
 			weather.forecast.push( {
 				temp_min: Math.floor( forecast.temperatureMin[index] ),
 				temp_max: Math.floor( forecast.temperatureMax[index] ),
-				date: forecast.sunriseTimeUtc[index],
+				date: forecast.validTimeUtc[index],
 				icon: this.getWUIconCode( forecast.daypart[0].iconCode[index] ),
 				description: forecast.narrative[index]
 			} );
