@@ -161,7 +161,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		}
 
 		let windSpeed = ( historicData.forecastDaily.days[ 0 ].daytimeForecast.windSpeed + historicData.forecastDaily.days[ 0 ].overnightForecast.windSpeed ) / 2;
-		
+
 		return {
 			weatherProvider: "Apple",
 			periodStartTime: moment(historicData.forecastHourly.hours[ 0 ].forecastStart).unix(),

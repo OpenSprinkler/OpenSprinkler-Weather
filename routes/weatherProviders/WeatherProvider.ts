@@ -23,7 +23,7 @@ export class WeatherProvider {
 	 * or rejected with an error message if an error occurs while retrieving the WeatherData or the WeatherProvider does
 	 * not support this method.
 	 */
-	getWeatherData( coordinates : GeoCoordinates ): Promise< WeatherData > {
+	getWeatherData( coordinates : GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
 		throw "Selected WeatherProvider does not support getWeatherData";
 	}
 
