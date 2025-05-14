@@ -5,7 +5,7 @@ import { CodedError, ErrorCode } from "../../errors";
 
 export abstract class Geocoder {
 
-	private static cacheFile: string = __dirname + "/../../../geocoderCache.json";
+	private static cacheFile: string = (process.env.PERSISTENCE_LOCATION || __dirname + "/../../..") + "/geocoderCache.json";
 
 	private cache: Map<string, GeoCoordinates>;
 
