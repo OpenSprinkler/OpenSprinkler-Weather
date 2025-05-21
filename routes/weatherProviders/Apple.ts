@@ -15,6 +15,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		super();
 
         if (!process.env.APPLE_PRIVATE_KEY) {
+            return;
 			throw "APPLE_PRIVATE_KEY environment variable is not defined.";
 		}
 

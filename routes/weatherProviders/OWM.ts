@@ -21,7 +21,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 
 		// The OWM free API options changed so need to use the new API method
 		//Get previous date by using UTC
-		const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
+		const timezone = moment().tz( geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
 		let time = Date.now();
 		time -= (86400000 + timezone * 3600);
 		const date = new Date(time);
@@ -115,7 +115,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 
 		// The OWM API changed what you get on the free subscription so need to adjust the call and translate the data.
 		//Get previous date by using UTC
-		const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
+		const timezone = moment().tz( geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
 		let time = Date.now();
 		time -= (86400000 + timezone * 3600);
 		const date = new Date(time);
