@@ -27,7 +27,7 @@ export default class WateringScaleCache {
 		wateringScale: CachedScale
 	): void {
 		// The end of the day in the controller's timezone.
-		const expirationDate: Moment = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).endOf( "day" );
+		const expirationDate: Moment = moment().tz( geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).endOf( "day" );
 		const ttl: number = ( expirationDate.unix() - moment().unix() );
 		const key = this.makeKey( adjustmentMethodId, coordinates, pws, adjustmentOptions );
 		this.cache.set( key, wateringScale, ttl );
