@@ -71,7 +71,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		//console.log("OM getWeatherData request for coordinates: %s", coordinates);
 
 		const currentDate: number = moment().unix();
-		const timezone = geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
+		const timezone = geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
 
 		const currentUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime`;
 		//console.log(currentUrl);
@@ -126,7 +126,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		//console.log("OM getEToData request for coordinates: %s", coordinates);
 
 		const timestamp: string = moment().subtract( 1, "day" ).format();
-		const timezone = geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
+		const timezone = geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
 		const historicUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime&past_days=1`;
 		//console.log(historicUrl);
 
