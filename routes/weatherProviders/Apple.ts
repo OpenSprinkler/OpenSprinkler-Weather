@@ -16,8 +16,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
         if (!process.env.APPLE_PRIVATE_KEY) {
             return;
-			throw "APPLE_PRIVATE_KEY environment variable is not defined.";
-		}
+	}
 
 		this.API_KEY = jwt.sign(
             { sub: process.env.APPLE_SERVICE_ID },
