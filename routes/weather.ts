@@ -15,10 +15,47 @@ import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMe
 import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
+import { existsSync } from "fs";
 
-const WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.WEATHER_PROVIDER || "OWM" ) ).default )();
-const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
-const GEOCODER: Geocoder = new ( require("./geocoders/" + ( process.env.GEOCODER || "WUnderground" ) ).default )();
+const get_proivder = async (name: string) => {
+    if (
+    !existsSync(
+            `${__dirname}/weatherProviders/${name}.js`
+        )
+    ) {
+        // logger.error(
+        //     `Authentication plugin '${process.env.AUTHENTICATION_PLUGIN}' does not exist.`
+        // );
+        process.exit(1);
+    }
+    return new (
+        await import(
+            `${__dirname}/weatherProviders/${name}.js`
+        )
+    ).default.default();
+}
+
+const get_geocoder = async (name: string) => {
+    if (
+    !existsSync(
+            `${__dirname}/geocoders/${name}.js`
+        )
+    ) {
+        // logger.error(
+        //     `Authentication plugin '${process.env.AUTHENTICATION_PLUGIN}' does not exist.`
+        // );
+        process.exit(1);
+    }
+    return new (
+        await import(
+            `${__dirname}/geocoders/${name}.js`
+        )
+    ).default.default();
+}
+
+const WEATHER_PROVIDER_PROMISE: Promise<WeatherProvider> = get_proivder(process.env.WEATHER_PROVIDER || "OWM");
+const PWS_WEATHER_PROVIDER_PROMISE: Promise<WeatherProvider> = get_proivder(process.env.PWS_WEATHER_PROVIDER || "WUnderground");
+const GEOCODER_PROMISE: Promise<Geocoder> = get_geocoder(process.env.GEOCODER || "WUnderground" );
 
 // Define regex filters to match against location
 const filters = {
@@ -57,7 +94,7 @@ export async function resolveCoordinates( location: string ): Promise< GeoCoordi
 		const split: string[] = location.split( "," );
 		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
 	} else {
-		return GEOCODER.getLocation( location );
+		return (await GEOCODER_PROMISE).getLocation( location );
 	}
 }
 
@@ -143,7 +180,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 	const timeData: TimeData = getTimeData( coordinates );
 	let weatherData: WeatherData;
 	try {
-		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates );
+		weatherData = await (await WEATHER_PROVIDER_PROMISE).getWeatherData( coordinates );
 	} catch ( err ) {
 		res.send( "Error: " + err );
 		return;
@@ -228,7 +265,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		pws = { id: pwsId, apiKey: apiKey };
 	}
 
-	const weatherProvider = pws ? PWS_WEATHER_PROVIDER : WEATHER_PROVIDER;
+	const weatherProvider = await (pws ? PWS_WEATHER_PROVIDER_PROMISE : WEATHER_PROVIDER_PROMISE);
 
 	const data = {
 		scale:		undefined,

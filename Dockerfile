@@ -7,7 +7,7 @@ USER osweather
 
 ADD --chown=osweather:osweather . weather
 
-WORKDIR weather
+WORKDIR /weather
 RUN npm install
 RUN npm run compile
 CMD npm start

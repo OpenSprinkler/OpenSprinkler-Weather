@@ -1,16 +1,43 @@
 import { config as dotenv_config } from "dotenv"
 dotenv_config();
 
-import * as express from "express";
-import * as cors from "cors";
+import express from "express";
+import cors from "cors";
 
-import * as weather from "./routes/weather";
-import * as local from "./routes/weatherProviders/local";
-import * as baselineETo from "./routes/baselineETo";
-import * as packageJson from "./package.json";
+import { getWateringData, getWeatherData } from "./routes/weather";
+import { captureWUStream } from "./routes/weatherProviders/local";
+import { getBaselineETo } from "./routes/baselineETo";
+import {default as packageJson} from "./package.json";
+import { pinoHttp } from "pino-http";
+import { pino, LevelWithSilent } from "pino";
 
-let	host	= process.env.HOST || "127.0.0.1",
-	port	= parseInt( process.env.PORT ) || 3000;
+function getLogLevel(): LevelWithSilent {
+    switch (process.env.LOG_LEVEL) {
+        case "trace":
+            return "trace";
+        case "debug":
+            return "debug";
+        case "info":
+            return "info";
+        case "warn":
+            return "warn";
+        case "error":
+            return "error";
+        case "fatal":
+            return "fatal";
+        case "silent":
+            return "silent";
+        default:
+            return "info";
+    }
+}
+
+const logger = pino({ level: getLogLevel() });
+
+dotenv_config();
+
+const host = process.env.HOST || "127.0.0.1";
+const port = parseInt(process.env.HTTP_PORT) || 3000;
 
 export let pws = process.env.PWS || "none";
 export const app = express();
@@ -18,16 +45,16 @@ export const app = express();
 // Handle requests matching /weatherID.py where ID corresponds to the
 // weather adjustment method selector.
 // This endpoint is considered deprecated and supported for prior firmware
-app.get( /weather(\d+)\.py/, weather.getWateringData );
-app.get( /(\d+)/, weather.getWateringData );
+app.get( /weather(\d+)\.py/, getWateringData );
+app.get( /(\d+)/, getWateringData );
 
 // Handle requests matching /weatherData
 app.options( /weatherData/, cors() );
-app.get( /weatherData/, cors(), weather.getWeatherData );
+app.get( /weatherData/, cors(), getWeatherData );
 
 // Endpoint to stream Weather Underground data from local PWS
 if ( pws === "WU" ) {
-	app.get( "/weatherstation/updateweatherstation.php", local.captureWUStream );
+	app.get( "/weatherstation/updateweatherstation.php", captureWUStream );
 }
 
 app.get( "/", function( req, res ) {
@@ -36,7 +63,7 @@ app.get( "/", function( req, res ) {
 
 // Handle requests matching /baselineETo
 app.options( /baselineETo/, cors() );
-app.get( /baselineETo/, cors(), baselineETo.getBaselineETo );
+app.get( /baselineETo/, cors(), getBaselineETo );
 
 // Handle 404 error
 app.use( function( req, res ) {
