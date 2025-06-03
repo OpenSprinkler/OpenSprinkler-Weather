@@ -15,47 +15,36 @@ import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMe
 import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
-import { existsSync } from "fs";
+import OWMWeatherProvider from "./weatherProviders/OWM";
+import WUndergroundWeatherProvider from "./weatherProviders/WUnderground";
+import AppleWeatherProvider from "./weatherProviders/Apple";
+import AccuWeatherWeatherProvider from "./weatherProviders/AccuWeather";
+import DWDWeatherProvider from "./weatherProviders/DWD";
+import LocalWeatherProvider from "./weatherProviders/local";
+import OpenMeteoWeatherProvider from "./weatherProviders/OpenMeteo";
+import PirateWeatherWeatherProvider from "./weatherProviders/PirateWeather";
+import GoogleMapsGeocoder from "./geocoders/GoogleMaps";
+import WUndergroundGeocoder from "./geocoders/WUnderground";
 
-const get_proivder = async (name: string) => {
-    if (
-    !existsSync(
-            `${__dirname}/weatherProviders/${name}.js`
-        )
-    ) {
-        // logger.error(
-        //     `Authentication plugin '${process.env.AUTHENTICATION_PLUGIN}' does not exist.`
-        // );
-        process.exit(1);
-    }
-    return new (
-        await import(
-            `${__dirname}/weatherProviders/${name}.js`
-        )
-    ).default.default();
-}
+const WEATHER_PROVIDERS: {[name: string]: WeatherProvider} = {
+    "Apple": new AppleWeatherProvider(),
+    "AccuWeather": new AccuWeatherWeatherProvider(),
+    "DWD": new DWDWeatherProvider(),
+    "local": new LocalWeatherProvider(),
+    "OpenMeteo": new OpenMeteoWeatherProvider(),
+    "OWM": new OWMWeatherProvider(),
+    "PirateWeather": new PirateWeatherWeatherProvider(),
+    "WUnderground": new WUndergroundWeatherProvider(),
+};
 
-const get_geocoder = async (name: string) => {
-    if (
-    !existsSync(
-            `${__dirname}/geocoders/${name}.js`
-        )
-    ) {
-        // logger.error(
-        //     `Authentication plugin '${process.env.AUTHENTICATION_PLUGIN}' does not exist.`
-        // );
-        process.exit(1);
-    }
-    return new (
-        await import(
-            `${__dirname}/geocoders/${name}.js`
-        )
-    ).default.default();
-}
+const GEOCODERS: {[name: string]: Geocoder} = {
+    "GoogleMaps": new GoogleMapsGeocoder(),
+    "WUnderground": new WUndergroundGeocoder(),
+};
 
-const WEATHER_PROVIDER_PROMISE: Promise<WeatherProvider> = get_proivder(process.env.WEATHER_PROVIDER || "OWM");
-const PWS_WEATHER_PROVIDER_PROMISE: Promise<WeatherProvider> = get_proivder(process.env.PWS_WEATHER_PROVIDER || "WUnderground");
-const GEOCODER_PROMISE: Promise<Geocoder> = get_geocoder(process.env.GEOCODER || "WUnderground" );
+const WEATHER_PROVIDER: WeatherProvider = WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["OWM"];
+const PWS_WEATHER_PROVIDER: WeatherProvider = WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["WUnderground"];
+const GEOCODER: Geocoder = GEOCODERS[process.env.GEOCODER] || GEOCODERS["WUnderground"];
 
 // Define regex filters to match against location
 const filters = {
@@ -94,7 +83,7 @@ export async function resolveCoordinates( location: string ): Promise< GeoCoordi
 		const split: string[] = location.split( "," );
 		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
 	} else {
-		return (await GEOCODER_PROMISE).getLocation( location );
+		return GEOCODER.getLocation( location );
 	}
 }
 
@@ -121,7 +110,7 @@ export async function httpJSONRequest(url: string, headers?, body?): Promise< an
  * @return The TimeData for the specified coordinates.
  */
 function getTimeData( coordinates: GeoCoordinates ): TimeData {
-	const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
+	const timezone = moment().tz( geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
 	const tzOffset: number = getTimezone( timezone, true );
 
 	// Calculate sunrise and sunset since Weather Underground does not provide it
@@ -167,6 +156,21 @@ function checkWeatherRestriction( adjustmentValue: number, weather: BaseWatering
 
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
+	let adjustmentOptionsString: string	= getParameter(req.query.wto),
+		adjustmentOptions: AdjustmentOptions;;
+
+	// Parse weather adjustment options
+	try {
+		// Parse data that may be encoded
+		adjustmentOptionsString = decodeURIComponent( adjustmentOptionsString.replace( /\\x/g, "%" ) );
+
+		// Reconstruct JSON string from deformed controller output
+		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
+	} catch ( err ) {
+		// If the JSON is not valid then abort the calculation
+		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ));
+		return;
+	}
 
 	let coordinates: GeoCoordinates;
 	try {
@@ -176,11 +180,40 @@ export const getWeatherData = async function( req: express.Request, res: express
 		return;
 	}
 
+	let pws: PWS | undefined = undefined;
+	if ( adjustmentOptions.provider === "WU" && adjustmentOptions.pws && adjustmentOptions.key ) {
+		const idMatch = adjustmentOptions.pws.match( /^[a-zA-Z\d]+$/ );
+		const pwsId = idMatch ? idMatch[ 0 ] : undefined;
+		const keyMatch = adjustmentOptions.key.match( /^[a-f\d]{32}$/ );
+		const apiKey = keyMatch ? keyMatch[ 0 ] : undefined;
+
+		// Make sure that the PWS ID and API key look valid.
+		if ( !pwsId ) {
+			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsId ) );
+			return;
+		}
+		if ( !apiKey ) {
+			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsApiKey ) );
+			return;
+		}
+
+		pws = { id: pwsId, apiKey: apiKey };
+	}else if ( adjustmentOptions.key ){
+		pws = {apiKey: adjustmentOptions.key};
+	}
+
+	let WEATHER_PROVIDER: WeatherProvider;
+	const provider: string = adjustmentOptions.provider;
+ 	 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
+  	  WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
+  	} else {
+   	 WEATHER_PROVIDER = WEATHER_PROVIDERS['Apple'];
+  	}
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
 	let weatherData: WeatherData;
 	try {
-		weatherData = await (await WEATHER_PROVIDER_PROMISE).getWeatherData( coordinates );
+		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates );
 	} catch ( err ) {
 		res.send( "Error: " + err );
 		return;
@@ -245,7 +278,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	// Parse the PWS information.
 	let pws: PWS | undefined = undefined;
-	if ( adjustmentOptions.pws && adjustmentOptions.key ) {
+	if ( adjustmentOptions.provider === "WU" && adjustmentOptions.pws && adjustmentOptions.key ) {
 
 		const idMatch = adjustmentOptions.pws.match( /^[a-zA-Z\d]+$/ );
 		const pwsId = idMatch ? idMatch[ 0 ] : undefined;
@@ -265,7 +298,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		pws = { id: pwsId, apiKey: apiKey };
 	}
 
-	const weatherProvider = await (pws ? PWS_WEATHER_PROVIDER_PROMISE : WEATHER_PROVIDER_PROMISE);
+	const weatherProvider = pws ? PWS_WEATHER_PROVIDER : WEATHER_PROVIDER;
 
 	const data = {
 		scale:		undefined,
@@ -538,4 +571,14 @@ export function getParameter( parameter: string | string[] ): string {
 
 	// Return an empty string if the parameter is undefined.
 	return parameter || "";
+}
+
+export function keyToUse( defaultKey: string, pws: PWS ): string {
+	if(pws && pws.apiKey){
+		return pws.apiKey;
+	}else if(defaultKey){
+		return defaultKey;
+	}else{
+		throw new CodedError( ErrorCode.NoAPIKeyProvided );
+	}
 }
