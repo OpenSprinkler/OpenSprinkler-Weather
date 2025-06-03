@@ -2,7 +2,7 @@
 export type GeoCoordinates = [number, number];
 
 /** A PWS ID and API key. */
-export type PWS = { id: string, apiKey: string };
+export type PWS = { id?: string, apiKey: string };
 
 export interface TimeData {
     /** The UTC offset, in minutes. This uses POSIX offsets, which are the negation of typically used offsets
@@ -74,5 +74,5 @@ export interface ZimmermanWateringData extends BaseWateringData {
     raining: boolean;
 }
 
-export type WeatherProviderId = "OWM" | "DarkSky" | "Apple" | "local" | "mock" | "WUnderground";
-export type WeatherProviderShortId = "OWM" | "DS" | "Apple" | "local" | "mock" | "WU";
+export type WeatherProviderId = "OWM" | "PirateWeather" | "local" | "mock" | "WUnderground" | "DWD" | "OpenMeteo" | "AccuWeather" | "Apple";
+export type WeatherProviderShortId = "OWM" | "PW" | "local" | "mock" | "WU" | "DWD" | "OpenMeteo" | "AW" | "Apple";

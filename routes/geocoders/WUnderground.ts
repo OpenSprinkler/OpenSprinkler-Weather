@@ -3,7 +3,7 @@ import { CodedError, ErrorCode } from "../../errors";
 import { httpJSONRequest } from "../weather";
 import { Geocoder } from "./Geocoder";
 
-export default class WUnderground extends Geocoder {
+export default class WUndergroundGeocoder extends Geocoder {
 	public async geocodeLocation( location: string ): Promise<GeoCoordinates> {
 		// Generate URL for autocomplete request
 		const url = "http://autocomplete.wunderground.com/aq?h=0&query=" +

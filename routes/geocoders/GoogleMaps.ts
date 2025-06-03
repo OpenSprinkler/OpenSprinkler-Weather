@@ -3,7 +3,7 @@ import { CodedError, ErrorCode } from "../../errors";
 import { httpJSONRequest } from "../weather";
 import { Geocoder } from "./Geocoder";
 
-export default class GoogleMaps extends Geocoder {
+export default class GoogleMapsGeocoder extends Geocoder {
 	private readonly API_KEY: string;
 
 	public constructor() {

@@ -70,6 +70,7 @@ DARKSKY_API_KEY=<YOUR DARK SKY KEY>
 ```
 WEATHER_PROVIDER=local
 PWS=WU
+LOCAL_PERSISTENCE=true #It's advisable to use this option which logs data to observations.json every 30 minutes and maintains data accross reboots
 ```
 
 * **Step 5d:** If you registered for the Apple WeatherKit API then also add these two lines to the .env file:
@@ -91,7 +92,7 @@ Cut and paste the following lines into the weather.service file:
 Description=OpenSprinkler Weather Server
 
 [Service]
-ExecStart=/usr/bin/npm start
+ExecStart=/usr/local/bin/npm start
 WorkingDirectory=/home/pi/weather
 Restart=always
 RestartSec=10

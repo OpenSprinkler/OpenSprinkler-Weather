@@ -52,4 +52,6 @@ export interface AdjustmentOptions {
 	pws?: string;
 	/** The API key to use to access PWS data. */
 	key?: string;
+	/** The provider selected using the UI. */
+	provider?: string;
 }

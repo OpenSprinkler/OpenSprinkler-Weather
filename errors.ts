@@ -36,6 +36,9 @@ export enum ErrorCode {
 	/** A PWS is required by the WeatherProvider but was not provided. */
 	NoPwsProvided = 34,
 
+	/** API key is not provided to a weather service provider that requires API key */
+	NoAPIKeyProvided = 35,
+
 	/** An error related to AdjustmentMethods or watering restrictions. */
 	AdjustmentMethodError = 4,
 	/** The WeatherProvider is incompatible with the specified AdjustmentMethod. */
