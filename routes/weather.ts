@@ -213,7 +213,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 	const timeData: TimeData = getTimeData( coordinates );
 	let weatherData: WeatherData;
 	try {
-		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates );
+		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates, pws );
 	} catch ( err ) {
 		res.send( "Error: " + err );
 		return;
@@ -296,9 +296,17 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 
 		pws = { id: pwsId, apiKey: apiKey };
+	} else if ( adjustmentOptions.key ){
+		pws = {apiKey: adjustmentOptions.key};
 	}
 
-	const weatherProvider = pws ? PWS_WEATHER_PROVIDER : WEATHER_PROVIDER;
+    let weatherProvider: WeatherProvider;
+	if( pws && pws.id ){
+		weatherProvider = PWS_WEATHER_PROVIDER;
+	}else{
+		const provider: string = adjustmentOptions.provider;
+  		  weatherProvider = WEATHER_PROVIDERS[provider] || WEATHER_PROVIDER;
+	}
 
 	const data = {
 		scale:		undefined,
