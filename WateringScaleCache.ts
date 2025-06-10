@@ -1,9 +1,9 @@
-import * as NodeCache from "node-cache";
+import NodeCache from "node-cache";
 import { GeoCoordinates, PWS } from "./types";
 import { AdjustmentOptions } from "./routes/adjustmentMethods/AdjustmentMethod";
-import * as moment from "moment-timezone";
-import * as geoTZ from "geo-tz";
-import { Moment } from "moment-timezone/moment-timezone";
+import geoTZ from "geo-tz";
+import { TZDate } from "@date-fns/tz";
+import { endOfDay, getUnixTime } from "date-fns";
 
 export default class WateringScaleCache {
 	private readonly cache: NodeCache = new NodeCache();
@@ -27,8 +27,8 @@ export default class WateringScaleCache {
 		wateringScale: CachedScale
 	): void {
 		// The end of the day in the controller's timezone.
-		const expirationDate: Moment = moment().tz( geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).endOf( "day" );
-		const ttl: number = ( expirationDate.unix() - moment().unix() );
+        const expirationDate: TZDate = endOfDay(new TZDate(new Date(), geoTZ.find(coordinates[0], coordinates[1])[0]));
+		const ttl: number = getUnixTime(expirationDate) - getUnixTime(new Date());
 		const key = this.makeKey( adjustmentMethodId, coordinates, pws, adjustmentOptions );
 		this.cache.set( key, wateringScale, ttl );
 	}

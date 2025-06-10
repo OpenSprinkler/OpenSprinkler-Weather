@@ -1,5 +1,4 @@
-import * as moment from "moment-timezone";
-import * as jwt from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 
 import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
 import { httpJSONRequest } from "../weather";

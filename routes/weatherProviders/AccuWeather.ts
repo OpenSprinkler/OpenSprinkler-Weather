@@ -1,5 +1,3 @@
-import * as moment from "moment-timezone";
-
 import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
 import { httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
@@ -145,6 +143,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		}
 
 		// The Unix epoch seconds timestamp of 24 hours ago.
+
 		const timestamp: number = moment().subtract( 1, "day" ).unix();
 
 		const ACCUWEATHER_API_KEY = process.env.ACCUWEATHER_API_KEY,

@@ -1,9 +1,8 @@
-import * as express from "express";
-import * as http from "http";
-import * as https from "https";
-import * as SunCalc from "suncalc";
-import * as moment from "moment-timezone";
-import * as geoTZ from "geo-tz";
+import express from "express";
+import http from "http";
+import https from "https";
+import SunCalc from "suncalc";
+import geoTZ from "geo-tz";
 
 import { BaseWateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
@@ -26,25 +25,27 @@ import PirateWeatherWeatherProvider from "./weatherProviders/PirateWeather";
 import GoogleMapsGeocoder from "./geocoders/GoogleMaps";
 import WUndergroundGeocoder from "./geocoders/WUnderground";
 
-const WEATHER_PROVIDERS: {[name: string]: WeatherProvider} = {
-    "Apple": new AppleWeatherProvider(),
-    "AccuWeather": new AccuWeatherWeatherProvider(),
-    "DWD": new DWDWeatherProvider(),
-    "local": new LocalWeatherProvider(),
-    "OpenMeteo": new OpenMeteoWeatherProvider(),
-    "OWM": new OWMWeatherProvider(),
-    "PirateWeather": new PirateWeatherWeatherProvider(),
-    "WUnderground": new WUndergroundWeatherProvider(),
+type ClassType<T = any> = new (...args: any[]) => T;
+
+const WEATHER_PROVIDERS: {[name: string]: ClassType<WeatherProvider>} = {
+    "Apple": AppleWeatherProvider,
+    "AccuWeather": AccuWeatherWeatherProvider,
+    "DWD": DWDWeatherProvider,
+    "local": LocalWeatherProvider,
+    "OpenMeteo": OpenMeteoWeatherProvider,
+    "OWM": OWMWeatherProvider,
+    "PirateWeather": PirateWeatherWeatherProvider,
+    "WUnderground": WUndergroundWeatherProvider,
 };
 
-const GEOCODERS: {[name: string]: Geocoder} = {
-    "GoogleMaps": new GoogleMapsGeocoder(),
-    "WUnderground": new WUndergroundGeocoder(),
+const GEOCODERS: {[name: string]: ClassType<Geocoder>} = {
+    "GoogleMaps": GoogleMapsGeocoder,
+    "WUnderground": WUndergroundGeocoder,
 };
 
-const WEATHER_PROVIDER: WeatherProvider = WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["OWM"];
-const PWS_WEATHER_PROVIDER: WeatherProvider = WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["WUnderground"];
-const GEOCODER: Geocoder = GEOCODERS[process.env.GEOCODER] || GEOCODERS["WUnderground"];
+const WEATHER_PROVIDER: WeatherProvider = new (WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["OWM"]);
+const PWS_WEATHER_PROVIDER: WeatherProvider = new (WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["WUnderground"]);
+const GEOCODER: Geocoder = new (GEOCODERS[process.env.GEOCODER] || GEOCODERS["WUnderground"]);
 
 // Define regex filters to match against location
 const filters = {

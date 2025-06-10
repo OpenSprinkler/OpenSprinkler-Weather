@@ -1,8 +1,8 @@
 /* This script requires the file Baseline_ETo_Data.bin file to be created in the baselineEToData directory. More
  * information about this is available in /baselineEToData/README.md.
  */
-import * as express from "express";
-import * as fs from "fs";
+import express from "express";
+import fs from "fs";
 import { GeoCoordinates } from "../types";
 import { getParameter, resolveCoordinates } from "./weather";
 

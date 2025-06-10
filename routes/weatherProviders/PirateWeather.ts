@@ -1,5 +1,3 @@
-import * as moment from "moment-timezone";
-
 import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
 import { httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";

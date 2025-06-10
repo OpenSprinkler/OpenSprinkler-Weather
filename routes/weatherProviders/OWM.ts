@@ -2,8 +2,7 @@ import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../t
 import { httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
-import * as moment from "moment";
-import * as geoTZ from "geo-tz";
+import geoTZ from "geo-tz";
 import { CodedError, ErrorCode } from "../../errors";
 
 export default class OWMWeatherProvider extends WeatherProvider {

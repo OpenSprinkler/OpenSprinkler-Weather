@@ -1,9 +1,9 @@
-import * as SunCalc from "suncalc";
-import * as moment from "moment";
+import SunCalc from "suncalc";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./AdjustmentMethod";
 import { BaseWateringData, GeoCoordinates, PWS } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
+import { fromUnixTime, getDayOfYear } from "date-fns";
 
 
 /**
@@ -112,7 +112,7 @@ export function calculateETo( etoData: EToData, elevation: number, coordinates: 
 
 	const actualVaporPressure = ( minSaturationVaporPressure * etoData.maxHumidity / 100 + maxSaturationVaporPressure * etoData.minHumidity / 100 ) / 2;
 
-	const dayOfYear = moment.unix( etoData.periodStartTime ).dayOfYear();
+	const dayOfYear = getDayOfYear(fromUnixTime(etoData.periodStartTime));
 
 	const inverseRelativeEarthSunDistance = 1 + 0.033 * Math.cos( 2 * Math.PI / 365 * dayOfYear );
 

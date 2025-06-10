@@ -1,5 +1,4 @@
-import * as moment from "moment-timezone";
-import * as geoTZ from "geo-tz";
+import geoTZ from "geo-tz";
 
 import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
 import { httpJSONRequest } from "../weather";

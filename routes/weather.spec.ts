@@ -1,8 +1,8 @@
 import { expect } from 'chai';
-import * as nock from 'nock';
-import * as MockExpressRequest from 'mock-express-request';
-import * as MockExpressResponse from 'mock-express-response';
-import * as MockDate from 'mockdate';
+import nock from 'nock';
+import MockExpressRequest from 'mock-express-request';
+import MockExpressResponse from 'mock-express-response';
+import MockDate from 'mockdate';
 
 // The tests don't use OWM, but the WeatherProvider API key must be set to prevent an error from being thrown on startup.
 process.env.WEATHER_PROVIDER = "OWM";
