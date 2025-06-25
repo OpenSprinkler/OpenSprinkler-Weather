@@ -127,9 +127,9 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData[] > {
 		// The Unix timestamp of 24 hours ago.
-		const yesterdayTimestamp: string = moment().subtract( 1, "day" ).toISOString();
+		const yesterdayTimestamp: string = moment().subtract( 240, "hours" ).toISOString();
 
         const yesterdayUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${yesterdayTimestamp}&dailyStart=${yesterdayTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
 
@@ -140,40 +140,60 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
-		const cloudCoverInfo: CloudCoverInfo[] = historicData.forecastHourly.hours.map( ( hour ): CloudCoverInfo => {
-			return {
-				startTime: moment( hour.forecastStart ),
-				endTime: moment( hour.forecastStart ).add( 1, "hours" ),
-				cloudCover: hour.cloudCover
-			};
-		} );
+		const hours = historicData.forecastHourly.hours;
+		const days = historicData.forecastDaily.days;
 
-		let minHumidity: number = undefined, maxHumidity: number = undefined;
-		for ( const hour of historicData.forecastHourly.hours ) {
-			// Skip hours where humidity measurement does not exist to prevent result from being NaN.
-			if ( hour.humidity === undefined ) {
-				continue;
-			}
-
-			// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-			minHumidity = minHumidity < hour.humidity ? minHumidity : hour.humidity;
-			maxHumidity = maxHumidity > hour.humidity ? maxHumidity : hour.humidity;
+		// Cut hours down into full 24 hour sections
+		hours.splice(0, hours.length % 24);
+		const daysInHours = [];
+		for ( let i = 0; i < hours.length; i+=24 ){
+			daysInHours.push(hours.slice(i, i+24));
 		}
 
-		let windSpeed = ( historicData.forecastDaily.days[ 0 ].daytimeForecast.windSpeed + historicData.forecastDaily.days[ 0 ].overnightForecast.windSpeed ) / 2;
+		// Cut days down to match number of hours
+		days.splice(0, days.length - daysInHours.length)
 
-		return {
-			weatherProvider: "Apple",
-			periodStartTime: moment(historicData.forecastHourly.hours[ 0 ].forecastStart).unix(),
-			minTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ 0 ].temperatureMin ),
-			maxTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ 0 ].temperatureMax ),
-			minHumidity: minHumidity * 100,
-			maxHumidity: maxHumidity * 100,
-			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
-			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: this.kphToMph( windSpeed ),
-			precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ 0 ].precipitationAmount || 0 )
-		};
+		// Pull data for each day of the given interval
+		const data = [];
+		for ( let i = 0; i < daysInHours.length; i++ ){
+			const cloudCoverInfo: CloudCoverInfo[] = daysInHours[i].map( ( hour ): CloudCoverInfo => {
+				return {
+					startTime: moment( hour.forecastStart ),
+					endTime: moment( hour.forecastStart ).add( 1, "hours" ),
+					cloudCover: hour.cloudCover
+				};
+			} );
+
+			let minHumidity: number = undefined, maxHumidity: number = undefined;
+			for ( const hour of daysInHours[i] ) {
+				// Skip hours where humidity measurement does not exist to prevent result from being NaN.
+				if ( hour.humidity === undefined ) {
+					continue;
+				}
+
+				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
+				minHumidity = minHumidity < hour.humidity ? minHumidity : hour.humidity;
+				maxHumidity = maxHumidity > hour.humidity ? maxHumidity : hour.humidity;
+			}
+
+			let windSpeed = ( days[i].daytimeForecast.windSpeed + days[i].overnightForecast.windSpeed ) / 2;
+
+			data.push({
+				weatherProvider: "Apple",
+				periodStartTime: moment(historicData.forecastHourly.hours[ 0 ].forecastStart).unix(),
+				minTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ 0 ].temperatureMin ),
+				maxTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ 0 ].temperatureMax ),
+				minHumidity: minHumidity * 100,
+				maxHumidity: maxHumidity * 100,
+				solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
+				// Assume wind speed measurements are taken at 2 meters.
+				windSpeed: this.kphToMph( windSpeed ),
+				precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ 0 ].precipitationAmount || 0 )
+			})
+		}
+
+		return data;
+
 	}
 
 	public shouldCacheWateringScale(): boolean {

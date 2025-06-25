@@ -166,85 +166,85 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
-		// The Unix epoch seconds timestamp of 24 hours ago.
-		//const timestamp: number = moment().subtract( 1, "day" ).unix();
+	// public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+	// 	// The Unix epoch seconds timestamp of 24 hours ago.
+	// 	//const timestamp: number = moment().subtract( 1, "day" ).unix();
 
-		//const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
-		//	historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}`;
+	// 	//const DARKSKY_API_KEY = process.env.DARKSKY_API_KEY,
+	// 	//	historicUrl = `https://api.darksky.net/forecast/${DARKSKY_API_KEY}/${coordinates[0]},${coordinates[1]},${timestamp}`;
 
-		//console.log("DWD getEToData request for coordinates: %s", coordinates);
-		const timestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD");
-		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ timestamp }`;
+	// 	//console.log("DWD getEToData request for coordinates: %s", coordinates);
+	// 	const timestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD");
+	// 	const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ timestamp }`;
 
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl );
-		} catch (err) {
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
+	// 	let historicData;
+	// 	try {
+	// 		historicData = await httpJSONRequest( historicUrl );
+	// 	} catch (err) {
+	// 		throw new CodedError( ErrorCode.WeatherApiError );
+	// 	}
 
-		if ( !historicData || !historicData.weather ) {
-			throw "Necessary field(s) were missing from weather information returned by Bright Sky.";
-		}
+	// 	if ( !historicData || !historicData.weather ) {
+	// 		throw "Necessary field(s) were missing from weather information returned by Bright Sky.";
+	// 	}
 
-		const cloudCoverInfo: CloudCoverInfo[] = historicData.weather.map( ( hour ): CloudCoverInfo => {
+	// 	const cloudCoverInfo: CloudCoverInfo[] = historicData.weather.map( ( hour ): CloudCoverInfo => {
 
-			const result : CloudCoverInfo = {
-				startTime: moment( hour.timestamp ),
-				endTime: moment( hour.timestamp ).add( 1, "hours" ),
-				cloudCover: hour.cloud_cover / 100.0,
-			};
-			//console.log("CloudCoverInfo: %s", result);
-			return result;
-		} );
+	// 		const result : CloudCoverInfo = {
+	// 			startTime: moment( hour.timestamp ),
+	// 			endTime: moment( hour.timestamp ).add( 1, "hours" ),
+	// 			cloudCover: hour.cloud_cover / 100.0,
+	// 		};
+	// 		//console.log("CloudCoverInfo: %s", result);
+	// 		return result;
+	// 	} );
 
 
-		let minHumidity: number = undefined, maxHumidity: number = undefined;
-		let minTemp: number = undefined, maxTemp: number = undefined, precip: number = 0;
-		let wind: number = 0;
-		for ( const hour of historicData.weather ) {
+	// 	let minHumidity: number = undefined, maxHumidity: number = undefined;
+	// 	let minTemp: number = undefined, maxTemp: number = undefined, precip: number = 0;
+	// 	let wind: number = 0;
+	// 	for ( const hour of historicData.weather ) {
 
-			minTemp = minTemp < hour.temperature ? minTemp : hour.temperature;
-			maxTemp = maxTemp > hour.temperature ? maxTemp : hour.temperature;
+	// 		minTemp = minTemp < hour.temperature ? minTemp : hour.temperature;
+	// 		maxTemp = maxTemp > hour.temperature ? maxTemp : hour.temperature;
 
-			precip += hour.precipitation;
-			wind += hour.wind_speed;
+	// 		precip += hour.precipitation;
+	// 		wind += hour.wind_speed;
 
-			// Skip hours where humidity measurement does not exist to prevent result from being NaN.
+	// 		// Skip hours where humidity measurement does not exist to prevent result from being NaN.
 
-			if ( hour.relative_humidity === undefined || hour.relative_humidity === null) {
-				continue;
-			}
+	// 		if ( hour.relative_humidity === undefined || hour.relative_humidity === null) {
+	// 			continue;
+	// 		}
 
-			// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-			minHumidity = minHumidity < hour.relative_humidity ? minHumidity : hour.relative_humidity;
-			maxHumidity = maxHumidity > hour.relative_humidity ? maxHumidity : hour.relative_humidity;
-		}
+	// 		// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
+	// 		minHumidity = minHumidity < hour.relative_humidity ? minHumidity : hour.relative_humidity;
+	// 		maxHumidity = maxHumidity > hour.relative_humidity ? maxHumidity : hour.relative_humidity;
+	// 	}
 
-		let solar = approximateSolarRadiation( cloudCoverInfo, coordinates );
+	// 	let solar = approximateSolarRadiation( cloudCoverInfo, coordinates );
 
-		const result : EToData = {
-			weatherProvider: "DWD",
-			periodStartTime: moment( historicData.weather[ 0 ].timestamp).unix(), //"2022-05-02T21:30:00+00:00"
-			minTemp: this.C2F(minTemp),
-			maxTemp: this.C2F(maxTemp),
-			minHumidity: minHumidity,
-			maxHumidity: maxHumidity,
-			solarRadiation: solar,
-			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: this.kmh2mph(wind / historicData.weather.length),
-			precip: this.mm2inch(precip),
-		}
-		console.log("DWD 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s",
-			precip.toPrecision(3),
-			solar.toPrecision(3),
-			minTemp, maxTemp, minHumidity, maxHumidity, wind / historicData.weather.length);
-		if ( minTemp === undefined || maxTemp === undefined || minHumidity === undefined || maxHumidity === undefined || solar === undefined || wind === undefined || precip === undefined ) {
-			throw "Information missing from BrightSky.";
-		}
-		return result;
-	}
+	// 	const result : EToData = {
+	// 		weatherProvider: "DWD",
+	// 		periodStartTime: moment( historicData.weather[ 0 ].timestamp).unix(), //"2022-05-02T21:30:00+00:00"
+	// 		minTemp: this.C2F(minTemp),
+	// 		maxTemp: this.C2F(maxTemp),
+	// 		minHumidity: minHumidity,
+	// 		maxHumidity: maxHumidity,
+	// 		solarRadiation: solar,
+	// 		// Assume wind speed measurements are taken at 2 meters.
+	// 		windSpeed: this.kmh2mph(wind / historicData.weather.length),
+	// 		precip: this.mm2inch(precip),
+	// 	}
+	// 	console.log("DWD 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s",
+	// 		precip.toPrecision(3),
+	// 		solar.toPrecision(3),
+	// 		minTemp, maxTemp, minHumidity, maxHumidity, wind / historicData.weather.length);
+	// 	if ( minTemp === undefined || maxTemp === undefined || minHumidity === undefined || maxHumidity === undefined || solar === undefined || wind === undefined || precip === undefined ) {
+	// 		throw "Information missing from BrightSky.";
+	// 	}
+	// 	return result;
+	// }
 
 	public shouldCacheWateringScale(): boolean {
 		return false;

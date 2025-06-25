@@ -117,70 +117,70 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData > {
-		// The Unix epoch seconds timestamp of 24 hours ago.
-		const timestamp: number = moment().subtract( 1, "day" ).unix();
+	// public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData > {
+	// 	// The Unix epoch seconds timestamp of 24 hours ago.
+	// 	const timestamp: number = moment().subtract( 1, "day" ).unix();
 
-		const localKey = keyToUse(this.API_KEY, pws);
+	// 	const localKey = keyToUse(this.API_KEY, pws);
 
-		const historicUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[0] },${ coordinates[1] },${ timestamp }?units=us&exclude=currently,minutely,alerts`;
+	// 	const historicUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[0] },${ coordinates[1] },${ timestamp }?units=us&exclude=currently,minutely,alerts`;
 
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl );
-		} catch (err) {
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
+	// 	let historicData;
+	// 	try {
+	// 		historicData = await httpJSONRequest( historicUrl );
+	// 	} catch (err) {
+	// 		throw new CodedError( ErrorCode.WeatherApiError );
+	// 	}
 
-		let samples = [
-			...historicData.hourly.data
-		];
+	// 	let samples = [
+	// 		...historicData.hourly.data
+	// 	];
 
-		//Fail if not enough data is available
-		if( samples.length < 24 ){
-			throw new CodedError( ErrorCode.InsufficientWeatherData );
-		}
+	// 	//Fail if not enough data is available
+	// 	if( samples.length < 24 ){
+	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
+	// 	}
 
-		//Cut down to the first 24 hours (historical portion)
-		samples = samples.slice(0,24);
+	// 	//Cut down to the first 24 hours (historical portion)
+	// 	samples = samples.slice(0,24);
 
-		const cloudCoverInfo: CloudCoverInfo[] = samples.map( ( hour ): CloudCoverInfo => {
-			return {
-				startTime: moment.unix( hour.time ),
-				endTime: moment.unix( hour.time ).add( 1, "hours" ),
-				cloudCover: hour.cloudCover
-			};
-		} );
+	// 	const cloudCoverInfo: CloudCoverInfo[] = samples.map( ( hour ): CloudCoverInfo => {
+	// 		return {
+	// 			startTime: moment.unix( hour.time ),
+	// 			endTime: moment.unix( hour.time ).add( 1, "hours" ),
+	// 			cloudCover: hour.cloudCover
+	// 		};
+	// 	} );
 
-		let minHumidity: number = undefined, maxHumidity: number = undefined, totalPrecip: number = 0;
-		for ( const hour of samples ) {
-			// Skip hours where humidity measurement does not exist to prevent result from being NaN.
-			if ( hour.humidity !== undefined ) {
-				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-				minHumidity = minHumidity < hour.humidity ? minHumidity : hour.humidity;
-				maxHumidity = maxHumidity > hour.humidity ? maxHumidity : hour.humidity;
-			}
+	// 	let minHumidity: number = undefined, maxHumidity: number = undefined, totalPrecip: number = 0;
+	// 	for ( const hour of samples ) {
+	// 		// Skip hours where humidity measurement does not exist to prevent result from being NaN.
+	// 		if ( hour.humidity !== undefined ) {
+	// 			// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
+	// 			minHumidity = minHumidity < hour.humidity ? minHumidity : hour.humidity;
+	// 			maxHumidity = maxHumidity > hour.humidity ? maxHumidity : hour.humidity;
+	// 		}
 
-			// Skip hours where precipitation measurement does not exist to prevent result from being NaN.
-			if ( hour.precipAccumulation !== undefined ) {
-				totalPrecip += hour.precipAccumulation;
-			}
+	// 		// Skip hours where precipitation measurement does not exist to prevent result from being NaN.
+	// 		if ( hour.precipAccumulation !== undefined ) {
+	// 			totalPrecip += hour.precipAccumulation;
+	// 		}
 
-		}
+	// 	}
 
-		return {
-			weatherProvider: "PW",
-			periodStartTime: historicData.hourly.data[ 0 ].time,
-			minTemp: historicData.daily.data[ 0 ].temperatureMin,
-			maxTemp: historicData.daily.data[ 0 ].temperatureMax,
-			minHumidity: minHumidity * 100,
-			maxHumidity: maxHumidity * 100,
-			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
-			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: historicData.daily.data[ 0 ].windSpeed,
-			precip: totalPrecip
-		};
-	}
+	// 	return {
+	// 		weatherProvider: "PW",
+	// 		periodStartTime: historicData.hourly.data[ 0 ].time,
+	// 		minTemp: historicData.daily.data[ 0 ].temperatureMin,
+	// 		maxTemp: historicData.daily.data[ 0 ].temperatureMax,
+	// 		minHumidity: minHumidity * 100,
+	// 		maxHumidity: maxHumidity * 100,
+	// 		solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
+	// 		// Assume wind speed measurements are taken at 2 meters.
+	// 		windSpeed: historicData.daily.data[ 0 ].windSpeed,
+	// 		precip: totalPrecip
+	// 	};
+	// }
 
 	public shouldCacheWateringScale(): boolean {
 		return true;

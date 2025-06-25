@@ -32,7 +32,7 @@ async function calculateEToWateringScale(
 	 */
 
 	// This will throw a CodedError if ETo data cannot be retrieved.
-	const etoData: EToData = await weatherProvider.getEToData( coordinates, pws );
+	const etoData: EToData[] = await weatherProvider.getEToData( coordinates, pws );
 
 	let baseETo: number;
 	// Default elevation is based on data from https://www.pnas.org/content/95/24/14009.
@@ -48,23 +48,28 @@ async function calculateEToWateringScale(
 		elevation = adjustmentOptions.elevation;
 	}
 
-	const eto: number = calculateETo( etoData, elevation, coordinates );
+	const etos = [];
+	for ( let i=0; i < etoData.length; i++ ){
+		etos.push( calculateETo( etoData[i], elevation, coordinates ) );
+	}
 
-	const scale =  Math.floor( Math.min( Math.max( 0, ( eto - etoData.precip ) / baseETo * 100 ), 200 ) );
+	// Compute scale for most recent day for old firmware
+	const scale =  Math.floor( Math.min( Math.max( 0, ( etos[etos.length-1] - etoData[etoData.length-1].precip ) / baseETo * 100 ), 200 ) );
 	return {
 		scale: scale,
 		rawData: {
-			wp: etoData.weatherProvider,
-			eto: Math.round( eto * 1000) / 1000,
-			radiation: Math.round( etoData.solarRadiation * 100) / 100,
-			minT: Math.round( etoData.minTemp ),
-			maxT: Math.round( etoData.maxTemp ),
-			minH: Math.round( etoData.minHumidity ),
-			maxH: Math.round( etoData.maxHumidity ),
-			wind: Math.round( etoData.windSpeed * 10 ) / 10,
-			p: Math.round( etoData.precip * 100 ) / 100
+			wp: etoData[etoData.length-1].weatherProvider,
+			eto: Math.round( etos[etos.length-1] * 1000) / 1000,
+			radiation: Math.round( etoData[etoData.length-1].solarRadiation * 100) / 100,
+			minT: Math.round( etoData[etoData.length-1].minTemp ),
+			maxT: Math.round( etoData[etoData.length-1].maxTemp ),
+			minH: Math.round( etoData[etoData.length-1].minHumidity ),
+			maxH: Math.round( etoData[etoData.length-1].maxHumidity ),
+			wind: Math.round( etoData[etoData.length-1].windSpeed * 10 ) / 10,
+			p: Math.round( etoData[etoData.length-1].precip * 100 ) / 100
 		},
-		wateringData: etoData
+		wateringData: etoData[etoData.length-1],
+		etos: etos
 	}
 }
 

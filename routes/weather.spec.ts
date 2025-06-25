@@ -90,14 +90,22 @@ export class MockWeatherProvider extends WeatherProvider {
         return await this.getData( "weatherData" ) as WeatherData;
     }
 
-    public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
-        return await this.getData( "etoData" ) as EToData;
+    public async getEToData( coordinates: GeoCoordinates ): Promise< EToData[] > {
+        return await this.getData( "etoData" ) as EToData[];
     }
 
     private async getData( type: "wateringData" | "weatherData" | "etoData" ) {
         const data = this.mockData[ type ];
-        if ( !data.weatherProvider ) {
-            data.weatherProvider = "mock";
+        if (data instanceof Array) {
+            data.forEach((e) => {
+                if ( !e.weatherProvider ) {
+                    e.weatherProvider = "mock";
+                }
+            });
+        } else {
+            if ( !data.weatherProvider ) {
+                data.weatherProvider = "mock";
+            }
         }
 
         return data;
@@ -107,5 +115,5 @@ export class MockWeatherProvider extends WeatherProvider {
 interface MockWeatherData {
     wateringData?: ZimmermanWateringData,
     weatherData?: WeatherData,
-    etoData?: EToData
+    etoData?: EToData[]
 }

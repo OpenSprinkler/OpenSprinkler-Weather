@@ -131,85 +131,85 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData > {
+	// public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData > {
 
-		const localKey = keyToUse(this.API_KEY, pws);
+	// 	const localKey = keyToUse(this.API_KEY, pws);
 
-		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
+	// 	const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
 
-		let locationData;
-		try {
-			locationData = await httpJSONRequest( locationUrl );
-		} catch ( err ) {
-			console.error( "Error retrieving location information from AccuWeather:", err );
-		}
+	// 	let locationData;
+	// 	try {
+	// 		locationData = await httpJSONRequest( locationUrl );
+	// 	} catch ( err ) {
+	// 		console.error( "Error retrieving location information from AccuWeather:", err );
+	// 	}
 
-		// The Unix epoch seconds timestamp of 24 hours ago.
-		const timestamp: number = moment().subtract( 1, "day" ).unix();
+	// 	// The Unix epoch seconds timestamp of 24 hours ago.
+	// 	const timestamp: number = moment().subtract( 1, "day" ).unix();
 
-		const ACCUWEATHER_API_KEY = process.env.ACCUWEATHER_API_KEY,
-			historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
+	// 	const ACCUWEATHER_API_KEY = process.env.ACCUWEATHER_API_KEY,
+	// 		historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
 
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl );
-		} catch (err) {
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
+	// 	let historicData;
+	// 	try {
+	// 		historicData = await httpJSONRequest( historicUrl );
+	// 	} catch (err) {
+	// 		throw new CodedError( ErrorCode.WeatherApiError );
+	// 	}
 
-		const cloudCoverInfo: CloudCoverInfo[] = historicData.map( ( hour ): CloudCoverInfo => {
-			//return empty interval if measurement does not exist
-			if(hour.CloudCover === undefined ){
-				return {
-					startTime: moment.unix( hour.EpochTime ),
-					endTime: moment.unix( hour.EpochTime ),
-					cloudCover: 0
-				}
-			}
-			return {
-				startTime: moment.unix( hour.EpochTime ),
-				endTime: moment.unix( hour.EpochTime ).add( 1, "hours" ),
-				cloudCover: hour.CloudCover / 100
-			};
-		} );
+	// 	const cloudCoverInfo: CloudCoverInfo[] = historicData.map( ( hour ): CloudCoverInfo => {
+	// 		//return empty interval if measurement does not exist
+	// 		if(hour.CloudCover === undefined ){
+	// 			return {
+	// 				startTime: moment.unix( hour.EpochTime ),
+	// 				endTime: moment.unix( hour.EpochTime ),
+	// 				cloudCover: 0
+	// 			}
+	// 		}
+	// 		return {
+	// 			startTime: moment.unix( hour.EpochTime ),
+	// 			endTime: moment.unix( hour.EpochTime ).add( 1, "hours" ),
+	// 			cloudCover: hour.CloudCover / 100
+	// 		};
+	// 	} );
 
 
-		let minHumidity: number = undefined, maxHumidity: number = undefined, avgWindSpeed: number = 0, precip: number = 0,
-		minTemp: number = undefined, maxTemp: number = undefined;
-		for ( const hour of historicData ) {
-			// Skip hours where humidity measurement does not exist to prevent result from being NaN.
-			if ( hour.RelativeHumidity !== undefined ) {
-				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-				minHumidity = minHumidity < hour.RelativeHumidity ? minHumidity : hour.RelativeHumidity;
-				maxHumidity = maxHumidity > hour.RelativeHumidity ? maxHumidity : hour.RelativeHumidity;
-			}
+	// 	let minHumidity: number = undefined, maxHumidity: number = undefined, avgWindSpeed: number = 0, precip: number = 0,
+	// 	minTemp: number = undefined, maxTemp: number = undefined;
+	// 	for ( const hour of historicData ) {
+	// 		// Skip hours where humidity measurement does not exist to prevent result from being NaN.
+	// 		if ( hour.RelativeHumidity !== undefined ) {
+	// 			// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
+	// 			minHumidity = minHumidity < hour.RelativeHumidity ? minHumidity : hour.RelativeHumidity;
+	// 			maxHumidity = maxHumidity > hour.RelativeHumidity ? maxHumidity : hour.RelativeHumidity;
+	// 		}
 
-			//Skip hours where temperature does not exist to prevent result from being NaN.
-			if ( hour.Temperature.Imperial.Value !== undefined ) {
-				minTemp = minTemp < hour.Temperature.Imperial.Value ? minTemp : hour.Temperature.Imperial.Value;
-				maxTemp = maxTemp > hour.Temperature.Imperial.Value ? maxTemp : hour.Temperature.Imperial.Value;
-			}
+	// 		//Skip hours where temperature does not exist to prevent result from being NaN.
+	// 		if ( hour.Temperature.Imperial.Value !== undefined ) {
+	// 			minTemp = minTemp < hour.Temperature.Imperial.Value ? minTemp : hour.Temperature.Imperial.Value;
+	// 			maxTemp = maxTemp > hour.Temperature.Imperial.Value ? maxTemp : hour.Temperature.Imperial.Value;
+	// 		}
 
-			avgWindSpeed += hour.Wind.Speed.Imperial.Value || 0;
+	// 		avgWindSpeed += hour.Wind.Speed.Imperial.Value || 0;
 
-			precip += hour.Precip1hr.Imperial.Value || 0;
-		}
+	// 		precip += hour.Precip1hr.Imperial.Value || 0;
+	// 	}
 
-		avgWindSpeed = avgWindSpeed / historicData.length;
+	// 	avgWindSpeed = avgWindSpeed / historicData.length;
 
-		return {
-			weatherProvider: "AW",
-			periodStartTime: historicData[0].EpochTime,
-			minTemp: minTemp,
-			maxTemp: maxTemp,
-			minHumidity: minHumidity,
-			maxHumidity: maxHumidity,
-			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
-			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: avgWindSpeed,
-			precip: precip
-		};
-	}
+	// 	return {
+	// 		weatherProvider: "AW",
+	// 		periodStartTime: historicData[0].EpochTime,
+	// 		minTemp: minTemp,
+	// 		maxTemp: maxTemp,
+	// 		minHumidity: minHumidity,
+	// 		maxHumidity: maxHumidity,
+	// 		solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
+	// 		// Assume wind speed measurements are taken at 2 meters.
+	// 		windSpeed: avgWindSpeed,
+	// 		precip: precip
+	// 	};
+	// }
 
 	public shouldCacheWateringScale(): boolean {
 		return true;

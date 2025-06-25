@@ -66,4 +66,5 @@ export interface CachedScale {
 	scale: number;
 	rawData: object;
 	rainDelay: number;
+	etos: number[];
 }

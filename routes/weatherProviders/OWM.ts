@@ -109,70 +109,70 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	async getEToData(coordinates: GeoCoordinates, pws?: PWS): Promise<EToData> {
+	// async getEToData(coordinates: GeoCoordinates, pws?: PWS): Promise<EToData> {
 
-		const localKey = keyToUse(this.API_KEY, pws);
+	// 	const localKey = keyToUse(this.API_KEY, pws);
 
-		// The OWM API changed what you get on the free subscription so need to adjust the call and translate the data.
-		//Get previous date by using UTC
-		const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
-		let time = Date.now();
-		time -= (86400000 + timezone * 3600);
-		const date = new Date(time);
-		let day = this.pad(date.getUTCDate());
-		let month = this.pad(date.getUTCMonth() + 1);
+	// 	// The OWM API changed what you get on the free subscription so need to adjust the call and translate the data.
+	// 	//Get previous date by using UTC
+	// 	const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
+	// 	let time = Date.now();
+	// 	time -= (86400000 + timezone * 3600);
+	// 	const date = new Date(time);
+	// 	let day = this.pad(date.getUTCDate());
+	// 	let month = this.pad(date.getUTCMonth() + 1);
 
-		const historicUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${date.getUTCFullYear()}-${month}-${day}`;
-		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ localKey }`;
+	// 	const historicUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${date.getUTCFullYear()}-${month}-${day}`;
+	// 	const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ localKey }`;
 
 
-		// Perform the HTTP request to retrieve the weather data
-		let historicData, todayData;
-		try {
-			historicData = await httpJSONRequest(historicUrl);
-			todayData = await httpJSONRequest(todayUrl);
-		} catch (err) {
-			console.error( "Error retrieving ETo information from OWM:", err );
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
+	// 	// Perform the HTTP request to retrieve the weather data
+	// 	let historicData, todayData;
+	// 	try {
+	// 		historicData = await httpJSONRequest(historicUrl);
+	// 		todayData = await httpJSONRequest(todayUrl);
+	// 	} catch (err) {
+	// 		console.error( "Error retrieving ETo information from OWM:", err );
+	// 		throw new CodedError( ErrorCode.WeatherApiError );
+	// 	}
 
-		// Indicate ETo data could not be retrieved if the forecast data is incomplete.
-		if ( !historicData || !todayData ) {
-			throw new CodedError( ErrorCode.InsufficientWeatherData );
-		}
+	// 	// Indicate ETo data could not be retrieved if the forecast data is incomplete.
+	// 	if ( !historicData || !todayData ) {
+	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
+	// 	}
 
-		let clouds = [historicData.cloud_cover.afternoon, todayData.current.clouds];
+	// 	let clouds = [historicData.cloud_cover.afternoon, todayData.current.clouds];
 
-		const cloudCoverInfo: CloudCoverInfo[] = clouds.map( ( sample ): CloudCoverInfo => {
-			if( sample === undefined ) {
-				return {
-					startTime: moment(),
-					endTime: moment(),
-					cloudCover: 0
-				}
-			}
-			return {
-				startTime: moment(),
-				endTime: moment().add( 1, "hours" ),
-				cloudCover: sample / 100
-			}
-		})
+	// 	const cloudCoverInfo: CloudCoverInfo[] = clouds.map( ( sample ): CloudCoverInfo => {
+	// 		if( sample === undefined ) {
+	// 			return {
+	// 				startTime: moment(),
+	// 				endTime: moment(),
+	// 				cloudCover: 0
+	// 			}
+	// 		}
+	// 		return {
+	// 			startTime: moment(),
+	// 			endTime: moment().add( 1, "hours" ),
+	// 			cloudCover: sample / 100
+	// 		}
+	// 	})
 
-		return {
-			weatherProvider: "OWM",
-			periodStartTime: time,
-			minTemp: historicData.temperature.min,
-			maxTemp: historicData.temperature.max,
-			minHumidity: (historicData.humidity.afternoon < todayData.current.humidity ? historicData.humidity.afternoon : todayData.current.humidity),
-			maxHumidity: (historicData.humidity.afternoon > todayData.current.humidity ? historicData.humidity.afternoon : todayData.current.humidity),
-			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
-			// Assume wind speed measurements are taken at 2 meters.
-			// Use current wind speed as previous day only returns max for the day
-			windSpeed: todayData.current.wind_speed,
-			// OWM always returns precip in mm, so it must be converted.
-			precip: historicData.precipitation.total / 25.4
-		};
-	}
+	// 	return {
+	// 		weatherProvider: "OWM",
+	// 		periodStartTime: time,
+	// 		minTemp: historicData.temperature.min,
+	// 		maxTemp: historicData.temperature.max,
+	// 		minHumidity: (historicData.humidity.afternoon < todayData.current.humidity ? historicData.humidity.afternoon : todayData.current.humidity),
+	// 		maxHumidity: (historicData.humidity.afternoon > todayData.current.humidity ? historicData.humidity.afternoon : todayData.current.humidity),
+	// 		solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
+	// 		// Assume wind speed measurements are taken at 2 meters.
+	// 		// Use current wind speed as previous day only returns max for the day
+	// 		windSpeed: todayData.current.wind_speed,
+	// 		// OWM always returns precip in mm, so it must be converted.
+	// 		precip: historicData.precipitation.total / 25.4
+	// 	};
+	// }
 
 	pad(number: number){
 		return (number<10 ? "0" + number.toString() : number.toString());

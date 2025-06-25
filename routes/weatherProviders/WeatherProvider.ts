@@ -30,10 +30,11 @@ export class WeatherProvider {
 	/**
 	 * Retrieves the data necessary for calculating potential ETo.
 	 * @param coordinates The coordinates to retrieve the data for.
-	 * @return A Promise that will be resolved with the EToData if it is successfully retrieved, or rejected with a
-	 * CodedError if an error occurs while retrieving the EToData (or the WeatherProvider does not support this method).
+	 * @return A Promise that will be resolved with an array of the maximum amount of possible days of EToData according
+	 * to the provider if it is successfully retrieved, or rejected with a CodedError if an error occurs while retrieving
+	 * the EToData (or the WeatherProvider does not support this method).
 	 */
-	getEToData( coordinates: GeoCoordinates, pws?: PWS  ): Promise< EToData > {
+	getEToData( coordinates: GeoCoordinates, pws?: PWS  ): Promise< EToData[] > {
 		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
 	};
 
