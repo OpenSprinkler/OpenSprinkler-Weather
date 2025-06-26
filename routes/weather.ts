@@ -305,7 +305,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		eip:		ipToInt( remoteAddress ),
 		rawData:	undefined,
 		errCode:	0,
-		etos:		undefined
+		scales:		undefined
 	};
 
 	let cachedScale: CachedScale;
@@ -318,7 +318,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		data.scale = cachedScale.scale;
 		data.rawData = cachedScale.rawData;
 		data.rd = cachedScale.rainDelay;
-		data.etos = cachedScale.etos;
+		data.scales = cachedScale.scales;
 	} else {
 		// Calculate the watering scale if it wasn't found in the cache.
 		let adjustmentMethodResponse: AdjustmentMethodResponse;
@@ -334,7 +334,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		data.scale = adjustmentMethodResponse.scale;
 		data.rd = adjustmentMethodResponse.rainDelay;
 		data.rawData = adjustmentMethodResponse.rawData;
-		data.etos = adjustmentMethodResponse.etos;
+		data.scales = adjustmentMethodResponse.scales;
 
 		if ( checkRestrictions ) {
 			let wateringData: BaseWateringData = adjustmentMethodResponse.wateringData;
@@ -360,7 +360,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 				scale: data.scale,
 				rawData: data.rawData,
 				rainDelay: data.rd,
-				etos: data.etos
+				scales: data.scales
 			} );
 		}
 	}

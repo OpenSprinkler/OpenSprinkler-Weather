@@ -45,8 +45,8 @@ export interface AdjustmentMethodResponse {
 	rainDelay?: number;
 	/** The data that was used to calculate the watering scale, or undefined if no data was used. */
 	wateringData: BaseWateringData;
-	/** A list of ETos for multiple day data usage. */
-	etos?: number[];
+	/** A list of scales for multiple day data usage. */
+	scales?: number[];
 }
 
 export interface AdjustmentOptions {

@@ -48,28 +48,44 @@ async function calculateEToWateringScale(
 		elevation = adjustmentOptions.elevation;
 	}
 
-	const etos = [];
-	for ( let i=0; i < etoData.length; i++ ){
-		etos.push( calculateETo( etoData[i], elevation, coordinates ) );
-	}
+	// Calculate eto scores per day
+	const etos = etoData.map(data => calculateETo( data, elevation, coordinates) - data.precip);
+
+	// Flip array so in reverse chronological order
+	// Now the order is index by days going backwards, with 0 index referring to the most recent day of data.
+	etos.reverse();
+
+	// Compute uncapped scales for each score
+	const uncappedScales = etos.map(score => score / baseETo * 100);
+
+	// Compute a rolling average for each scale and cap them to 0-200
+	let sum = 0;
+	let count = 1;
+	const scales = uncappedScales.map(scale => {
+		sum += scale;
+		console.log(sum/count);
+		const result = Math.floor( Math.min( Math.max( 0, sum / count), 200 ) );
+		count ++;
+		return result;
+	});
 
 	// Compute scale for most recent day for old firmware
-	const scale =  Math.floor( Math.min( Math.max( 0, ( etos[etos.length-1] - etoData[etoData.length-1].precip ) / baseETo * 100 ), 200 ) );
+	const scale =  scales[0]
 	return {
 		scale: scale,
 		rawData: {
 			wp: etoData[etoData.length-1].weatherProvider,
 			eto: Math.round( etos[etos.length-1] * 1000) / 1000,
-			radiation: Math.round( etoData[etoData.length-1].solarRadiation * 100) / 100,
-			minT: Math.round( etoData[etoData.length-1].minTemp ),
-			maxT: Math.round( etoData[etoData.length-1].maxTemp ),
-			minH: Math.round( etoData[etoData.length-1].minHumidity ),
-			maxH: Math.round( etoData[etoData.length-1].maxHumidity ),
-			wind: Math.round( etoData[etoData.length-1].windSpeed * 10 ) / 10,
-			p: Math.round( etoData[etoData.length-1].precip * 100 ) / 100
+			radiation: Math.round( etoData[0].solarRadiation * 100) / 100,
+			minT: Math.round( etoData[0].minTemp ),
+			maxT: Math.round( etoData[0].maxTemp ),
+			minH: Math.round( etoData[0].minHumidity ),
+			maxH: Math.round( etoData[0].maxHumidity ),
+			wind: Math.round( etoData[0].windSpeed * 10 ) / 10,
+			p: Math.round( etoData[0].precip * 100 ) / 100
 		},
-		wateringData: etoData[etoData.length-1],
-		etos: etos
+		wateringData: etoData[0],
+		scales: scales
 	}
 }
 
