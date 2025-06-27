@@ -122,68 +122,76 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	// public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
-	// 	//console.log("OM getEToData request for coordinates: %s", coordinates);
+	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData[] > {
 
-	// 	const timestamp: string = moment().subtract( 1, "day" ).format();
-	// 	const timezone = geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
-	// 	const historicUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime&past_days=1`;
-	// 	//console.log(historicUrl);
+		const start: string = moment().subtract( 10, "day" ).format("YYYY-MM-DD");
+		const end: string = moment().subtract( 0, "day" ).format("YYYY-MM-DD");
+		const timezone = geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
+		const historicUrl = `https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime&start_date=${ start }&end_date=${ end }`;
 
-	// 	let historicData;
-	// 	try {
-	// 		historicData = await httpJSONRequest( historicUrl );
-	// 	} catch (err) {
-	// 		throw new CodedError( ErrorCode.WeatherApiError );
-	// 	}
+		let historicData;
+		try {
+			historicData = await httpJSONRequest( historicUrl );
+		} catch (err) {
+			throw new CodedError( ErrorCode.WeatherApiError );
+		}
 
-	// 	if ( !historicData || !historicData.hourly ) {
-	// 		throw "Necessary field(s) were missing from weather information returned by Bright Sky.";
-	// 	}
+		if ( !historicData || !historicData.hourly ) {
+			throw "Necessary field(s) were missing from weather information returned by Bright Sky.";
+		}
 
-	// 	let minHumidity: number = undefined, maxHumidity: number = undefined;
-	// 	let minTemp: number = undefined, maxTemp: number = undefined, precip: number = 0;
-	// 	let wind: number = 0, solar: number = 0;
-	// 	let maxIndex: number = 0;
-	// 	const now: number = moment().unix();
-	// 	for (let index = 0;  index < historicData.hourly.time.length; index++ ) {
-	// 		if (historicData.hourly.time[index] > now)
-	// 		{
-	// 			maxIndex = index-1;
-	// 			break;
-	// 		}
+		const days = Math.floor(historicData.hourly.time.length / 24);
+		const data = [];
 
-	// 		minTemp = minTemp < historicData.hourly.temperature_2m[index] ? minTemp : historicData.hourly.temperature_2m[index];
-	// 		maxTemp = maxTemp > historicData.hourly.temperature_2m[index] ? maxTemp : historicData.hourly.temperature_2m[index];
+		for(let i = 0; i < days; i++){
+			let minHumidity: number = undefined, maxHumidity: number = undefined;
+			let minTemp: number = undefined, maxTemp: number = undefined, precip: number = 0;
+			let wind: number = 0, solar: number = 0;
+			let maxIndex: number = 0;
+			const now: number = moment().unix();
+			for (let index = i*24;  index < ((i+1)*24); index++ ) {
+				if (historicData.hourly.time[index] > now)
+				{
+					maxIndex = index-1;
+					break;
+				}
 
-	// 		precip += historicData.hourly.precipitation[index];
-	// 		if (historicData.hourly.windspeed_10m[index] > wind)
-	// 			wind = historicData.hourly.windspeed_10m[index];
+				minTemp = minTemp < historicData.hourly.temperature_2m[index] ? minTemp : historicData.hourly.temperature_2m[index];
+				maxTemp = maxTemp > historicData.hourly.temperature_2m[index] ? maxTemp : historicData.hourly.temperature_2m[index];
 
-	// 		minHumidity = minHumidity < historicData.hourly.relativehumidity_2m[index] ? minHumidity : historicData.hourly.relativehumidity_2m[index];
-	// 		maxHumidity = maxHumidity > historicData.hourly.relativehumidity_2m[index] ? maxHumidity : historicData.hourly.relativehumidity_2m[index];
+				precip += historicData.hourly.precipitation[index];
+				if (historicData.hourly.windspeed_10m[index] > wind)
+					wind = historicData.hourly.windspeed_10m[index];
 
-	// 		solar += historicData.hourly.direct_radiation[index];
-	// 	}
+				minHumidity = minHumidity < historicData.hourly.relativehumidity_2m[index] ? minHumidity : historicData.hourly.relativehumidity_2m[index];
+				maxHumidity = maxHumidity > historicData.hourly.relativehumidity_2m[index] ? maxHumidity : historicData.hourly.relativehumidity_2m[index];
 
-	// 	solar = solar / maxIndex * 24 / 1000;
-	// 	const result : EToData = {
-	// 		weatherProvider: "OpenMeteo",
-	// 		periodStartTime: historicData.hourly.time[0],
-	// 		minTemp: minTemp,
-	// 		maxTemp: maxTemp,
-	// 		minHumidity: minHumidity,
-	// 		maxHumidity: maxHumidity,
-	// 		solarRadiation: solar,
-	// 		windSpeed: wind,
-	// 		precip: precip,
-	// 	}
-	// 	/*console.log("OM 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s from:%s maxIdx:%s",
-	// 		precip.toPrecision(3),
-	// 		solar.toPrecision(3),
-	// 		this.F2C(minTemp), this.F2C(maxTemp), minHumidity, maxHumidity, this.mph2kmh(wind), moment.unix(historicData.hourly.time[0]).format(), maxIndex);*/
-	// 	return result;
-	// }
+				solar += historicData.hourly.direct_radiation[index];
+			}
+
+			solar = solar / 1000; // Returned each hour in Watts
+			const result : EToData = {
+				weatherProvider: "OpenMeteo",
+				periodStartTime: historicData.hourly.time[i*24],
+				minTemp: minTemp,
+				maxTemp: maxTemp,
+				minHumidity: minHumidity,
+				maxHumidity: maxHumidity,
+				solarRadiation: solar,
+				windSpeed: wind,
+				precip: precip,
+			}
+			/*console.log("OM 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s from:%s maxIdx:%s",
+				precip.toPrecision(3),
+				solar.toPrecision(3),
+				this.F2C(minTemp), this.F2C(maxTemp), minHumidity, maxHumidity, this.mph2kmh(wind), moment.unix(historicData.hourly.time[0]).format(), maxIndex);*/
+
+			data.push(result);
+
+		}
+
+		return data;
+	}
 
 	public shouldCacheWateringScale(): boolean {
 		return true;
