@@ -63,7 +63,6 @@ async function calculateEToWateringScale(
 	let count = 1;
 	const scales = uncappedScales.map(scale => {
 		sum += scale;
-		console.log(sum/count);
 		const result = Math.floor( Math.min( Math.max( 0, sum / count), 200 ) );
 		count ++;
 		return result;

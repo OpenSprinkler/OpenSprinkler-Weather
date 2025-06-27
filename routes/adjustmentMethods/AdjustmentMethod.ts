@@ -56,4 +56,6 @@ export interface AdjustmentOptions {
 	key?: string;
 	/** The provider selected using the UI. */
 	provider?: string;
+	/** Flag used to indicate if historical weather data is used. */
+	hwt?: number;
 }

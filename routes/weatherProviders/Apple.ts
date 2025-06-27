@@ -180,15 +180,15 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
 			data.push({
 				weatherProvider: "Apple",
-				periodStartTime: moment(historicData.forecastHourly.hours[ 0 ].forecastStart).unix(),
-				minTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ 0 ].temperatureMin ),
-				maxTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ 0 ].temperatureMax ),
+				periodStartTime: moment(historicData.forecastDaily.days[ i ].forecastStart).unix(),
+				minTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ i ].temperatureMin ),
+				maxTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ i ].temperatureMax ),
 				minHumidity: minHumidity * 100,
 				maxHumidity: maxHumidity * 100,
 				solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
 				// Assume wind speed measurements are taken at 2 meters.
 				windSpeed: this.kphToMph( windSpeed ),
-				precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ 0 ].precipitationAmount || 0 )
+				precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ i ].precipitationAmount || 0 )
 			})
 		}
 
