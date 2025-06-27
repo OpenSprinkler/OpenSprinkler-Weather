@@ -91,36 +91,36 @@ export default class LocalWeatherProvider extends WeatherProvider {
 		return result;
 	};
 
-	// public async getEToData( coordinates: GeoCoordinates ): Promise< EToData > {
+	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData[] > {
 
-	// 	queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
+		queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
 
-	// 	if ( queue.length == 0 || queue[ 0 ].timestamp - queue[ queue.length - 1 ].timestamp < 23*60*60 ) {
-	// 			console.error( "There is insufficient data to support ETo calculation from local PWS." );
-	// 			throw new CodedError( ErrorCode.InsufficientWeatherData );
-	// 	}
+		if ( queue.length == 0 || queue[ 0 ].timestamp - queue[ queue.length - 1 ].timestamp < 23*60*60 ) {
+				console.error( "There is insufficient data to support ETo calculation from local PWS." );
+				throw new CodedError( ErrorCode.InsufficientWeatherData );
+		}
 
-	// 	let cSolar = 0, cWind = 0, cPrecip = 0;
-	// 	const result: EToData = {
-	// 		weatherProvider: "local",
-	// 		periodStartTime: Math.floor( queue[ queue.length - 1 ].timestamp ),
-	// 		minTemp: queue.reduce( (min, obs) => ( min > obs.temp ) ? obs.temp : min, Infinity ),
-	// 		maxTemp: queue.reduce( (max, obs) => ( max < obs.temp ) ? obs.temp : max, -Infinity ),
-	// 		minHumidity: queue.reduce( (min, obs) => ( min > obs.humidity ) ? obs.humidity : min, Infinity ),
-	// 		maxHumidity: queue.reduce( (max, obs) => ( max < obs.humidity ) ? obs.humidity : max, -Infinity ),
-	// 		solarRadiation: queue.reduce( (sum, obs) => !isNaN( obs.solarRadiation ) && ++cSolar ? sum + obs.solarRadiation : sum, 0) / cSolar,
-	// 		windSpeed: queue.reduce( (sum, obs) => !isNaN( obs.windSpeed ) && ++cWind ? sum + obs.windSpeed : sum, 0) / cWind,
-	// 		precip: queue.reduce( (sum, obs) => !isNaN( obs.precip ) && ++cPrecip ? sum + obs.precip : sum, 0 ),
-	// 	};
+		let cSolar = 0, cWind = 0, cPrecip = 0;
+		const result: EToData = {
+			weatherProvider: "local",
+			periodStartTime: Math.floor( queue[ queue.length - 1 ].timestamp ),
+			minTemp: queue.reduce( (min, obs) => ( min > obs.temp ) ? obs.temp : min, Infinity ),
+			maxTemp: queue.reduce( (max, obs) => ( max < obs.temp ) ? obs.temp : max, -Infinity ),
+			minHumidity: queue.reduce( (min, obs) => ( min > obs.humidity ) ? obs.humidity : min, Infinity ),
+			maxHumidity: queue.reduce( (max, obs) => ( max < obs.humidity ) ? obs.humidity : max, -Infinity ),
+			solarRadiation: queue.reduce( (sum, obs) => !isNaN( obs.solarRadiation ) && ++cSolar ? sum + obs.solarRadiation : sum, 0) / cSolar,
+			windSpeed: queue.reduce( (sum, obs) => !isNaN( obs.windSpeed ) && ++cWind ? sum + obs.windSpeed : sum, 0) / cWind,
+			precip: queue.reduce( (sum, obs) => !isNaN( obs.precip ) && ++cPrecip ? sum + obs.precip : sum, 0 ),
+		};
 
-	// 	if ( [ result.minTemp, result.minHumidity, -result.maxTemp, -result.maxHumidity ].includes( Infinity ) ||
-	// 		!( cSolar && cWind && cPrecip ) ) {
-	// 			console.error( "There is insufficient data to support ETo calculation from local PWS." );
-	// 			throw new CodedError( ErrorCode.InsufficientWeatherData );
-	// 		}
+		if ( [ result.minTemp, result.minHumidity, -result.maxTemp, -result.maxHumidity ].includes( Infinity ) ||
+			!( cSolar && cWind && cPrecip ) ) {
+				console.error( "There is insufficient data to support ETo calculation from local PWS." );
+				throw new CodedError( ErrorCode.InsufficientWeatherData );
+			}
 
-	// 	return result;
-	// };
+		return [result];
+	};
 }
 
 function saveQueue() {
