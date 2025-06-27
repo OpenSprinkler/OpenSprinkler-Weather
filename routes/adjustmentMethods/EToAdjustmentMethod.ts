@@ -48,12 +48,12 @@ async function calculateEToWateringScale(
 		elevation = adjustmentOptions.elevation;
 	}
 
-	// Calculate eto scores per day
-	const etos = etoData.map(data => calculateETo( data, elevation, coordinates) - data.precip);
-
 	// Flip array so in reverse chronological order
 	// Now the order is index by days going backwards, with 0 index referring to the most recent day of data.
-	etos.reverse();
+	etoData.reverse();
+
+	// Calculate eto scores per day
+	const etos = etoData.map(data => calculateETo( data, elevation, coordinates) - data.precip);
 
 	// Compute uncapped scales for each score
 	const uncappedScales = etos.map(score => score / baseETo * 100);
@@ -73,8 +73,8 @@ async function calculateEToWateringScale(
 	return {
 		scale: scale,
 		rawData: {
-			wp: etoData[etoData.length-1].weatherProvider,
-			eto: Math.round( etos[etos.length-1] * 1000) / 1000,
+			wp: etoData[0].weatherProvider,
+			eto: Math.round( etos[0] * 1000) / 1000,
 			radiation: Math.round( etoData[0].solarRadiation * 100) / 100,
 			minT: Math.round( etoData[0].minTemp ),
 			maxT: Math.round( etoData[0].maxTemp ),
