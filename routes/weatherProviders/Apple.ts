@@ -189,7 +189,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 				// Assume wind speed measurements are taken at 2 meters.
 				windSpeed: this.kphToMph( windSpeed ),
 				precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ i ].precipitationAmount || 0 )
-			})
+			});
 		}
 
 		return data;
