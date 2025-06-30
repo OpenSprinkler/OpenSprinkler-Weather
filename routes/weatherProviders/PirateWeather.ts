@@ -15,60 +15,60 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		this.API_KEY = process.env.PIRATEWEATHER_API_KEY;
 	}
 
-	// public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData > {
-	// 	// The Unix timestamp of 24 hours ago.
-	// 	const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
+	public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData[] > {
+		// The Unix timestamp of 24 hours ago.
+		const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
 
-	// 	const localKey = keyToUse(this.API_KEY, pws);
+		const localKey = keyToUse(this.API_KEY, pws);
 
-	// 	const yesterdayUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1] },${ yesterdayTimestamp }?units=us&exclude=currently,minutely,daily,alerts`;
+		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1] },${ yesterdayTimestamp }?units=us&exclude=currently,minutely,daily,alerts`;
 
-	// 	let yesterdayData;
-	// 	try {
-	// 		yesterdayData = await httpJSONRequest( yesterdayUrl );
-	// 	} catch ( err ) {
-	// 		console.error( "Error retrieving weather information from PirateWeather:", err );
-	// 		throw new CodedError( ErrorCode.WeatherApiError );
-	// 	}
+		let yesterdayData;
+		try {
+			yesterdayData = await httpJSONRequest( yesterdayUrl );
+		} catch ( err ) {
+			console.error( "Error retrieving weather information from PirateWeather:", err );
+			throw new CodedError( ErrorCode.WeatherApiError );
+		}
 
-	// 	if ( !yesterdayData.hourly || !yesterdayData.hourly.data ) {
-	// 		throw new CodedError( ErrorCode.MissingWeatherField );
-	// 	}
+		if ( !yesterdayData.hourly || !yesterdayData.hourly.data ) {
+			throw new CodedError( ErrorCode.MissingWeatherField );
+		}
 
-	// 	let samples = [
-	// 		...yesterdayData.hourly.data
-	// 	];
+		let samples = [
+			...yesterdayData.hourly.data
+		];
 
-	// 	// Fail if not enough data is available.
-	// 	if ( samples.length < 24 ) {
-	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
-	// 	}
+		// Fail if not enough data is available.
+		if ( samples.length < 24 ) {
+			throw new CodedError( ErrorCode.InsufficientWeatherData );
+		}
 
-	// 	//returns 48 hours (first 24 are historical so only loop those)
-	// 	samples = samples.slice(0,24);
+		//returns 48 hours (first 24 are historical so only loop those)
+		samples = samples.slice(0,24);
 
-	// 	const totals = { temp: 0, humidity: 0, precip: 0 };
-	// 	for ( const sample of samples ) {
-	// 		/*
-	// 		 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
-	// 		 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
-	// 		 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
-	// 		 * significantly skewed if data is missing for several consecutive hours).
-	// 		 */
-	// 		totals.temp += sample.temperature;
-	// 		totals.humidity += sample.humidity;
-	// 		// This field may be missing from the response if it is snowing.
-	// 		totals.precip += sample.precipAccumulation || 0;
-	// 	}
+		const totals = { temp: 0, humidity: 0, precip: 0 };
+		for ( const sample of samples ) {
+			/*
+			 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
+			 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
+			 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
+			 * significantly skewed if data is missing for several consecutive hours).
+			 */
+			totals.temp += sample.temperature;
+			totals.humidity += sample.humidity;
+			// This field may be missing from the response if it is snowing.
+			totals.precip += sample.precipAccumulation || 0;
+		}
 
-	// 	return {
-	// 		weatherProvider: "PW",
-	// 		temp: totals.temp / samples.length,
-	// 		humidity: totals.humidity / samples.length * 100,
-	// 		precip: totals.precip,
-	// 		raining: samples[ samples.length - 1 ].precipIntensity > 0
-	// 	};
-	// }
+		return [{
+			weatherProvider: "PW",
+			temp: totals.temp / samples.length,
+			humidity: totals.humidity / samples.length * 100,
+			precip: totals.precip,
+			raining: samples[ samples.length - 1 ].precipIntensity > 0
+		}];
+	}
 
 	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
 
