@@ -16,55 +16,78 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		super();
 	}
 
-	// public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
-	// 	//console.log("OM getWateringData request for coordinates: %s", coordinates);
+	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData[] > {
+		//console.log("OM getWateringData request for coordinates: %s", coordinates);
 
-	// 	const yesterdayUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation&temperature_unit=fahrenheit&precipitation_unit=inch&timeformat=unixtime&past_days=1`;
-	// 	//console.log(yesterdayUrl);
+		const start: string = moment().subtract( 10, "day" ).format("YYYY-MM-DD");
+		const end: string = moment().subtract( 0, "day" ).format("YYYY-MM-DD");
+		const historicUrl = `https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation&temperature_unit=fahrenheit&precipitation_unit=inch&timeformat=unixtime&start_date=${ start }&end_date=${ end }`;
 
-	// 	let yesterdayData;
-	// 	try {
-	// 		yesterdayData = await httpJSONRequest( yesterdayUrl );
-	// 	} catch ( err ) {
-	// 		console.error( "Error retrieving weather information from OpenMeteo:", err );
-	// 		throw new CodedError( ErrorCode.WeatherApiError );
-	// 	}
+		let historicData;
+		try {
+			historicData = await httpJSONRequest( historicUrl );
+		} catch ( err ) {
+			console.error( "Error retrieving weather information from OpenMeteo:", err );
+			throw new CodedError( ErrorCode.WeatherApiError );
+		}
 
-	// 	if ( !yesterdayData.hourly ) {
-	// 		throw new CodedError( ErrorCode.MissingWeatherField );
-	// 	}
+		if ( !historicData.hourly ) {
+			throw new CodedError( ErrorCode.MissingWeatherField );
+		}
 
-	// 	let maxIndex: number = 0;
+		// Offset makes sure always reach most recent data
+		const offset = historicData.hourly.time.length % 24;
+		const days = Math.floor(historicData.hourly.time.length / 24);
+		const data = [];
 
-	// 	const totals = { temp: 0, humidity: 0, precip: 0, raining: false };
-	// 	const now: number = moment().unix();
+		for(let i = 0; i < days; i++){
+			let result;
+			let maxIndex: number = 0;
+			const totals = { temp: 0, humidity: 0, precip: 0, raining: false };
+			const now: number = moment().unix();
 
-	// 	for (let index = 0;  index < yesterdayData.hourly.time.length; index++ ) {
-	// 		if (yesterdayData.hourly.time[index] > now)
-	// 		{
-	// 			maxIndex = index-1;
-	// 			totals.raining = yesterdayData.hourly.precipitation[maxIndex] > 0 || yesterdayData.hourly.precipitation[index] > 0;
-	// 			break;
-	// 		}
-	// 		totals.temp += yesterdayData.hourly.temperature_2m[index];
-	// 		totals.humidity += yesterdayData.hourly.relativehumidity_2m[index];
-	// 		totals.precip += yesterdayData.hourly.precipitation[index]  || 0;
-	// 	}
+			for (let index = i*24 + offset;  index < ((i+1)*24 + offset); index++ ) {
+				if (historicData.hourly.time[index] > now) {
+					maxIndex = index-1;
+					totals.raining = historicData.hourly.precipitation[maxIndex] > 0 || historicData.hourly.precipitation[index] > 0;
+					break;
+				}
+				totals.temp += historicData.hourly.temperature_2m[index];
+				totals.humidity += historicData.hourly.relativehumidity_2m[index];
+				totals.precip += historicData.hourly.precipitation[index]  || 0;
+			}
 
-	// 	const result : ZimmermanWateringData = {
-	// 		weatherProvider: "OpenMeteo",
-	// 		temp: totals.temp / maxIndex,
-	// 		humidity: totals.humidity / maxIndex,
-	// 		precip: totals.precip,
-	// 		raining: totals.raining
-	// 	}
-	// 	/*console.log("OM 1: temp:%s humidity:%s precip:%s raining:%s",
-	// 		this.F2C(result.temp),
-	// 		result.humidity,
-	// 		this.inch2mm(result.precip),
-	// 		result.raining);*/
-	// 	return result;
-	// }
+			if(maxIndex !== 0){
+				// Compute how many hours in non full day
+				const hours = maxIndex - (24 * i + offset);
+				result = {
+					weatherProvider: "OpenMeteo",
+					temp: totals.temp / hours,
+					humidity: totals.humidity / hours,
+					precip: totals.precip,
+					raining: totals.raining
+				}
+			}else{
+				result = {
+					weatherProvider: "OpenMeteo",
+					temp: totals.temp / 24,
+					humidity: totals.humidity / 24,
+					precip: totals.precip,
+					raining: totals.raining
+				}
+			}
+
+			/*console.log("OM 1: temp:%s humidity:%s precip:%s raining:%s",
+				this.F2C(result.temp),
+				result.humidity,
+				this.inch2mm(result.precip),
+				result.raining);*/
+
+			data.push(result);
+		}
+
+		return data;
+	}
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 
@@ -126,7 +149,6 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 
 		const start: string = moment().subtract( 10, "day" ).format("YYYY-MM-DD");
 		const end: string = moment().subtract( 0, "day" ).format("YYYY-MM-DD");
-		const timezone = geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
 		const historicUrl = `https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime&start_date=${ start }&end_date=${ end }`;
 
 		let historicData;
