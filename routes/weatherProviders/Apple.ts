@@ -90,7 +90,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 				temp: totals.temp / length,
 				humidity: totals.humidity / length * 100,
 				precip: totals.precip,
-				raining: (i < daysInHours.length - 1) ? 0 : daysInHours[i][length-1].precipitationIntensity > 0
+				raining: (i < daysInHours.length - 1) ? false : daysInHours[i][length-1].precipitationIntensity > 0
 			});
 		}
 
