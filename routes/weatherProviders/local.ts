@@ -65,31 +65,31 @@ export default class LocalWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	// public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
+	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData[] > {
 
-	// 	queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
+		queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
 
-	// 	if ( queue.length == 0 || queue[ 0 ].timestamp - queue[ queue.length - 1 ].timestamp < 23*60*60 ) {
-	// 		console.error( "There is insufficient data to support Zimmerman calculation from local PWS." );
-	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
-	// 	}
+		if ( queue.length == 0 || queue[ 0 ].timestamp - queue[ queue.length - 1 ].timestamp < 23*60*60 ) {
+			console.error( "There is insufficient data to support Zimmerman calculation from local PWS." );
+			throw new CodedError( ErrorCode.InsufficientWeatherData );
+		}
 
-	// 	let cTemp = 0, cHumidity = 0, cPrecip = 0;
-	// 	const result: ZimmermanWateringData = {
-	// 		weatherProvider: "local",
-	// 		temp: queue.reduce( ( sum, obs ) => !isNaN( obs.temp ) && ++cTemp ? sum + obs.temp : sum, 0) / cTemp,
-	// 		humidity: queue.reduce( ( sum, obs ) => !isNaN( obs.humidity ) && ++cHumidity ? sum + obs.humidity : sum, 0) / cHumidity,
-	// 		precip: queue.reduce( ( sum, obs ) => !isNaN( obs.precip ) && ++cPrecip ? sum + obs.precip : sum, 0),
-	// 		raining: ( ( moment().unix() - lastRainEpoch ) / 60 / 60 < 1 ),
-	// 	};
+		let cTemp = 0, cHumidity = 0, cPrecip = 0;
+		const result: ZimmermanWateringData = {
+			weatherProvider: "local",
+			temp: queue.reduce( ( sum, obs ) => !isNaN( obs.temp ) && ++cTemp ? sum + obs.temp : sum, 0) / cTemp,
+			humidity: queue.reduce( ( sum, obs ) => !isNaN( obs.humidity ) && ++cHumidity ? sum + obs.humidity : sum, 0) / cHumidity,
+			precip: queue.reduce( ( sum, obs ) => !isNaN( obs.precip ) && ++cPrecip ? sum + obs.precip : sum, 0),
+			raining: ( ( moment().unix() - lastRainEpoch ) / 60 / 60 < 1 ),
+		};
 
-	// 	if ( !( cTemp && cHumidity && cPrecip ) ) {
-	// 		console.error( "There is insufficient data to support Zimmerman calculation from local PWS." );
-	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
-	// 	}
+		if ( !( cTemp && cHumidity && cPrecip ) ) {
+			console.error( "There is insufficient data to support Zimmerman calculation from local PWS." );
+			throw new CodedError( ErrorCode.InsufficientWeatherData );
+		}
 
-	// 	return result;
-	// };
+		return [result];
+	};
 
 	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData[] > {
 
