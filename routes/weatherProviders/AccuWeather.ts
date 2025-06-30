@@ -79,7 +79,6 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		} catch ( err ) {
 			console.error( "Error retrieving location information from AccuWeather:", err );
 		}
-		//console.log("Location key:" + locationData.Key);
 
 		const currentUrl = `https://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }?apikey=${ localKey }&details=true`;
 		const forecastUrl = `https://dataservice.accuweather.com/forecasts/v1/daily/5day/${ locationData.Key }?apikey=${ localKey }&details=true`;
@@ -181,7 +180,6 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 
 		avgWindSpeed = avgWindSpeed / historicData.length;
 
-		console.log(historicData[0]);
 		return [{
 			weatherProvider: "AW",
 			periodStartTime: historicData[historicData.length - 1].EpochTime,
