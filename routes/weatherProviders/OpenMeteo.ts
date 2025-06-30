@@ -16,55 +16,55 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		super();
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
-		//console.log("OM getWateringData request for coordinates: %s", coordinates);
+	// public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
+	// 	//console.log("OM getWateringData request for coordinates: %s", coordinates);
 
-		const yesterdayUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation&temperature_unit=fahrenheit&precipitation_unit=inch&timeformat=unixtime&past_days=1`;
-		//console.log(yesterdayUrl);
+	// 	const yesterdayUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation&temperature_unit=fahrenheit&precipitation_unit=inch&timeformat=unixtime&past_days=1`;
+	// 	//console.log(yesterdayUrl);
 
-		let yesterdayData;
-		try {
-			yesterdayData = await httpJSONRequest( yesterdayUrl );
-		} catch ( err ) {
-			console.error( "Error retrieving weather information from OpenMeteo:", err );
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
+	// 	let yesterdayData;
+	// 	try {
+	// 		yesterdayData = await httpJSONRequest( yesterdayUrl );
+	// 	} catch ( err ) {
+	// 		console.error( "Error retrieving weather information from OpenMeteo:", err );
+	// 		throw new CodedError( ErrorCode.WeatherApiError );
+	// 	}
 
-		if ( !yesterdayData.hourly ) {
-			throw new CodedError( ErrorCode.MissingWeatherField );
-		}
+	// 	if ( !yesterdayData.hourly ) {
+	// 		throw new CodedError( ErrorCode.MissingWeatherField );
+	// 	}
 
-		let maxIndex: number = 0;
+	// 	let maxIndex: number = 0;
 
-		const totals = { temp: 0, humidity: 0, precip: 0, raining: false };
-		const now: number = moment().unix();
+	// 	const totals = { temp: 0, humidity: 0, precip: 0, raining: false };
+	// 	const now: number = moment().unix();
 
-		for (let index = 0;  index < yesterdayData.hourly.time.length; index++ ) {
-			if (yesterdayData.hourly.time[index] > now)
-			{
-				maxIndex = index-1;
-				totals.raining = yesterdayData.hourly.precipitation[maxIndex] > 0 || yesterdayData.hourly.precipitation[index] > 0;
-				break;
-			}
-			totals.temp += yesterdayData.hourly.temperature_2m[index];
-			totals.humidity += yesterdayData.hourly.relativehumidity_2m[index];
-			totals.precip += yesterdayData.hourly.precipitation[index]  || 0;
-		}
+	// 	for (let index = 0;  index < yesterdayData.hourly.time.length; index++ ) {
+	// 		if (yesterdayData.hourly.time[index] > now)
+	// 		{
+	// 			maxIndex = index-1;
+	// 			totals.raining = yesterdayData.hourly.precipitation[maxIndex] > 0 || yesterdayData.hourly.precipitation[index] > 0;
+	// 			break;
+	// 		}
+	// 		totals.temp += yesterdayData.hourly.temperature_2m[index];
+	// 		totals.humidity += yesterdayData.hourly.relativehumidity_2m[index];
+	// 		totals.precip += yesterdayData.hourly.precipitation[index]  || 0;
+	// 	}
 
-		const result : ZimmermanWateringData = {
-			weatherProvider: "OpenMeteo",
-			temp: totals.temp / maxIndex,
-			humidity: totals.humidity / maxIndex,
-			precip: totals.precip,
-			raining: totals.raining
-		}
-		/*console.log("OM 1: temp:%s humidity:%s precip:%s raining:%s",
-			this.F2C(result.temp),
-			result.humidity,
-			this.inch2mm(result.precip),
-			result.raining);*/
-		return result;
-	}
+	// 	const result : ZimmermanWateringData = {
+	// 		weatherProvider: "OpenMeteo",
+	// 		temp: totals.temp / maxIndex,
+	// 		humidity: totals.humidity / maxIndex,
+	// 		precip: totals.precip,
+	// 		raining: totals.raining
+	// 	}
+	// 	/*console.log("OM 1: temp:%s humidity:%s precip:%s raining:%s",
+	// 		this.F2C(result.temp),
+	// 		result.humidity,
+	// 		this.inch2mm(result.precip),
+	// 		result.raining);*/
+	// 	return result;
+	// }
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 

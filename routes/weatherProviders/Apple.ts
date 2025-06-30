@@ -32,55 +32,70 @@ export default class AppleWeatherProvider extends WeatherProvider {
           );
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
-		// The Unix timestamp of 24 hours ago.
-		const yesterdayTimestamp: string = moment().subtract( 1, "day" ).toISOString();
+	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData[] > {
+		// The Unix timestamp of 10 days ago.
+		const historicTimestamp: string = moment().subtract( 240, "hours" ).toISOString();
 
-        const yesterdayUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly&hourlyStart=${yesterdayTimestamp}&timezone=UTC`
+        const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${historicTimestamp}&dailyStart=${historicTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
 
-		let yesterdayData;
+		let historicData;
 		try {
-			yesterdayData = await httpJSONRequest( yesterdayUrl, {Authorization: `Bearer ${this.API_KEY}`} );
+			historicData = await httpJSONRequest( historicUrl, {Authorization: `Bearer ${this.API_KEY}`} );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from Apple:", err );
 			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
-		if ( !yesterdayData.forecastHourly || !yesterdayData.forecastHourly.hours ) {
+		if ( !historicData.forecastHourly || !historicData.forecastHourly.hours ) {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
-		const samples = [
-			...yesterdayData.forecastHourly.hours
+		const hours = [
+			...historicData.forecastHourly.hours
 		];
 
         // Fail if not enough data is available.
 		// There will only be 23 samples on the day that daylight saving time begins.
-		if ( samples.length < 23 ) {
+		if ( hours.length < 23 ) {
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
-		const totals = { temp: 0, humidity: 0, precip: 0 };
-		for ( const sample of samples ) {
-			/*
-			 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
-			 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
-			 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
-			 * significantly skewed if data is missing for several consecutive hours).
-			 */
-			totals.temp += this.celsiusToFahrenheit(sample.temperature);
-			totals.humidity += sample.humidity;
-			// This field may be missing from the response if it is snowing.
-			totals.precip += this.mmToInchesPerHour(sample.precipitationIntensity || 0);
+		// Cut hours down into full 24 hour section
+		hours.splice(0, hours.length % 24);
+		const daysInHours = [];
+		for ( let i = 0; i < hours.length; i+=24 ){
+			daysInHours.push(hours.slice(i, i+24));
 		}
 
-		return {
-			weatherProvider: "Apple",
-			temp: totals.temp / samples.length,
-			humidity: totals.humidity / samples.length * 100,
-			precip: totals.precip,
-			raining: samples[ samples.length - 1 ].precipitationIntensity > 0
-		};
+		const data = [];
+		for ( let i = 0; i < daysInHours.length; i++ ){
+			const totals = { temp: 0, humidity: 0, precip: 0 };
+			for ( const hour of daysInHours[i] ) {
+				/*
+				* If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
+				* calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
+				* calculated when data is missing from some samples (since they follow diurnal cycles and will be
+				* significantly skewed if data is missing for several consecutive hours).
+				*/
+				totals.temp += this.celsiusToFahrenheit(hour.temperature);
+				totals.humidity += hour.humidity;
+				// This field may be missing from the response if it is snowing.
+				totals.precip += this.mmToInchesPerHour(hour.precipitationIntensity || 0);
+			}
+
+			const length = daysInHours[i].length;
+
+			data.push({
+				weatherProvider: "Apple",
+				temp: totals.temp / length,
+				humidity: totals.humidity / length * 100,
+				precip: totals.precip,
+				raining: (i < daysInHours.length - 1) ? 0 : daysInHours[i][length-1].precipitationIntensity > 0
+			});
+		}
+
+		return data;
+
 	}
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
@@ -128,14 +143,14 @@ export default class AppleWeatherProvider extends WeatherProvider {
 	}
 
 	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData[] > {
-		// The Unix timestamp of 24 hours ago.
-		const yesterdayTimestamp: string = moment().subtract( 240, "hours" ).toISOString();
+		// The Unix timestamp of 10 days ago.
+		const historicTimestamp: string = moment().subtract( 240, "hours" ).toISOString();
 
-        const yesterdayUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${yesterdayTimestamp}&dailyStart=${yesterdayTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
+        const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${historicTimestamp}&dailyStart=${historicTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
 
 		let historicData;
 		try {
-			historicData = await httpJSONRequest( yesterdayUrl, {Authorization: `Bearer ${this.API_KEY}`} );
+			historicData = await httpJSONRequest( historicUrl, {Authorization: `Bearer ${this.API_KEY}`} );
 		} catch (err) {
 			throw new CodedError( ErrorCode.WeatherApiError );
 		}

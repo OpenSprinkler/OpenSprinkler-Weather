@@ -12,66 +12,66 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		super();
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
-		const yesterdayTimestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD");
-		//console.log("DWD getWateringData request for coordinates: %s", coordinates);
+	// public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
+	// 	const yesterdayTimestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD");
+	// 	//console.log("DWD getWateringData request for coordinates: %s", coordinates);
 
-		const yesterdayUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ yesterdayTimestamp }`;
+	// 	const yesterdayUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ yesterdayTimestamp }`;
 
-		//console.log("1: %s", yesterdayUrl);
+	// 	//console.log("1: %s", yesterdayUrl);
 
-		let yesterdayData;
-		try {
-			yesterdayData = await httpJSONRequest( yesterdayUrl );
-		} catch ( err ) {
-			console.error( "Error retrieving weather information from Bright Sky:", err );
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
+	// 	let yesterdayData;
+	// 	try {
+	// 		yesterdayData = await httpJSONRequest( yesterdayUrl );
+	// 	} catch ( err ) {
+	// 		console.error( "Error retrieving weather information from Bright Sky:", err );
+	// 		throw new CodedError( ErrorCode.WeatherApiError );
+	// 	}
 
-		if ( !yesterdayData.weather ) {
-			throw new CodedError( ErrorCode.MissingWeatherField );
-		}
+	// 	if ( !yesterdayData.weather ) {
+	// 		throw new CodedError( ErrorCode.MissingWeatherField );
+	// 	}
 
-		const samples = yesterdayData.weather;
+	// 	const samples = yesterdayData.weather;
 
-		//console.log("2: %s", samples.len);
+	// 	//console.log("2: %s", samples.len);
 
-		// Fail if not enough data is available.
-		// There will only be 23 samples on the day that daylight saving time begins.
-		if ( samples.length < 23 ) {
-			throw new CodedError( ErrorCode.InsufficientWeatherData );
-		}
+	// 	// Fail if not enough data is available.
+	// 	// There will only be 23 samples on the day that daylight saving time begins.
+	// 	if ( samples.length < 23 ) {
+	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
+	// 	}
 
-		const totals = { temp: 0, humidity: 0, precip: 0 };
-		for ( const sample of samples ) {
-			/*
-			 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
-			 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
-			 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
-			 * significantly skewed if data is missing for several consecutive hours).
-			 */
-			totals.temp += sample.temperature;
-			totals.humidity += sample.relative_humidity;
-			// This field may be missing from the response if it is snowing.
-			totals.precip += sample.precipitation || 0;
-		}
+	// 	const totals = { temp: 0, humidity: 0, precip: 0 };
+	// 	for ( const sample of samples ) {
+	// 		/*
+	// 		 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
+	// 		 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
+	// 		 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
+	// 		 * significantly skewed if data is missing for several consecutive hours).
+	// 		 */
+	// 		totals.temp += sample.temperature;
+	// 		totals.humidity += sample.relative_humidity;
+	// 		// This field may be missing from the response if it is snowing.
+	// 		totals.precip += sample.precipitation || 0;
+	// 	}
 
-		const result : ZimmermanWateringData = {
-			weatherProvider: "DWD",
-			temp: this.C2F(totals.temp / samples.length),
-			humidity: totals.humidity / samples.length,
-			precip: this.mm2inch(totals.precip),
-			raining: samples[ samples.length - 1 ].precipitation > 0
-		}
+	// 	const result : ZimmermanWateringData = {
+	// 		weatherProvider: "DWD",
+	// 		temp: this.C2F(totals.temp / samples.length),
+	// 		humidity: totals.humidity / samples.length,
+	// 		precip: this.mm2inch(totals.precip),
+	// 		raining: samples[ samples.length - 1 ].precipitation > 0
+	// 	}
 
-		console.log("DWD 1: temp:%s humidity:%s precip:%s raining:%s",
-			totals.temp / samples.length,
-			totals.humidity / samples.length,
-			totals.precip,
-			samples[ samples.length - 1 ].precipitation > 0);
+	// 	console.log("DWD 1: temp:%s humidity:%s precip:%s raining:%s",
+	// 		totals.temp / samples.length,
+	// 		totals.humidity / samples.length,
+	// 		totals.precip,
+	// 		samples[ samples.length - 1 ].precipitation > 0);
 
-		return result;
-	}
+	// 	return result;
+	// }
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 

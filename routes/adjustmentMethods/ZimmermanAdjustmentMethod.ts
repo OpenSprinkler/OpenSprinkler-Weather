@@ -15,7 +15,7 @@ async function calculateZimmermanWateringScale(
 	weatherProvider: WeatherProvider,
 	pws?: PWS
 ): Promise< AdjustmentMethodResponse > {
-	const wateringData: ZimmermanWateringData = await weatherProvider.getWateringData( coordinates, pws );
+	const wateringData: ZimmermanWateringData[] = await weatherProvider.getWateringData( coordinates, pws );
 
 	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
 	/*
@@ -29,18 +29,27 @@ async function calculateZimmermanWateringScale(
 	}
 	*/
 
-	const rawData = {
-		wp: wateringData.weatherProvider,
-		h: wateringData ? Math.round( wateringData.humidity * 100) / 100 : null,
-		p: wateringData ? Math.round( wateringData.precip * 100 ) / 100 : null,
-		t: wateringData ? Math.round( wateringData.temp * 10 ) / 10 : null,
-		raining: wateringData ? ( wateringData.raining ? 1 : 0 ) : null
-	};
+	// Flip the array so it is in reverse chronological order
+	// Now the order is indexed by days going backwards, with 0 index referring to the most recent day of data.
+	wateringData.reverse();
 
-	// Check to make sure valid data exists for all factors
-	if ( !validateValues( [ "temp", "humidity", "precip" ], wateringData ) ) {
-		// Default to a scale of 100% if fields are missing.
-		throw new CodedError( ErrorCode.MissingWeatherField );
+	// Map data into proper format
+	const rawData = wateringData.map(data => {
+		return {
+			wp: data.weatherProvider,
+			h: data ? Math.round( data.humidity * 100) / 100 : null,
+			p: data ? Math.round( data.precip * 100 ) / 100 : null,
+			t: data ? Math.round( data.temp * 10 ) / 10 : null,
+			raining: data ? ( data.raining ? 1 : 0 ) : null
+		};
+	});
+
+	for ( let i = 0; i < wateringData.length; i++ ) {
+		// Check to make sure valid data exists for all factors
+		if ( !validateValues( [ "temp", "humidity", "precip" ], wateringData[i] ) ) {
+			// Default to a scale of 100% if fields are missing.
+			throw new CodedError( ErrorCode.MissingWeatherField );
+		}
 	}
 
 	let humidityBase = 30, tempBase = 70, precipBase = 0;
@@ -50,28 +59,44 @@ async function calculateZimmermanWateringScale(
 	tempBase = adjustmentOptions.hasOwnProperty( "bt" ) ? adjustmentOptions.bt : tempBase;
 	precipBase = adjustmentOptions.hasOwnProperty( "br" ) ? adjustmentOptions.br : precipBase;
 
-	let humidityFactor = ( humidityBase - wateringData.humidity ),
-		tempFactor = ( ( wateringData.temp - tempBase ) * 4 ),
-		precipFactor = ( ( precipBase - wateringData.precip ) * 200 );
+	// Compute uncapped scales for each day
+	const uncappedScales = wateringData.map(data => {
+		let humidityFactor = ( humidityBase - data.humidity ),
+			tempFactor = ( ( data.temp - tempBase ) * 4 ),
+			precipFactor = ( ( precipBase - data.precip ) * 200 );
 
-	// Apply adjustment options, if provided, by multiplying the percentage against the factor
-	if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
-		humidityFactor = humidityFactor * ( adjustmentOptions.h / 100 );
-	}
+		// Apply adjustment options, if provided, by multiplying the percentage against the factor
+		if ( adjustmentOptions.hasOwnProperty( "h" ) ) {
+			humidityFactor = humidityFactor * ( adjustmentOptions.h / 100 );
+		}
 
-	if ( adjustmentOptions.hasOwnProperty( "t" ) ) {
-		tempFactor = tempFactor * ( adjustmentOptions.t / 100 );
-	}
+		if ( adjustmentOptions.hasOwnProperty( "t" ) ) {
+			tempFactor = tempFactor * ( adjustmentOptions.t / 100 );
+		}
 
-	if ( adjustmentOptions.hasOwnProperty( "r" ) ) {
-		precipFactor = precipFactor * ( adjustmentOptions.r / 100 );
-	}
+		if ( adjustmentOptions.hasOwnProperty( "r" ) ) {
+			precipFactor = precipFactor * ( adjustmentOptions.r / 100 );
+		}
+
+		return 100 + humidityFactor + tempFactor + precipFactor;
+	});
+
+	// Compute a rolling average for each scale and cap them to 0-200
+	let sum = 0;
+	let count = 1;
+	const scales = uncappedScales.map(scale => {
+		sum += scale;
+		const result = Math.floor( Math.min( Math.max( 0, sum / count ), 200 ) );
+		count ++;
+		return result;
+	});
 
 	return {
 		// Apply all of the weather modifying factors and clamp the result between 0 and 200%.
-		scale: Math.floor( Math.min( Math.max( 0, 100 + humidityFactor + tempFactor + precipFactor ), 200 ) ),
-		rawData: rawData,
-		wateringData: wateringData
+		scale: scales[0],
+		rawData: rawData[0],
+		wateringData: wateringData[0],
+		scales: scales
 	}
 }
 

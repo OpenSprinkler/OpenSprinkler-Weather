@@ -338,14 +338,17 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 		if ( checkRestrictions ) {
 			let wateringData: BaseWateringData = adjustmentMethodResponse.wateringData;
+			let dataArr;
 			// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
 			if ( checkRestrictions && !wateringData ) {
 				try {
-					wateringData = await weatherProvider.getWateringData( coordinates );
+					dataArr = await weatherProvider.getWateringData( coordinates );
 				} catch ( err ) {
 					sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
 					return;
 				}
+				// Last in data array in most recent.
+				wateringData = dataArr[dataArr.length-1];
 			}
 
 			// Check for any user-set restrictions and change the scale to 0 if the criteria is met

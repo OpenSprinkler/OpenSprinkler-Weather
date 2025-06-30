@@ -49,7 +49,7 @@ async function calculateEToWateringScale(
 	}
 
 	// Flip array so in reverse chronological order
-	// Now the order is index by days going backwards, with 0 index referring to the most recent day of data.
+	// Now the order is indexed by days going backwards, with 0 index referring to the most recent day of data.
 	etoData.reverse();
 
 	// Calculate eto scores per day

@@ -82,8 +82,8 @@ export class MockWeatherProvider extends WeatherProvider {
         this.mockData = mockData;
     }
 
-    public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData > {
-        return await this.getData( "wateringData" ) as ZimmermanWateringData;
+    public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData[] > {
+        return await this.getData( "wateringData" ) as ZimmermanWateringData[];
     }
 
     public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
@@ -113,7 +113,7 @@ export class MockWeatherProvider extends WeatherProvider {
 }
 
 interface MockWeatherData {
-    wateringData?: ZimmermanWateringData,
+    wateringData?: ZimmermanWateringData[],
     weatherData?: WeatherData,
     etoData?: EToData[]
 }
