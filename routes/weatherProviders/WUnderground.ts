@@ -8,58 +8,58 @@ import { CodedError, ErrorCode } from "../../errors";
 
 export default class WUnderground extends WeatherProvider {
 
-	async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData[] > {
-		if ( !pws ) {
-			throw new CodedError( ErrorCode.NoPwsProvided );
-		}
+	// async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData[] > {
+	// 	if ( !pws ) {
+	// 		throw new CodedError( ErrorCode.NoPwsProvided );
+	// 	}
 
-		console.log("WU getWateringData request for coordinates: %s", coordinates);
+	// 	console.log("WU getWateringData request for coordinates: %s", coordinates);
 
-		const historicUrl = `https://api.weather.com/v2/pws/observations/hourly/7day?stationId=${ pws.id }&format=json&units=e&apiKey=${ pws.apiKey }`;
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl );
-		} catch ( err ) {
-			console.error( "Error retrieving weather information from WUnderground:", err );
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
+	// 	const historicUrl = `https://api.weather.com/v2/pws/observations/hourly/7day?stationId=${ pws.id }&format=json&units=e&apiKey=${ pws.apiKey }`;
+	// 	let historicData;
+	// 	try {
+	// 		historicData = await httpJSONRequest( historicUrl );
+	// 	} catch ( err ) {
+	// 		console.error( "Error retrieving weather information from WUnderground:", err );
+	// 		throw new CodedError( ErrorCode.WeatherApiError );
+	// 	}
 
-		const hours = historicData.observations;
+	// 	const hours = historicData.observations;
 
-		// Cut hours into 24 hour sections up to most recent
-		hours.splice(0, hours.length % 24);
-		const daysInHours = [];
-		for (let i = 0; i < hours.length; i+=24){
-			daysInHours.push(hours.slice(i, i+24));
-		}
+	// 	// Cut hours into 24 hour sections up to most recent
+	// 	hours.splice(0, hours.length % 24);
+	// 	const daysInHours = [];
+	// 	for (let i = 0; i < hours.length; i+=24){
+	// 		daysInHours.push(hours.slice(i, i+24));
+	// 	}
 
-		// Fail if not enough data is available.
-		if ( daysInHours.length < 1 || daysInHours[0].length !== 24 ) {
-			throw new CodedError( ErrorCode.InsufficientWeatherData );
-		}
+	// 	// Fail if not enough data is available.
+	// 	if ( daysInHours.length < 1 || daysInHours[0].length !== 24 ) {
+	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
+	// 	}
 
-		const data = [];
-		for ( let i = 0; i < daysInHours.length; i++ ){
-			const totals = { temp: 0, humidity: 0, precip: 0 };
-			for ( const hour of daysInHours[i] ) {
-				totals.temp += hour.imperial.tempAvg;
-				totals.humidity += hour.humidityAvg;
-				// Each hour is accumulation to present, not per hour precipitation. Using greatest value means last hour of each day is used.
-				totals.precip = totals.precip > hour.imperial.precipTotal ? totals.precip : hour.imperial.precipTotal;
-			}
+	// 	const data = [];
+	// 	for ( let i = 0; i < daysInHours.length; i++ ){
+	// 		const totals = { temp: 0, humidity: 0, precip: 0 };
+	// 		for ( const hour of daysInHours[i] ) {
+	// 			totals.temp += hour.imperial.tempAvg;
+	// 			totals.humidity += hour.humidityAvg;
+	// 			// Each hour is accumulation to present, not per hour precipitation. Using greatest value means last hour of each day is used.
+	// 			totals.precip = totals.precip > hour.imperial.precipTotal ? totals.precip : hour.imperial.precipTotal;
+	// 		}
 
-			data.push( {
-				weatherProvider: "WU",
-				temp: totals.temp / 24,
-				humidity: totals.humidity / 24,
-				precip: totals.precip,
-				raining: daysInHours[i][ daysInHours[i].length - 1 ].imperial.precipRate > 0
-			} );
-		}
+	// 		data.push( {
+	// 			weatherProvider: "WU",
+	// 			temp: totals.temp / 24,
+	// 			humidity: totals.humidity / 24,
+	// 			precip: totals.precip,
+	// 			raining: daysInHours[i][ daysInHours[i].length - 1 ].imperial.precipRate > 0
+	// 		} );
+	// 	}
 
-		return data;
+	// 	return data;
 
-	}
+	// }
 
 	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
 		if ( !pws ) {

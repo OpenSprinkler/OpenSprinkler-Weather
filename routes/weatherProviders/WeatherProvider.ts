@@ -1,18 +1,18 @@
-import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
 import { EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 
 export class WeatherProvider {
 	/**
-	 * Retrieves weather data necessary for Zimmerman watering level calculations.
+	 * Retrieves weather data necessary for watering level calculations.
 	 * @param coordinates The coordinates to retrieve the watering data for.
 	 * @param pws The PWS to retrieve the weather from, or undefined if a PWS should not be used. If the implementation
 	 * of this method does not have PWS support, this parameter may be ignored and coordinates may be used instead.
-	 * @return A Promise that will be resolved with the ZimmermanWateringData if it is successfully retrieved,
-	 * or rejected with a CodedError if an error occurs while retrieving the ZimmermanWateringData (or the WeatherProvider
+	 * @return A Promise that will be resolved with the WateringData if it is successfully retrieved,
+	 * or rejected with a CodedError if an error occurs while retrieving the WateringData (or the WeatherProvider
 	 * does not support this method).
 	 */
-	getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData[] > {
+	getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WateringData[] > {
 		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
 	}
 

@@ -12,82 +12,82 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		super();
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData[] > {
+	// public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData[] > {
 
-		const start: string = moment().subtract( 10, "day" ).utc().format("YYYY-MM-DD");
-		const end: string = moment().subtract(0, "day" ).utc().format("YYYY-MM-DD");
-		//console.log("DWD getWateringData request for coordinates: %s", coordinates);
+	// 	const start: string = moment().subtract( 10, "day" ).utc().format("YYYY-MM-DD");
+	// 	const end: string = moment().subtract(0, "day" ).utc().format("YYYY-MM-DD");
+	// 	//console.log("DWD getWateringData request for coordinates: %s", coordinates);
 
-		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ start }&last_date=${ end }`
-		//console.log("1: %s", yesterdayUrl);
+	// 	const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ start }&last_date=${ end }`
+	// 	//console.log("1: %s", yesterdayUrl);
 
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl );
-		} catch ( err ) {
-			console.error( "Error retrieving weather information from Bright Sky:", err );
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
+	// 	let historicData;
+	// 	try {
+	// 		historicData = await httpJSONRequest( historicUrl );
+	// 	} catch ( err ) {
+	// 		console.error( "Error retrieving weather information from Bright Sky:", err );
+	// 		throw new CodedError( ErrorCode.WeatherApiError );
+	// 	}
 
-		if ( !historicData.weather ) {
-			throw new CodedError( ErrorCode.MissingWeatherField );
-		}
+	// 	if ( !historicData.weather ) {
+	// 		throw new CodedError( ErrorCode.MissingWeatherField );
+	// 	}
 
-		const hours = historicData.weather;
+	// 	const hours = historicData.weather;
 
-		//console.log("2: %s", samples.len);
+	// 	//console.log("2: %s", samples.len);
 
-		// Fail if not enough data is available.
-		// There will only be 23 samples on the day that daylight saving time begins.
-		if ( hours.length < 23 ) {
-			throw new CodedError( ErrorCode.InsufficientWeatherData );
-		}
+	// 	// Fail if not enough data is available.
+	// 	// There will only be 23 samples on the day that daylight saving time begins.
+	// 	if ( hours.length < 23 ) {
+	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
+	// 	}
 
-		// Cut down to 24 hour sections
-		hours.splice(0, hours.length % 24);
-		const daysInHours = [];
-		for ( let i = 0; i < hours.length; i+=24 ){
-			daysInHours.push(hours.slice(i, i+24));
-		}
+	// 	// Cut down to 24 hour sections
+	// 	hours.splice(0, hours.length % 24);
+	// 	const daysInHours = [];
+	// 	for ( let i = 0; i < hours.length; i+=24 ){
+	// 		daysInHours.push(hours.slice(i, i+24));
+	// 	}
 
-		const data = [];
+	// 	const data = [];
 
-		for(let i = 0; i < daysInHours.length; i++){
-			const totals = { temp: 0, humidity: 0, precip: 0 };
-			for ( const hour of daysInHours[i] ) {
-				/*
-				* If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
-				* calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
-				* calculated when data is missing from some samples (since they follow diurnal cycles and will be
-				* significantly skewed if data is missing for several consecutive hours).
-				*/
-				totals.temp += hour.temperature;
-				totals.humidity += hour.relative_humidity;
-				// This field may be missing from the response if it is snowing.
-				totals.precip += hour.precipitation || 0;
-			}
+	// 	for(let i = 0; i < daysInHours.length; i++){
+	// 		const totals = { temp: 0, humidity: 0, precip: 0 };
+	// 		for ( const hour of daysInHours[i] ) {
+	// 			/*
+	// 			* If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
+	// 			* calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
+	// 			* calculated when data is missing from some samples (since they follow diurnal cycles and will be
+	// 			* significantly skewed if data is missing for several consecutive hours).
+	// 			*/
+	// 			totals.temp += hour.temperature;
+	// 			totals.humidity += hour.relative_humidity;
+	// 			// This field may be missing from the response if it is snowing.
+	// 			totals.precip += hour.precipitation || 0;
+	// 		}
 
-			const length = daysInHours[i].length;
+	// 		const length = daysInHours[i].length;
 
-			const result : ZimmermanWateringData = {
-				weatherProvider: "DWD",
-				temp: this.C2F(totals.temp / length),
-				humidity: totals.humidity / length,
-				precip: this.mm2inch(totals.precip),
-				raining: (i < daysInHours.length - 1) ? false : daysInHours[i][length-1].precipitation > 0
-			}
+	// 		const result : ZimmermanWateringData = {
+	// 			weatherProvider: "DWD",
+	// 			temp: this.C2F(totals.temp / length),
+	// 			humidity: totals.humidity / length,
+	// 			precip: this.mm2inch(totals.precip),
+	// 			raining: (i < daysInHours.length - 1) ? false : daysInHours[i][length-1].precipitation > 0
+	// 		}
 
-			data.push(result);
+	// 		data.push(result);
 
-			// console.log("DWD 1: temp:%s humidity:%s precip:%s raining:%s",
-			// 	totals.temp / samples.length,
-			// 	totals.humidity / samples.length,
-			// 	totals.precip,
-			// 	samples[ samples.length - 1 ].precipitation > 0);
-		}
+	// 		// console.log("DWD 1: temp:%s humidity:%s precip:%s raining:%s",
+	// 		// 	totals.temp / samples.length,
+	// 		// 	totals.humidity / samples.length,
+	// 		// 	totals.precip,
+	// 		// 	samples[ samples.length - 1 ].precipitation > 0);
+	// 	}
 
-		return data;
-	}
+	// 	return data;
+	// }
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 

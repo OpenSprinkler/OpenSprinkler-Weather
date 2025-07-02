@@ -1,6 +1,6 @@
 import * as moment from "moment-timezone";
 
-import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
 import { httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
@@ -15,58 +15,58 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		this.API_KEY = process.env.ACCUWEATHER_API_KEY;
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData[] > {
+	// public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WateringData[] > {
 
-		const localKey = keyToUse(this.API_KEY, pws);
+	// 	const localKey = keyToUse(this.API_KEY, pws);
 
-		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
+	// 	const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
 
-		let locationData;
-		try {
-			locationData = await httpJSONRequest( locationUrl );
-		} catch ( err ) {
-			console.error( "Error retrieving location information from AccuWeather:", err );
-		}
+	// 	let locationData;
+	// 	try {
+	// 		locationData = await httpJSONRequest( locationUrl );
+	// 	} catch ( err ) {
+	// 		console.error( "Error retrieving location information from AccuWeather:", err );
+	// 	}
 
-		const historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
+	// 	const historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
 
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl );
-		} catch ( err ) {
-			console.error( "Error retrieving weather information from AccuWeather:", err );
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
+	// 	let historicData;
+	// 	try {
+	// 		historicData = await httpJSONRequest( historicUrl );
+	// 	} catch ( err ) {
+	// 		console.error( "Error retrieving weather information from AccuWeather:", err );
+	// 		throw new CodedError( ErrorCode.WeatherApiError );
+	// 	}
 
-		let dataLen = historicData.length;
-		if ( typeof dataLen !== "number" ) {
-			throw "Necessary field(s) were missing from weather information returned by AccuWeather.";
-		}
-		if ( dataLen < 23 ) {
-			throw new CodedError( ErrorCode.InsufficientWeatherData );
-		}
+	// 	let dataLen = historicData.length;
+	// 	if ( typeof dataLen !== "number" ) {
+	// 		throw "Necessary field(s) were missing from weather information returned by AccuWeather.";
+	// 	}
+	// 	if ( dataLen < 23 ) {
+	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
+	// 	}
 
-		const totals = { temp: 0, humidity: 0};
-		for ( const sample of historicData ) {
-			/*
-			 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
-			 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
-			 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
-			 * significantly skewed if data is missing for several consecutive hours).
-			 */
-			totals.temp += sample.Temperature.Imperial.Value;
-			totals.humidity += sample.RelativeHumidity;
-		}
+	// 	const totals = { temp: 0, humidity: 0};
+	// 	for ( const sample of historicData ) {
+	// 		/*
+	// 		 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
+	// 		 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
+	// 		 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
+	// 		 * significantly skewed if data is missing for several consecutive hours).
+	// 		 */
+	// 		totals.temp += sample.Temperature.Imperial.Value;
+	// 		totals.humidity += sample.RelativeHumidity;
+	// 	}
 
-		// Accuweather returns data in reverse chronological order by hour
-		return [{
-			weatherProvider: "AW",
-			temp: totals.temp / dataLen,
-			humidity: totals.humidity / dataLen,
-			precip: historicData[0].PrecipitationSummary.Past24Hours.Imperial.Value,
-			raining: historicData[0].Precip1hr.Imperial.Value > 0
-		}];
-	}
+	// 	// Accuweather returns data in reverse chronological order by hour
+	// 	return [{
+	// 		weatherProvider: "AW",
+	// 		temp: totals.temp / dataLen,
+	// 		humidity: totals.humidity / dataLen,
+	// 		precip: historicData[0].PrecipitationSummary.Past24Hours.Imperial.Value,
+	// 		raining: historicData[0].Precip1hr.Imperial.Value > 0
+	// 	}];
+	// }
 
 	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
 

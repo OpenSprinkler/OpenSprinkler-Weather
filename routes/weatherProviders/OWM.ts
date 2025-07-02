@@ -15,49 +15,49 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		this.API_KEY = process.env.OWM_API_KEY;
 	}
 
-	public async getWateringData(coordinates: GeoCoordinates, pws?: PWS): Promise<ZimmermanWateringData[]> {
+	// public async getWateringData(coordinates: GeoCoordinates, pws?: PWS): Promise<ZimmermanWateringData[]> {
 
-		const localKey = keyToUse(this.API_KEY, pws);
+	// 	const localKey = keyToUse(this.API_KEY, pws);
 
-		// The OWM free API options changed so need to use the new API method
-		//Get previous date by using UTC
-		const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
-		let time = Date.now();
-		time -= (86400000 + timezone * 3600);
-		const date = new Date(time);
-		let day = this.pad(date.getUTCDate());
-		let month = this.pad(date.getUTCMonth() + 1);
-		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${date.getUTCFullYear()}-${month}-${day}`;
-		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ localKey }`;
+	// 	// The OWM free API options changed so need to use the new API method
+	// 	//Get previous date by using UTC
+	// 	const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
+	// 	let time = Date.now();
+	// 	time -= (86400000 + timezone * 3600);
+	// 	const date = new Date(time);
+	// 	let day = this.pad(date.getUTCDate());
+	// 	let month = this.pad(date.getUTCMonth() + 1);
+	// 	const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${date.getUTCFullYear()}-${month}-${day}`;
+	// 	const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ localKey }`;
 
-		// Perform the HTTP request to retrieve the weather data
-		let yesterdayData, todayData;
-		try {
-			yesterdayData = await httpJSONRequest(yesterdayUrl);
-			todayData = await httpJSONRequest(todayUrl);
+	// 	// Perform the HTTP request to retrieve the weather data
+	// 	let yesterdayData, todayData;
+	// 	try {
+	// 		yesterdayData = await httpJSONRequest(yesterdayUrl);
+	// 		todayData = await httpJSONRequest(todayUrl);
 
-		} catch ( err ) {
-			console.error( "Error retrieving weather information from OWM:", err );
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
+	// 	} catch ( err ) {
+	// 		console.error( "Error retrieving weather information from OWM:", err );
+	// 		throw new CodedError( ErrorCode.WeatherApiError );
+	// 	}
 
-		// Indicate watering data could not be retrieved if the forecast data is incomplete.
-		if ( !yesterdayData || !todayData ) {
-			throw new CodedError( ErrorCode.MissingWeatherField );
-		}
+	// 	// Indicate watering data could not be retrieved if the forecast data is incomplete.
+	// 	if ( !yesterdayData || !todayData ) {
+	// 		throw new CodedError( ErrorCode.MissingWeatherField );
+	// 	}
 
-		let temp = yesterdayData.temperature;
+	// 	let temp = yesterdayData.temperature;
 
-		let totalTemp = temp.min + temp.max + temp.afternoon + temp.night + temp.evening + temp.morning;
+	// 	let totalTemp = temp.min + temp.max + temp.afternoon + temp.night + temp.evening + temp.morning;
 
-		return [{
-			weatherProvider: "OWM",
-			temp: totalTemp / 6,
-			humidity: (yesterdayData.humidity.afternoon + todayData.current.humidity) / 2,
-			precip: yesterdayData.precipitation.total / 25.4,
-			raining: (todayData.current.weather.main === "Rain")
-		}];
-	}
+	// 	return [{
+	// 		weatherProvider: "OWM",
+	// 		temp: totalTemp / 6,
+	// 		humidity: (yesterdayData.humidity.afternoon + todayData.current.humidity) / 2,
+	// 		precip: yesterdayData.precipitation.total / 25.4,
+	// 		raining: (todayData.current.weather.main === "Rain")
+	// 	}];
+	// }
 
 	public async getWeatherData(coordinates: GeoCoordinates, pws?: PWS): Promise<WeatherData> {
 

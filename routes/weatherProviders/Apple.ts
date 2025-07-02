@@ -1,10 +1,10 @@
 import * as moment from "moment-timezone";
 import * as jwt from "jsonwebtoken";
 
-import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, WeatherData, WateringData } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
-import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
+import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 
 export default class AppleWeatherProvider extends WeatherProvider {
@@ -32,7 +32,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
           );
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData[] > {
+	public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData[] > {
 		// The Unix timestamp of 10 days ago.
 		const historicTimestamp: string = moment().subtract( 240, "hours" ).toISOString();
 
@@ -50,9 +50,8 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
-		const hours = [
-			...historicData.forecastHourly.hours
-		];
+		const hours = historicData.forecastHourly.hours;
+		const days = historicData.forecastDaily.days;
 
         // Fail if not enough data is available.
 		// There will only be 23 samples on the day that daylight saving time begins.
@@ -67,9 +66,23 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			daysInHours.push(hours.slice(i, i+24));
 		}
 
+		// Cut days down to match number of hours
+		days.splice(0, days.length - daysInHours.length);
+
+		// Pull data for each day of the given interval
 		const data = [];
 		for ( let i = 0; i < daysInHours.length; i++ ){
-			const totals = { temp: 0, humidity: 0, precip: 0 };
+			let temp: number = 0, humidity: number = 0,
+				minHumidity: number = undefined, maxHumidity: number = undefined;
+
+			const cloudCoverInfo: CloudCoverInfo[] = daysInHours[i].map( ( hour ): CloudCoverInfo => {
+				return {
+					startTime: moment( hour.forecastStart ),
+					endTime: moment( hour.forecastStart ).add( 1, "hours" ),
+					cloudCover: hour.cloudCover
+				};
+			} );
+
 			for ( const hour of daysInHours[i] ) {
 				/*
 				* If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
@@ -77,20 +90,36 @@ export default class AppleWeatherProvider extends WeatherProvider {
 				* calculated when data is missing from some samples (since they follow diurnal cycles and will be
 				* significantly skewed if data is missing for several consecutive hours).
 				*/
-				totals.temp += this.celsiusToFahrenheit(hour.temperature);
-				totals.humidity += hour.humidity;
-				// This field may be missing from the response if it is snowing.
-				totals.precip += this.mmToInchesPerHour(hour.precipitationIntensity || 0);
+				temp += this.celsiusToFahrenheit(hour.temperature);
+				humidity += hour.humidity;
+
+				// ETo should skip NaN humidity
+				if ( hour.humidity === undefined ) {
+					continue;
+				}
+
+				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
+				minHumidity = minHumidity < hour.humidity ? minHumidity : hour.humidity;
+				maxHumidity = maxHumidity > hour.humidity ? maxHumidity : hour.humidity;
 			}
 
 			const length = daysInHours[i].length;
+			const windSpeed = ( days[i].daytimeForecast.windSpeed + days[i].overnightForecast.windSpeed ) / 2;
 
 			data.push({
 				weatherProvider: "Apple",
-				temp: totals.temp / length,
-				humidity: totals.humidity / length * 100,
-				precip: totals.precip,
-				raining: (i < daysInHours.length - 1) ? false : daysInHours[i][length-1].precipitationIntensity > 0
+				temp: temp / length,
+				humidity: humidity / length * 100,
+				raining: (i < daysInHours.length - 1) ? false : daysInHours[i][length-1].precipitationIntensity > 0,
+				periodStartTime: moment(historicData.forecastDaily.days[ i ].forecastStart).unix(),
+				minTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ i ].temperatureMin ),
+				maxTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ i ].temperatureMax ),
+				minHumidity: minHumidity * 100,
+				maxHumidity: maxHumidity * 100,
+				solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
+				// Assume wind speed measurements are taken at 2 meters.
+				windSpeed: this.kphToMph( windSpeed ),
+				precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ i ].precipitationAmount || 0 )
 			});
 		}
 
@@ -141,75 +170,6 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		}
 
 		return weather;
-	}
-
-	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData[] > {
-		// The Unix timestamp of 10 days ago.
-		const historicTimestamp: string = moment().subtract( 240, "hours" ).toISOString();
-
-        const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${historicTimestamp}&dailyStart=${historicTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
-
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl, {Authorization: `Bearer ${this.API_KEY}`} );
-		} catch (err) {
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
-
-		const hours = historicData.forecastHourly.hours;
-		const days = historicData.forecastDaily.days;
-
-		// Cut hours down into full 24 hour sections
-		hours.splice(0, hours.length % 24);
-		const daysInHours = [];
-		for ( let i = 0; i < hours.length; i+=24 ){
-			daysInHours.push(hours.slice(i, i+24));
-		}
-
-		// Cut days down to match number of hours
-		days.splice(0, days.length - daysInHours.length)
-
-		// Pull data for each day of the given interval
-		const data = [];
-		for ( let i = 0; i < daysInHours.length; i++ ){
-			const cloudCoverInfo: CloudCoverInfo[] = daysInHours[i].map( ( hour ): CloudCoverInfo => {
-				return {
-					startTime: moment( hour.forecastStart ),
-					endTime: moment( hour.forecastStart ).add( 1, "hours" ),
-					cloudCover: hour.cloudCover
-				};
-			} );
-
-			let minHumidity: number = undefined, maxHumidity: number = undefined;
-			for ( const hour of daysInHours[i] ) {
-				// Skip hours where humidity measurement does not exist to prevent result from being NaN.
-				if ( hour.humidity === undefined ) {
-					continue;
-				}
-
-				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-				minHumidity = minHumidity < hour.humidity ? minHumidity : hour.humidity;
-				maxHumidity = maxHumidity > hour.humidity ? maxHumidity : hour.humidity;
-			}
-
-			let windSpeed = ( days[i].daytimeForecast.windSpeed + days[i].overnightForecast.windSpeed ) / 2;
-
-			data.push({
-				weatherProvider: "Apple",
-				periodStartTime: moment(historicData.forecastDaily.days[ i ].forecastStart).unix(),
-				minTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ i ].temperatureMin ),
-				maxTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ i ].temperatureMax ),
-				minHumidity: minHumidity * 100,
-				maxHumidity: maxHumidity * 100,
-				solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
-				// Assume wind speed measurements are taken at 2 meters.
-				windSpeed: this.kphToMph( windSpeed ),
-				precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ i ].precipitationAmount || 0 )
-			});
-		}
-
-		return data;
-
 	}
 
 	public shouldCacheWateringScale(): boolean {
