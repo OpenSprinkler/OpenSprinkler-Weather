@@ -1,65 +1,92 @@
-import * as moment from "moment-timezone";
-
-import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
 import { httpJSONRequest } from "../weather";
-import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 
 export default class WUnderground extends WeatherProvider {
 
-	// async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData[] > {
-	// 	if ( !pws ) {
-	// 		throw new CodedError( ErrorCode.NoPwsProvided );
-	// 	}
+	async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WateringData[] > {
+		if ( !pws ) {
+			throw new CodedError( ErrorCode.NoPwsProvided );
+		}
 
-	// 	console.log("WU getWateringData request for coordinates: %s", coordinates);
+		console.log("WU getWateringData request for coordinates: %s", coordinates);
 
-	// 	const historicUrl = `https://api.weather.com/v2/pws/observations/hourly/7day?stationId=${ pws.id }&format=json&units=e&apiKey=${ pws.apiKey }`;
-	// 	let historicData;
-	// 	try {
-	// 		historicData = await httpJSONRequest( historicUrl );
-	// 	} catch ( err ) {
-	// 		console.error( "Error retrieving weather information from WUnderground:", err );
-	// 		throw new CodedError( ErrorCode.WeatherApiError );
-	// 	}
+		const historicUrl = `https://api.weather.com/v2/pws/observations/hourly/7day?stationId=${ pws.id }&format=json&units=e&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
+		let historicData;
+		try {
+			historicData = await httpJSONRequest( historicUrl );
+		} catch ( err ) {
+			console.error( "Error retrieving weather information from WUnderground:", err );
+			throw new CodedError( ErrorCode.WeatherApiError );
+		}
 
-	// 	const hours = historicData.observations;
+		if ( !historicData || !historicData.observations ) {
+			throw "Necessary field(s) were missing from weather information returned by Wunderground.";
+		}
 
-	// 	// Cut hours into 24 hour sections up to most recent
-	// 	hours.splice(0, hours.length % 24);
-	// 	const daysInHours = [];
-	// 	for (let i = 0; i < hours.length; i+=24){
-	// 		daysInHours.push(hours.slice(i, i+24));
-	// 	}
+		const hours = historicData.observations;
 
-	// 	// Fail if not enough data is available.
-	// 	if ( daysInHours.length < 1 || daysInHours[0].length !== 24 ) {
-	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
-	// 	}
+		// Cut hours into 24 hour sections up to most recent
+		hours.splice(0, hours.length % 24);
+		const daysInHours = [];
+		for (let i = 0; i < hours.length; i+=24){
+			daysInHours.push(hours.slice(i, i+24));
+		}
 
-	// 	const data = [];
-	// 	for ( let i = 0; i < daysInHours.length; i++ ){
-	// 		const totals = { temp: 0, humidity: 0, precip: 0 };
-	// 		for ( const hour of daysInHours[i] ) {
-	// 			totals.temp += hour.imperial.tempAvg;
-	// 			totals.humidity += hour.humidityAvg;
-	// 			// Each hour is accumulation to present, not per hour precipitation. Using greatest value means last hour of each day is used.
-	// 			totals.precip = totals.precip > hour.imperial.precipTotal ? totals.precip : hour.imperial.precipTotal;
-	// 		}
+		// Fail if not enough data is available.
+		if ( daysInHours.length < 1 || daysInHours[0].length !== 24 ) {
+			throw new CodedError( ErrorCode.InsufficientWeatherData );
+		}
 
-	// 		data.push( {
-	// 			weatherProvider: "WU",
-	// 			temp: totals.temp / 24,
-	// 			humidity: totals.humidity / 24,
-	// 			precip: totals.precip,
-	// 			raining: daysInHours[i][ daysInHours[i].length - 1 ].imperial.precipRate > 0
-	// 		} );
-	// 	}
+		const data = [];
+		for ( let i = 0; i < daysInHours.length; i++ ){
+			let temp: number = 0, humidity: number = 0, precip: number = 0,
+			minHumidity: number = undefined, maxHumidity: number = undefined,
+			minTemp: number = undefined, maxTemp: number = undefined,
+			wind: number = 0, solar: number = 0;
 
-	// 	return data;
+			for ( const hour of daysInHours[i] ) {
 
-	// }
+				temp += hour.imperial.tempAvg;
+				humidity += hour.humidityAvg;
+
+				// Each hour is accumulation to present, not per hour precipitation. Using greatest value means last hour of each day is used.
+				precip = precip > hour.imperial.precipTotal ? precip : hour.imperial.precipTotal;
+
+				minTemp = minTemp < hour.imperial.tempLow ? minTemp : hour.imperial.tempLow;
+				maxTemp = maxTemp > hour.imperial.tempHigh ? maxTemp : hour.imperial.tempHigh;
+
+				if (hour.imperial.windspeedAvg != null && hour.imperial.windspeedAvg > wind)
+					wind = hour.imperial.windspeedAvg;
+
+				if (hour.solarRadiationHigh != null)
+					solar += hour.solarRadiationHigh;
+
+				minHumidity = minHumidity < hour.humidityLow ? minHumidity : hour.humidityLow;
+				maxHumidity = maxHumidity > hour.humidityHigh ? maxHumidity : hour.humidityHigh;
+			}
+
+			data.push( {
+				weatherProvider: "WU",
+				temp: temp / 24,
+				humidity: humidity / 24,
+				precip: precip,
+				raining: daysInHours[i][ daysInHours[i].length - 1 ].imperial.precipRate > 0,
+				periodStartTime: daysInHours[i][0].epoch,
+				minTemp: minTemp,
+				maxTemp: maxTemp,
+				minHumidity: minHumidity,
+				maxHumidity: maxHumidity,
+				solarRadiation: solar / 1000, // Returned in Watts from API
+				// Assume wind speed measurements are taken at 2 meters.
+				windSpeed: wind
+			} );
+		}
+
+		return data;
+
+	}
 
 	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
 		if ( !pws ) {
@@ -122,87 +149,6 @@ export default class WUnderground extends WeatherProvider {
 		}
 
 		return weather;
-	}
-
-	public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData[] > {
-		if ( !pws ) {
-			throw new CodedError( ErrorCode.NoPwsProvided );
-		}
-
-		console.log("WU getEToData request for coordinates: %s %s", coordinates, pws.id);
-
-		//Calling for data from last 7 days
-		const historicUrl = `https://api.weather.com/v2/pws/observations/hourly/7day?stationId=${ pws.id }&format=json&units=e&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
-
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl );
-		} catch (err) {
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
-
-		if ( !historicData || !historicData.observations ) {
-			throw "Necessary field(s) were missing from weather information returned by Wunderground.";
-		}
-
-		const hours = historicData.observations;
-
-		// Cut hours into 24 hour sections
-		hours.splice(0, hours.length % 24);
-		const daysInHours = [];
-		for (let i = 0; i < hours.length; i+=24){
-			daysInHours.push(hours.slice(i, i+24));
-		}
-
-		const data = [];
-		for ( let i = 0; i < daysInHours.length; i++ ){
-			let minHumidity: number = undefined, maxHumidity: number = undefined;
-			let minTemp: number = undefined, maxTemp: number = undefined
-			let precip: number = 0;
-			let wind: number = 0, solar: number = 0;
-
-			for ( const hour of daysInHours[i] ) {
-
-				minTemp = minTemp < hour.imperial.tempLow ? minTemp : hour.imperial.tempLow;
-				maxTemp = maxTemp > hour.imperial.tempHigh ? maxTemp : hour.imperial.tempHigh;
-
-				// Each hour is accumulation to present, not per hour precipitation. Using greatest value means last hour of each day is used.
-				precip = precip > hour.imperial.precipTotal ? precip: hour.imperial.precipTotal;
-
-				if (hour.imperial.windspeedAvg != null && hour.imperial.windspeedAvg > wind)
-					wind = hour.imperial.windspeedAvg;
-
-				if (hour.solarRadiationHigh != null)
-					solar += hour.solarRadiationHigh;
-
-				minHumidity = minHumidity < hour.humidityLow ? minHumidity : hour.humidityLow;
-				maxHumidity = maxHumidity > hour.humidityHigh ? maxHumidity : hour.humidityHigh;
-			}
-
-			solar = solar / 1000; //Watts/m2 in 24h -->KWh/m2 (Total per day, not average)
-
-			const result : EToData = {
-				weatherProvider: "WU",
-				periodStartTime: daysInHours[i][0].epoch,
-				minTemp: minTemp,
-				maxTemp: maxTemp,
-				minHumidity: minHumidity,
-				maxHumidity: maxHumidity,
-				solarRadiation: solar,
-				// Assume wind speed measurements are taken at 2 meters.
-				windSpeed: wind,
-				precip: precip,
-			}
-
-			data.push(result);
-
-			// console.log("WU 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s n:%s nig:%s",
-			// 	(this.inch2mm(precip)).toPrecision(3),
-			// 	solar.toPrecision(3),
-			// 	(this.F2C(minTemp)).toPrecision(3), (this.F2C(maxTemp)).toPrecision(3), minHumidity, maxHumidity, (this.mph2kmh(wind)).toPrecision(4), n, nig);
-		}
-
-		return data;
 	}
 
 	public shouldCacheWateringScale(): boolean {
