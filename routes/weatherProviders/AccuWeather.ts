@@ -3,7 +3,7 @@ import * as moment from "moment-timezone";
 import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
 import { httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
-import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
+import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 
 export default class AccuWeatherWeatherProvider extends WeatherProvider {
