@@ -1,10 +1,10 @@
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { GeoCoordinates, WeatherData, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, WeatherData, WateringData } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
-import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
+import { EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 
 export default class OpenMeteoWeatherProvider extends WeatherProvider {
@@ -16,78 +16,93 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		super();
 	}
 
-	// public async getWateringData( coordinates: GeoCoordinates ): Promise< ZimmermanWateringData[] > {
-	// 	//console.log("OM getWateringData request for coordinates: %s", coordinates);
+	public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData[] > {
+		//console.log("OM getWateringData request for coordinates: %s", coordinates);
 
-	// 	const start: string = moment().subtract( 10, "day" ).format("YYYY-MM-DD");
-	// 	const end: string = moment().subtract( 0, "day" ).format("YYYY-MM-DD");
-	// 	const historicUrl = `https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation&temperature_unit=fahrenheit&precipitation_unit=inch&timeformat=unixtime&start_date=${ start }&end_date=${ end }`;
+		const start: string = moment().subtract( 10, "day" ).format("YYYY-MM-DD");
+		const end: string = moment().subtract( 0, "day" ).format("YYYY-MM-DD");
+		const historicUrl = `https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime&start_date=${ start }&end_date=${ end }`;
 
-	// 	let historicData;
-	// 	try {
-	// 		historicData = await httpJSONRequest( historicUrl );
-	// 	} catch ( err ) {
-	// 		console.error( "Error retrieving weather information from OpenMeteo:", err );
-	// 		throw new CodedError( ErrorCode.WeatherApiError );
-	// 	}
+		let historicData;
+		try {
+			historicData = await httpJSONRequest( historicUrl );
+		} catch ( err ) {
+			console.error( "Error retrieving weather information from OpenMeteo:", err );
+			throw new CodedError( ErrorCode.WeatherApiError );
+		}
 
-	// 	if ( !historicData.hourly ) {
-	// 		throw new CodedError( ErrorCode.MissingWeatherField );
-	// 	}
+		if ( !historicData && !historicData.hourly ) {
+			throw new CodedError( ErrorCode.MissingWeatherField );
+		}
 
-	// 	// Offset makes sure always reach most recent data
-	// 	const offset = historicData.hourly.time.length % 24;
-	// 	const days = Math.floor(historicData.hourly.time.length / 24);
-	// 	const data = [];
+		// Offset makes sure always reach most recent data
+		const offset = historicData.hourly.time.length % 24;
+		const days = Math.floor(historicData.hourly.time.length / 24);
+		const data = [];
 
-	// 	for(let i = 0; i < days; i++){
-	// 		let result;
-	// 		let maxIndex: number = 0;
-	// 		const totals = { temp: 0, humidity: 0, precip: 0, raining: false };
-	// 		const now: number = moment().unix();
+		for(let i = 0; i < days; i++){
+			let maxIndex: number = 0;
+			let temp: number = 0, humidity: number = 0, precip: number = 0, raining: boolean = false,
+				minHumidity: number = undefined, maxHumidity: number = undefined,
+				minTemp: number = undefined, maxTemp: number = undefined,
+				wind: number = 0, solar: number = 0;
+			const now: number = moment().unix();
 
-	// 		for (let index = i*24 + offset;  index < ((i+1)*24 + offset); index++ ) {
-	// 			if (historicData.hourly.time[index] > now) {
-	// 				maxIndex = index-1;
-	// 				totals.raining = historicData.hourly.precipitation[maxIndex] > 0 || historicData.hourly.precipitation[index] > 0;
-	// 				break;
-	// 			}
-	// 			totals.temp += historicData.hourly.temperature_2m[index];
-	// 			totals.humidity += historicData.hourly.relativehumidity_2m[index];
-	// 			totals.precip += historicData.hourly.precipitation[index]  || 0;
-	// 		}
+			for (let index = i*24 + offset;  index < ((i+1)*24 + offset); index++ ) {
+				if (historicData.hourly.time[index] > now) {
+					maxIndex = index-1;
+					raining = historicData.hourly.precipitation[maxIndex] > 0 || historicData.hourly.precipitation[index] > 0;
+					break;
+				}
+				temp += historicData.hourly.temperature_2m[index];
+				humidity += historicData.hourly.relativehumidity_2m[index];
+				precip += historicData.hourly.precipitation[index]  || 0;
 
-	// 		if(maxIndex !== 0){
-	// 			// Compute how many hours in non full day
-	// 			const hours = maxIndex - (24 * i + offset);
-	// 			result = {
-	// 				weatherProvider: "OpenMeteo",
-	// 				temp: totals.temp / hours,
-	// 				humidity: totals.humidity / hours,
-	// 				precip: totals.precip,
-	// 				raining: totals.raining
-	// 			}
-	// 		}else{
-	// 			result = {
-	// 				weatherProvider: "OpenMeteo",
-	// 				temp: totals.temp / 24,
-	// 				humidity: totals.humidity / 24,
-	// 				precip: totals.precip,
-	// 				raining: totals.raining
-	// 			}
-	// 		}
+				minTemp = minTemp < historicData.hourly.temperature_2m[index] ? minTemp : historicData.hourly.temperature_2m[index];
+				maxTemp = maxTemp > historicData.hourly.temperature_2m[index] ? maxTemp : historicData.hourly.temperature_2m[index];
 
-	// 		/*console.log("OM 1: temp:%s humidity:%s precip:%s raining:%s",
-	// 			this.F2C(result.temp),
-	// 			result.humidity,
-	// 			this.inch2mm(result.precip),
-	// 			result.raining);*/
+				if (historicData.hourly.windspeed_10m[index] > wind)
+					wind = historicData.hourly.windspeed_10m[index];
 
-	// 		data.push(result);
-	// 	}
+				minHumidity = minHumidity < historicData.hourly.relativehumidity_2m[index] ? minHumidity : historicData.hourly.relativehumidity_2m[index];
+				maxHumidity = maxHumidity > historicData.hourly.relativehumidity_2m[index] ? maxHumidity : historicData.hourly.relativehumidity_2m[index];
 
-	// 	return data;
-	// }
+				solar += historicData.hourly.direct_radiation[index];
+			}
+
+
+			let hours = 24;
+			if(maxIndex !== 0){
+				// Compute how many hours in non full day
+				hours = maxIndex - (24 * i + offset);
+			}
+
+			const result: WateringData = {
+				weatherProvider: "OpenMeteo",
+				temp: temp / hours,
+				humidity: humidity / hours,
+				precip: precip,
+				raining: raining,
+				periodStartTime: historicData.hourly.time[i*24],
+				minTemp: minTemp,
+				maxTemp: maxTemp,
+				minHumidity: minHumidity,
+				maxHumidity: maxHumidity,
+				solarRadiation: solar / 1000, // API gives in Watts
+				windSpeed: wind
+			}
+
+			/*console.log("OM 1: temp:%s humidity:%s precip:%s raining:%s",
+				this.F2C(result.temp),
+				result.humidity,
+				this.inch2mm(result.precip),
+				result.raining);*/
+
+			data.push(result);
+		}
+
+		return data;
+	}
 
 	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
 
@@ -144,76 +159,6 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			this.mph2kmh(weather.wind));*/
 
 		return weather;
-	}
-
-	public async getEToData( coordinates: GeoCoordinates ): Promise< EToData[] > {
-
-		const start: string = moment().subtract( 10, "day" ).format("YYYY-MM-DD");
-		const end: string = moment().subtract( 0, "day" ).format("YYYY-MM-DD");
-		const historicUrl = `https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime&start_date=${ start }&end_date=${ end }`;
-
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl );
-		} catch (err) {
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
-
-		if ( !historicData || !historicData.hourly ) {
-			throw "Necessary field(s) were missing from weather information returned by Bright Sky.";
-		}
-
-		const days = Math.floor(historicData.hourly.time.length / 24);
-		const data = [];
-
-		for(let i = 0; i < days; i++){
-			let minHumidity: number = undefined, maxHumidity: number = undefined;
-			let minTemp: number = undefined, maxTemp: number = undefined, precip: number = 0;
-			let wind: number = 0, solar: number = 0;
-			let maxIndex: number = 0;
-			const now: number = moment().unix();
-			for (let index = i*24;  index < ((i+1)*24); index++ ) {
-				if (historicData.hourly.time[index] > now)
-				{
-					maxIndex = index-1;
-					break;
-				}
-
-				minTemp = minTemp < historicData.hourly.temperature_2m[index] ? minTemp : historicData.hourly.temperature_2m[index];
-				maxTemp = maxTemp > historicData.hourly.temperature_2m[index] ? maxTemp : historicData.hourly.temperature_2m[index];
-
-				precip += historicData.hourly.precipitation[index];
-				if (historicData.hourly.windspeed_10m[index] > wind)
-					wind = historicData.hourly.windspeed_10m[index];
-
-				minHumidity = minHumidity < historicData.hourly.relativehumidity_2m[index] ? minHumidity : historicData.hourly.relativehumidity_2m[index];
-				maxHumidity = maxHumidity > historicData.hourly.relativehumidity_2m[index] ? maxHumidity : historicData.hourly.relativehumidity_2m[index];
-
-				solar += historicData.hourly.direct_radiation[index];
-			}
-
-			solar = solar / 1000; // Returned each hour in Watts
-			const result : EToData = {
-				weatherProvider: "OpenMeteo",
-				periodStartTime: historicData.hourly.time[i*24],
-				minTemp: minTemp,
-				maxTemp: maxTemp,
-				minHumidity: minHumidity,
-				maxHumidity: maxHumidity,
-				solarRadiation: solar,
-				windSpeed: wind,
-				precip: precip,
-			}
-			/*console.log("OM 3: precip:%s solar:%s minTemp:%s maxTemp:%s minHum:%s maxHum:%s wind:%s from:%s maxIdx:%s",
-				precip.toPrecision(3),
-				solar.toPrecision(3),
-				this.F2C(minTemp), this.F2C(maxTemp), minHumidity, maxHumidity, this.mph2kmh(wind), moment.unix(historicData.hourly.time[0]).format(), maxIndex);*/
-
-			data.push(result);
-
-		}
-
-		return data;
 	}
 
 	public shouldCacheWateringScale(): boolean {
