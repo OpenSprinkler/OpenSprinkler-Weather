@@ -15,58 +15,92 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		this.API_KEY = process.env.ACCUWEATHER_API_KEY;
 	}
 
-	// public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WateringData[] > {
+	public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WateringData[] > {
 
-	// 	const localKey = keyToUse(this.API_KEY, pws);
+		const localKey = keyToUse(this.API_KEY, pws);
 
-	// 	const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
+		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
 
-	// 	let locationData;
-	// 	try {
-	// 		locationData = await httpJSONRequest( locationUrl );
-	// 	} catch ( err ) {
-	// 		console.error( "Error retrieving location information from AccuWeather:", err );
-	// 	}
+		let locationData;
+		try {
+			locationData = await httpJSONRequest( locationUrl );
+		} catch ( err ) {
+			console.error( "Error retrieving location information from AccuWeather:", err );
+		}
 
-	// 	const historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
+		const historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
 
-	// 	let historicData;
-	// 	try {
-	// 		historicData = await httpJSONRequest( historicUrl );
-	// 	} catch ( err ) {
-	// 		console.error( "Error retrieving weather information from AccuWeather:", err );
-	// 		throw new CodedError( ErrorCode.WeatherApiError );
-	// 	}
+		let historicData;
+		try {
+			historicData = await httpJSONRequest( historicUrl );
+		} catch ( err ) {
+			console.error( "Error retrieving weather information from AccuWeather:", err );
+			throw new CodedError( ErrorCode.WeatherApiError );
+		}
 
-	// 	let dataLen = historicData.length;
-	// 	if ( typeof dataLen !== "number" ) {
-	// 		throw "Necessary field(s) were missing from weather information returned by AccuWeather.";
-	// 	}
-	// 	if ( dataLen < 23 ) {
-	// 		throw new CodedError( ErrorCode.InsufficientWeatherData );
-	// 	}
+		let dataLen = historicData.length;
+		if ( typeof dataLen !== "number" ) {
+			throw "Necessary field(s) were missing from weather information returned by AccuWeather.";
+		}
+		if ( dataLen < 23 ) {
+			throw new CodedError( ErrorCode.InsufficientWeatherData );
+		}
 
-	// 	const totals = { temp: 0, humidity: 0};
-	// 	for ( const sample of historicData ) {
-	// 		/*
-	// 		 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
-	// 		 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
-	// 		 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
-	// 		 * significantly skewed if data is missing for several consecutive hours).
-	// 		 */
-	// 		totals.temp += sample.Temperature.Imperial.Value;
-	// 		totals.humidity += sample.RelativeHumidity;
-	// 	}
+		const cloudCoverInfo: CloudCoverInfo[] = historicData.map( ( hour ): CloudCoverInfo => {
+			//return empty interval if measurement does not exist
+			if(hour.CloudCover === undefined ){
+				return {
+					startTime: moment.unix( hour.EpochTime ),
+					endTime: moment.unix( hour.EpochTime ),
+					cloudCover: 0
+				}
+			}
+			return {
+				startTime: moment.unix( hour.EpochTime ),
+				endTime: moment.unix( hour.EpochTime ).add( 1, "hours" ),
+				cloudCover: hour.CloudCover / 100
+			};
+		} );
 
-	// 	// Accuweather returns data in reverse chronological order by hour
-	// 	return [{
-	// 		weatherProvider: "AW",
-	// 		temp: totals.temp / dataLen,
-	// 		humidity: totals.humidity / dataLen,
-	// 		precip: historicData[0].PrecipitationSummary.Past24Hours.Imperial.Value,
-	// 		raining: historicData[0].Precip1hr.Imperial.Value > 0
-	// 	}];
-	// }
+		let temp: number = 0, humidity: number = 0,
+			minHumidity: number = undefined, maxHumidity: number = undefined, avgWindSpeed: number = 0;
+		for ( const hour of historicData ) {
+			/*
+			 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
+			 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
+			 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
+			 * significantly skewed if data is missing for several consecutive hours).
+			 */
+			temp += hour.Temperature.Imperial.Value;
+			humidity += hour.RelativeHumidity;
+
+			// Skip hours where humidity measurement does not exist to prevent ETo result from being NaN.
+			if ( hour.RelativeHumidity !== undefined ) {
+				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
+				minHumidity = minHumidity < hour.RelativeHumidity ? minHumidity : hour.RelativeHumidity;
+				maxHumidity = maxHumidity > hour.RelativeHumidity ? maxHumidity : hour.RelativeHumidity;
+			}
+
+			avgWindSpeed += hour.Wind.Speed.Imperial.Value || 0;
+		}
+
+		// Accuweather returns data in reverse chronological order by hour
+		return [{
+			weatherProvider: "AW",
+			temp: temp / dataLen,
+			humidity: humidity / dataLen,
+			precip: historicData[0].PrecipitationSummary.Past24Hours.Imperial.Value,
+			raining: historicData[0].Precip1hr.Imperial.Value > 0,
+			periodStartTime: historicData[dataLen - 1].EpochTime,
+			minTemp: historicData[0].TemperatureSummary.Past24HourRange.Minimum.Imperial.Value,
+			maxTemp: historicData[0].TemperatureSummary.Past24HourRange.Maximum.Imperial.Value,
+			minHumidity: minHumidity,
+			maxHumidity: maxHumidity,
+			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
+			// Assume wind speed measurements are taken at 2 meters.
+			windSpeed: avgWindSpeed
+		}];
+	}
 
 	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
 
@@ -127,73 +161,6 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		}
 
 		return weather;
-	}
-
-	public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData[] > {
-
-		const localKey = keyToUse(this.API_KEY, pws);
-
-		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
-
-		let locationData;
-		try {
-			locationData = await httpJSONRequest( locationUrl );
-		} catch ( err ) {
-			console.error( "Error retrieving location information from AccuWeather:", err );
-		}
-
-		const historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
-
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl );
-		} catch (err) {
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
-
-		const cloudCoverInfo: CloudCoverInfo[] = historicData.map( ( hour ): CloudCoverInfo => {
-			//return empty interval if measurement does not exist
-			if(hour.CloudCover === undefined ){
-				return {
-					startTime: moment.unix( hour.EpochTime ),
-					endTime: moment.unix( hour.EpochTime ),
-					cloudCover: 0
-				}
-			}
-			return {
-				startTime: moment.unix( hour.EpochTime ),
-				endTime: moment.unix( hour.EpochTime ).add( 1, "hours" ),
-				cloudCover: hour.CloudCover / 100
-			};
-		} );
-
-
-		let minHumidity: number = undefined, maxHumidity: number = undefined, avgWindSpeed: number = 0;
-		for ( const hour of historicData ) {
-			// Skip hours where humidity measurement does not exist to prevent result from being NaN.
-			if ( hour.RelativeHumidity !== undefined ) {
-				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-				minHumidity = minHumidity < hour.RelativeHumidity ? minHumidity : hour.RelativeHumidity;
-				maxHumidity = maxHumidity > hour.RelativeHumidity ? maxHumidity : hour.RelativeHumidity;
-			}
-
-			avgWindSpeed += hour.Wind.Speed.Imperial.Value || 0;
-		}
-
-		avgWindSpeed = avgWindSpeed / historicData.length;
-
-		return [{
-			weatherProvider: "AW",
-			periodStartTime: historicData[historicData.length - 1].EpochTime,
-			minTemp: historicData[0].TemperatureSummary.Past24HourRange.Minimum.Imperial.Value,
-			maxTemp: historicData[0].TemperatureSummary.Past24HourRange.Maximum.Imperial.Value,
-			minHumidity: minHumidity,
-			maxHumidity: maxHumidity,
-			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
-			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: avgWindSpeed,
-			precip: historicData[0].PrecipitationSummary.Past24Hours.Imperial.Value
-		}];
 	}
 
 	public shouldCacheWateringScale(): boolean {
