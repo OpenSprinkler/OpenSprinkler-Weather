@@ -93,6 +93,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			temp: Math.floor( forecast.currently.temperature ),
 			humidity: Math.floor( forecast.currently.humidity * 100 ),
 			wind: Math.floor( forecast.currently.windSpeed ),
+			raining: forecast.currently.precipIntensity > 0,
 			description: forecast.currently.summary,
 			icon: this.getOWMIconCode( forecast.currently.icon ),
 

@@ -24,6 +24,8 @@ export interface WeatherData {
     humidity: number;
     /** The current wind speed (in miles per hour). */
     wind: number;
+    /** A flag if it is currently raining.  */
+    raining: boolean;
     /** A human-readable description of the weather. */
     description: string;
     /** An icon ID that represents the current weather. This will be used in http://openweathermap.org/img/w/<ICON_ID>.png */

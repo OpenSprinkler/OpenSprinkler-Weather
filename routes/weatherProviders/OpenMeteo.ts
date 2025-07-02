@@ -116,6 +116,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			temp: current.current_weather.temperature,
 			humidity: 0,
 			wind: current.current_weather.windspeed,
+			raining: current.daily.precipitation_sum[0] > 0,
 			description: this.getWMOIconCode(current.current_weather.weathercode).desc,
 			icon: this.getWMOIconCode(current.current_weather.weathercode).icon,
 

@@ -118,6 +118,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			temp: Math.floor( this.celsiusToFahrenheit( forecast.currentWeather.temperature ) ),
 			humidity: Math.floor( forecast.currentWeather.humidity * 100 ),
 			wind: Math.floor( this.kphToMph( forecast.currentWeather.windSpeed ) ),
+			raining: forecast.currentWeather.precipitationIntensity > 0,
 			description: forecast.currentWeather.conditionCode,
 			icon: this.getOWMIconCode( forecast.currentWeather.conditionCode ),
 

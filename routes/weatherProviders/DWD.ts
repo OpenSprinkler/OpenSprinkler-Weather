@@ -114,6 +114,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			temp: this.C2F(current.weather.temperature),
 			humidity: current.weather.relative_humidity,
 			wind: this.kmh2mph(current.weather.wind_speed_30),
+			raining: current.weather.precipitation_60 > 0,
 			description: current.weather.condition,
 			icon: this.getOWMIconCode( current.weather.icon ),
 

@@ -99,6 +99,7 @@ export default class WUnderground extends WeatherProvider {
 			temp: Math.floor( current.imperial.temp ),
 			humidity: Math.floor( current.humidity ),
 			wind: Math.floor( current.imperial.windSpeed ),
+			raining: current.imperial.precipRate > 0,
 			description: forecast.narrative[0],
 			icon: this.getWUIconCode( (icon === null) ? -1 : icon ), //Null after 3pm
 

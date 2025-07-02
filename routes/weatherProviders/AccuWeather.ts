@@ -104,6 +104,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			temp: Math.floor( current.Temperature.Imperial.Value ),
 			humidity: Math.floor( current.RelativeHumidity ),
 			wind: Math.floor( current.Wind.Speed.Imperial.Value ),
+			raining: current.Precip1hr.Imperial.Value > 0,
 			description: current.WeatherText,
 			icon: this.getOWMIconCode( current.WeatherIcon ),
 

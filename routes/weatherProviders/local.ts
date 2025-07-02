@@ -54,6 +54,7 @@ export default class LocalWeatherProvider extends WeatherProvider {
 			maxTemp: undefined,
 			humidity: Math.floor( queue[ 0 ].humidity ) || undefined ,
 			wind: Math.floor( queue[ 0 ].windSpeed * 10 ) / 10 || undefined,
+			raining: false,
 			precip: Math.floor( queue.reduce( ( sum, obs ) => sum + ( obs.precip || 0 ), 0) * 100 ) / 100,
 			description: "",
 			icon: "01d",
@@ -61,6 +62,10 @@ export default class LocalWeatherProvider extends WeatherProvider {
 			city: undefined,
 			forecast: []
 		};
+
+		if (weather.precip > 0){
+			weather.raining = true;
+		}
 
 		return weather;
 	}
