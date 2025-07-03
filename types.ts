@@ -55,13 +55,6 @@ export interface WeatherDataForecast {
     description: string;
 }
 
-export interface BaseWateringData {
-    /** The WeatherProvider that generated this data. */
-    weatherProvider: WeatherProviderShortId;
-    /** The total precipitation over the window (in inches). */
-    precip: number;
-}
-
 /**
  * Data from a set of 24 hour windows that is used to calculate how watering levels should be scaled. This should ideally use
  * as many days of historic data as possible based on the selected provider.
@@ -95,15 +88,6 @@ export interface WateringData {
 	 * different height can be standardized to 2m using the `standardizeWindSpeed` function in EToAdjustmentMethod.
 	 */
 	windSpeed: number;
-}
-
-export interface ZimmermanWateringData extends BaseWateringData {
-    /** The average temperature over the window (in Fahrenheit). */
-    temp: number;
-    /** The average humidity over the window (as a percentage). */
-    humidity: number;
-    /** A boolean indicating if it is raining at the time that this data was retrieved. */
-    raining: boolean;
 }
 
 export type WeatherProviderId = "OWM" | "PirateWeather" | "local" | "mock" | "WUnderground" | "DWD" | "OpenMeteo" | "AccuWeather" | "Apple";

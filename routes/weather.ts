@@ -5,7 +5,7 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { BaseWateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
+import { WateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
 import WateringScaleCache, { CachedScale } from "../WateringScaleCache";
@@ -119,7 +119,7 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  * @param weather Watering data to use to determine if any restrictions apply.
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
-function checkWeatherRestriction( adjustmentValue: number, weather: BaseWateringData ): boolean {
+function checkWeatherRestriction( adjustmentValue: number, weather: WateringData ): boolean {
 
 	const californiaRestriction = ( adjustmentValue >> 7 ) & 1;
 
@@ -337,7 +337,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		data.scales = adjustmentMethodResponse.scales;
 
 		if ( checkRestrictions ) {
-			let wateringData: BaseWateringData = adjustmentMethodResponse.wateringData;
+			let wateringData: WateringData = adjustmentMethodResponse.wateringData;
 			let dataArr;
 			// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
 			if ( checkRestrictions && !wateringData ) {

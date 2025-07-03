@@ -11,7 +11,6 @@ process.env.OWM_API_KEY = "NO_KEY";
 import { getWateringData } from './weather';
 import { GeoCoordinates, WeatherData, WateringData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
-import { EToData } from "./adjustmentMethods/EToAdjustmentMethod";
 
 const expected = require( '../test/expected.json' );
 const replies = require( '../test/replies.json' );
@@ -90,11 +89,7 @@ export class MockWeatherProvider extends WeatherProvider {
         return await this.getData( "weatherData" ) as WeatherData;
     }
 
-    public async getEToData( coordinates: GeoCoordinates ): Promise< EToData[] > {
-        return await this.getData( "etoData" ) as EToData[];
-    }
-
-    private async getData( type: "wateringData" | "weatherData" | "etoData" ) {
+    private async getData( type: "wateringData" | "weatherData" ) {
         const data = this.mockData[ type ];
         if (data instanceof Array) {
             data.forEach((e) => {
@@ -114,6 +109,5 @@ export class MockWeatherProvider extends WeatherProvider {
 
 interface MockWeatherData {
     wateringData?: WateringData[],
-    weatherData?: WeatherData,
-    etoData?: EToData[]
+    weatherData?: WeatherData
 }

@@ -1,5 +1,4 @@
 import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
-import { EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 
 export class WeatherProvider {
@@ -26,17 +25,6 @@ export class WeatherProvider {
 	getWeatherData( coordinates : GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
 		throw "Selected WeatherProvider does not support getWeatherData";
 	}
-
-	/**
-	 * Retrieves the data necessary for calculating potential ETo.
-	 * @param coordinates The coordinates to retrieve the data for.
-	 * @return A Promise that will be resolved with an array of the maximum amount of possible days of EToData according
-	 * to the provider if it is successfully retrieved, or rejected with a CodedError if an error occurs while retrieving
-	 * the EToData (or the WeatherProvider does not support this method). Ensure this array is returned in chronological order.
-	 */
-	getEToData( coordinates: GeoCoordinates, pws?: PWS  ): Promise< EToData[] > {
-		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
-	};
 
 	/**
 	 * Returns a boolean indicating if watering scales calculated using data from this WeatherProvider should be cached

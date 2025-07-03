@@ -4,7 +4,6 @@ import * as geoTZ from "geo-tz";
 import { GeoCoordinates, WeatherData, WateringData } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
-import { EToData } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 
 export default class OpenMeteoWeatherProvider extends WeatherProvider {

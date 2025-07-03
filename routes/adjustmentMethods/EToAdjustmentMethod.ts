@@ -1,7 +1,7 @@
 import * as SunCalc from "suncalc";
 import * as moment from "moment";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./AdjustmentMethod";
-import { BaseWateringData, GeoCoordinates, PWS } from "../../types";
+import { GeoCoordinates, PWS, WateringData } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
 
@@ -32,7 +32,7 @@ async function calculateEToWateringScale(
 	 */
 
 	// This will throw a CodedError if ETo data cannot be retrieved.
-	const etoData: EToData[] = await weatherProvider.getWateringData( coordinates, pws );
+	const wateringData: WateringData[] = await weatherProvider.getWateringData( coordinates, pws );
 
 	let baseETo: number;
 	// Default elevation is based on data from https://www.pnas.org/content/95/24/14009.
@@ -50,10 +50,10 @@ async function calculateEToWateringScale(
 
 	// Flip array so in reverse chronological order
 	// Now the order is indexed by days going backwards, with 0 index referring to the most recent day of data.
-	etoData.reverse();
+	wateringData.reverse();
 
 	// Calculate eto scores per day
-	const etos = etoData.map(data => calculateETo( data, elevation, coordinates) - data.precip);
+	const etos = wateringData.map(data => calculateETo( data, elevation, coordinates) - data.precip);
 
 	// Compute uncapped scales for each score
 	const uncappedScales = etos.map(score => score / baseETo * 100);
@@ -73,17 +73,17 @@ async function calculateEToWateringScale(
 	return {
 		scale: scale,
 		rawData: {
-			wp: etoData[0].weatherProvider,
+			wp: wateringData[0].weatherProvider,
 			eto: Math.round( etos[0] * 1000) / 1000,
-			radiation: Math.round( etoData[0].solarRadiation * 100) / 100,
-			minT: Math.round( etoData[0].minTemp ),
-			maxT: Math.round( etoData[0].maxTemp ),
-			minH: Math.round( etoData[0].minHumidity ),
-			maxH: Math.round( etoData[0].maxHumidity ),
-			wind: Math.round( etoData[0].windSpeed * 10 ) / 10,
-			p: Math.round( etoData[0].precip * 100 ) / 100
+			radiation: Math.round( wateringData[0].solarRadiation * 100) / 100,
+			minT: Math.round( wateringData[0].minTemp ),
+			maxT: Math.round( wateringData[0].maxTemp ),
+			minH: Math.round( wateringData[0].minHumidity ),
+			maxH: Math.round( wateringData[0].maxHumidity ),
+			wind: Math.round( wateringData[0].windSpeed * 10 ) / 10,
+			p: Math.round( wateringData[0].precip * 100 ) / 100
 		},
-		wateringData: etoData[0],
+		wateringData: wateringData[0],
 		scales: scales
 	}
 }
@@ -94,21 +94,21 @@ async function calculateEToWateringScale(
  * Calculates the reference potential evapotranspiration using the Penman-Monteith (FAO-56) method
  * (http://www.fao.org/3/X0490E/x0490e07.htm).
  *
- * @param etoData The data to calculate the ETo with.
+ * @param wateringData The data to calculate the ETo with.
  * @param elevation The elevation above sea level of the watering site (in feet).
  * @param coordinates The coordinates of the watering site.
  * @return The reference potential evapotranspiration (in inches per day).
  */
-export function calculateETo( etoData: EToData, elevation: number, coordinates: GeoCoordinates ): number {
+export function calculateETo( wateringData: WateringData, elevation: number, coordinates: GeoCoordinates ): number {
 	// Convert to Celsius.
-	const minTemp = ( etoData.minTemp - 32 ) * 5 / 9;
-	const maxTemp = ( etoData.maxTemp - 32 ) * 5 / 9;
+	const minTemp = ( wateringData.minTemp - 32 ) * 5 / 9;
+	const maxTemp = ( wateringData.maxTemp - 32 ) * 5 / 9;
 	// Convert to meters.
 	elevation = elevation / 3.281;
 	// Convert to meters per second.
-	const windSpeed = etoData.windSpeed / 2.237;
+	const windSpeed = wateringData.windSpeed / 2.237;
 	// Convert to megajoules.
-	const solarRadiation = etoData.solarRadiation * 3.6;
+	const solarRadiation = wateringData.solarRadiation * 3.6;
 
 	const avgTemp = ( maxTemp + minTemp ) / 2;
 
@@ -130,9 +130,9 @@ export function calculateETo( etoData: EToData, elevation: number, coordinates: 
 
 	const avgSaturationVaporPressure = ( minSaturationVaporPressure + maxSaturationVaporPressure ) / 2;
 
-	const actualVaporPressure = ( minSaturationVaporPressure * etoData.maxHumidity / 100 + maxSaturationVaporPressure * etoData.minHumidity / 100 ) / 2;
+	const actualVaporPressure = ( minSaturationVaporPressure * wateringData.maxHumidity / 100 + maxSaturationVaporPressure * wateringData.minHumidity / 100 ) / 2;
 
-	const dayOfYear = moment.unix( etoData.periodStartTime ).dayOfYear();
+	const dayOfYear = moment.unix( wateringData.periodStartTime ).dayOfYear();
 
 	const inverseRelativeEarthSunDistance = 1 + 0.033 * Math.cos( 2 * Math.PI / 365 * dayOfYear );
 
@@ -227,29 +227,6 @@ export interface CloudCoverInfo {
 	endTime: moment.Moment;
 	/** The average fraction of the sky covered by clouds during this time period. */
 	cloudCover: number;
-}
-
-/**
- * Data used to calculate ETo. This data should be taken from a 24 hour time window.
- */
-export interface EToData extends BaseWateringData {
-	/** The Unix epoch seconds timestamp of the start of this 24 hour time window. */
-	periodStartTime: number;
-	/** The minimum temperature over the time period (in Fahrenheit). */
-	minTemp: number;
-	/** The maximum temperature over the time period (in Fahrenheit). */
-	maxTemp: number;
-	/** The minimum relative humidity over the time period (as a percentage). */
-	minHumidity: number;
-	/** The maximum relative humidity over the time period (as a percentage). */
-	maxHumidity: number;
-	/** The solar radiation, accounting for cloud coverage (in kilowatt hours per square meter per day). */
-	solarRadiation: number;
-	/**
-	 * The average wind speed measured at 2 meters over the time period (in miles per hour). A measurement taken at a
-	 * different height can be standardized to 2m using the `standardizeWindSpeed` function in EToAdjustmentMethod.
-	 */
-	windSpeed: number;
 }
 
 const EToAdjustmentMethod: AdjustmentMethod = {
