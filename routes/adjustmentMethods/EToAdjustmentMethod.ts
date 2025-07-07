@@ -83,7 +83,7 @@ async function calculateEToWateringScale(
 			wind: Math.round( wateringData[0].windSpeed * 10 ) / 10,
 			p: Math.round( wateringData[0].precip * 100 ) / 100
 		},
-		wateringData: wateringData[0],
+		wateringData: wateringData,
 		scales: scales
 	}
 }

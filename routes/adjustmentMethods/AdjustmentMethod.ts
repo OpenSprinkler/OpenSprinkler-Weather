@@ -44,7 +44,7 @@ export interface AdjustmentMethodResponse {
 	 */
 	rainDelay?: number;
 	/** The data that was used to calculate the watering scale, or undefined if no data was used. */
-	wateringData: WateringData;
+	wateringData: WateringData[];
 	/** A list of scales for multiple day data usage. */
 	scales?: number[];
 }
@@ -58,4 +58,8 @@ export interface AdjustmentOptions {
 	provider?: string;
 	/** Flag used to indicate if historical weather data is used. */
 	hwt?: number;
+	/** The maximum amount of rain that can be forecasted before watering stops */
+	rainAmt?: number;
+	/** The amount of days checked for the above rain amount */
+	rainDays?: number;
 }

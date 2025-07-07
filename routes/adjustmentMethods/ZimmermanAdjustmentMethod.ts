@@ -95,7 +95,7 @@ async function calculateZimmermanWateringScale(
 		// Apply all of the weather modifying factors and clamp the result between 0 and 200%.
 		scale: scales[0],
 		rawData: rawData[0],
-		wateringData: wateringData[0],
+		wateringData: wateringData,
 		scales: scales
 	}
 }

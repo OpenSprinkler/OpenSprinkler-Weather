@@ -90,5 +90,16 @@ export interface WateringData {
 	windSpeed: number;
 }
 
+/** A list of restrictions that can be checked. This list is used to enable or disable certain restrictions for checking. */
+
+export interface Restrictions {
+    /** Flag for the California restriction. */
+    california: boolean;
+    /** Flag for a forecasted rain restriction. */
+    rain: boolean;
+    /** Flag for a temperature restriction. */
+    temp: boolean;
+}
+
 export type WeatherProviderId = "OWM" | "PirateWeather" | "local" | "mock" | "WUnderground" | "DWD" | "OpenMeteo" | "AccuWeather" | "Apple";
 export type WeatherProviderShortId = "OWM" | "PW" | "local" | "mock" | "WU" | "DWD" | "OpenMeteo" | "AW" | "Apple";

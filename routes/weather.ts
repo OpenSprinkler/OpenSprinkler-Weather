@@ -5,7 +5,7 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { WateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
+import { WateringData, GeoCoordinates, PWS, TimeData, WeatherData, Restrictions } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
 import WateringScaleCache, { CachedScale } from "../WateringScaleCache";
@@ -115,21 +115,22 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  *
  * - California watering restriction prevents watering if precipitation over two days is greater than 0.1" over the past
  * 48 hours.
- * @param adjustmentValue The adjustment value, which indicates which restrictions should be checked.
- * @param weather Watering data to use to determine if any restrictions apply.
+ * @param restrictions A Restrictions object that defines which restrictions are enabled to check during this run.
+ * @param wateringData Watering data to use to determine if any restrictions apply.
+ * @param weather Weather data to use to determine if any restrictions apply.
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
-function checkWeatherRestriction( adjustmentValue: number, weather: WateringData ): boolean {
+function checkWeatherRestriction( restrictions: Restrictions, wateringData?: WateringData[], weather?: WeatherData ): boolean {
 
-	const californiaRestriction = ( adjustmentValue >> 7 ) & 1;
+	if ( restrictions.california ) {
+		// With the revamp of watering data, the most recent two days are the end of the array, giving 48 hours. If not, only the last one (24 hours) is used.
+		const len = wateringData.length;
+		let rain = wateringData[len-1].precip;
+		if ( len > 1 ){
+			rain += wateringData[len-2].precip;
+		}
 
-	if ( californiaRestriction ) {
-
-		// TODO depending on which WeatherProvider is used, this might be checking if rain is forecasted in th next 24
-		// 	hours rather than checking if it has rained in the past 48 hours.
-		// If the California watering restriction is in use then prevent watering
-		// if more then 0.1" of rain has accumulated in the past 48 hours
-		if ( weather.precip > 0.1 ) {
+		if ( rain > 0.1 ) {
 			return true;
 		}
 	}
@@ -337,7 +338,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		data.scales = adjustmentMethodResponse.scales;
 
 		if ( checkRestrictions ) {
-			let wateringData: WateringData = adjustmentMethodResponse.wateringData;
+			let wateringData: WateringData[] = adjustmentMethodResponse.wateringData;
 			let dataArr;
 			// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
 			if ( checkRestrictions && !wateringData ) {
@@ -351,8 +352,18 @@ export const getWateringData = async function( req: express.Request, res: expres
 				wateringData = dataArr[dataArr.length-1];
 			}
 
+			const restrictions: Restrictions = {
+				california: false,
+				rain: false,
+				temp: false
+			};
+
+			// Check California restriction enable
+			if ( (req.params[ 0 ] >> 7) & 1 )
+				restrictions.california = true;
+
 			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-			if ( checkWeatherRestriction( req.params[ 0 ], wateringData ) ) {
+			if ( checkWeatherRestriction( restrictions, wateringData, undefined ) ) {
 				data.scale = 0;
 			}
 		}
