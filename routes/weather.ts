@@ -136,13 +136,14 @@ function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], 
 		}
 	}
 
-	//TODO: Add rain
 	if ( restrictions.rainAmt > 0 && restrictions.rainDays ) {
-		// Currently, the only rain data provided is for the current day. So until I revamp the getWeatherData function it will only check today.
-		// TODO: Check if amount of data or raindays is greater before looping
-		//const days = weather.forecast.length > adjustmentOptions.restrictions.rainDays ? adjustmentOptions.restrictions.rainDays : weather.forecast.length;
+		const days = weather.forecast.length > restrictions.rainDays ? restrictions.rainDays : weather.forecast.length;
+		let precip = 0;
+		for ( let i = 0; i < days; i++ ) {
+			precip += weather.forecast[i].precip;
+		}
 
-		if ( weather.precip > restrictions.rainAmt ){
+		if ( precip > restrictions.rainAmt ){
 			return true;
 		}
 	}
@@ -369,7 +370,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 			let weatherData: WeatherData | undefined = undefined;
 			// TODO: If rain or temp call weather
-			if ( adjustmentOptions.restrictions.rainAmt > 0 && adjustmentOptions.restrictions.rainDays ) { //TODO: add temp to this
+			if ( adjustmentOptions.restrictions && (adjustmentOptions.restrictions.rainAmt && adjustmentOptions.restrictions.rainAmt > 0 && adjustmentOptions.restrictions.rainDays) ) { //TODO: add temp to this
 				try {
 					weatherData = await weatherProvider.getWeatherData( coordinates, pws );
 				} catch ( err ) {

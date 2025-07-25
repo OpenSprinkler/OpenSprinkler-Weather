@@ -47,6 +47,8 @@ export interface WeatherDataForecast {
     temp_min: number;
     /** The forecasted maximum temperature for this day (in Fahrenheit). */
     temp_max: number;
+    /** The forecaseted precipitation for this day (in inches). */
+    precip: number;
     /** The timestamp of the day this forecast is for (in Unix epoch seconds). */
     date: number;
     /** An icon ID that represents the weather at this forecast window. This will be used in http://openweathermap.org/img/w/<ICON_ID>.png */

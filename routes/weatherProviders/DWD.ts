@@ -201,6 +201,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			weather.forecast.push( {
 				temp_min: this.C2F(minTemp),
 				temp_max: this.C2F(maxTemp),
+				precip: this.mm2inch(precip),
 				date: date,
 				icon: this.getOWMIconCode( icon ),
 				description: condition,

@@ -122,6 +122,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			weather.forecast.push({
 				temp_min: weatherData.daily[index].temp.min,
 				temp_max: weatherData.daily[index].temp.max,
+				precip: (weatherData.daily[index].rain ? weatherData.daily[index].rain : 0) / 25.4,
 				date: weatherData.daily[index].dt,
 				icon: weatherData.daily[index].weather[0].icon,
 				description: weatherData.daily[index].weather[0].description

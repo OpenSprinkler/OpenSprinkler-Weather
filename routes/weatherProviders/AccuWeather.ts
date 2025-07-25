@@ -154,6 +154,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			weather.forecast.push( {
 				temp_min: Math.floor( daily[ index ].Temperature.Minimum.Value ),
 				temp_max: Math.floor( daily[ index ].Temperature.Maximum.Value ),
+				precip: daily[ index ].Day.Rain.Value + daily[ index ].Night.Rain.Value,
 				date: daily[ index ].EpochDate,
 				icon: this.getOWMIconCode( daily[ index ].Day.Icon ),
 				description: daily[ index ].Day.ShortPhrase

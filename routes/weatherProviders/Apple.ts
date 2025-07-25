@@ -155,7 +155,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			city: "",
 			minTemp: Math.floor( this.celsiusToFahrenheit( forecast.forecastDaily.days[ 0 ].temperatureMin ) ),
 			maxTemp: Math.floor( this.celsiusToFahrenheit( forecast.forecastDaily.days[ 0 ].temperatureMax ) ),
-			precip: this.mmToInchesPerHour( forecast.currentWeather.precipitationIntensity ) * 24,
+			precip: this.mmToInchesPerHour( forecast.forecastDaily.days[0].precipitationAmount ),
 			forecast: []
 		};
 
@@ -163,6 +163,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			weather.forecast.push( {
 				temp_min: Math.floor( this.celsiusToFahrenheit( forecast.forecastDaily.days[ index ].temperatureMin ) ),
 				temp_max: Math.floor( this.celsiusToFahrenheit( forecast.forecastDaily.days[ index ].temperatureMax ) ),
+				precip: this.mmToInchesPerHour( forecast.forecastDaily.days[ index ].precipitationAmount),
 				date: moment(forecast.forecastDaily.days[ index ].forecastStart).unix(),
 				icon: this.getOWMIconCode( forecast.forecastDaily.days[ index ].conditionCode ),
 				description: forecast.forecastDaily.days[ index ].conditionCode

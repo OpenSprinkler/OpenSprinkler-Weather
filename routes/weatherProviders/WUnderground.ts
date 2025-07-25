@@ -142,6 +142,7 @@ export default class WUnderground extends WeatherProvider {
 			weather.forecast.push( {
 				temp_min: Math.floor( forecast.temperatureMin[index] ),
 				temp_max: Math.floor( forecast.temperatureMax[index] ),
+				precip: forecast.qpf[index] + forecast.qpfSnow[index],
 				date: forecast.validTimeUtc[index],
 				icon: this.getWUIconCode( forecast.daypart[0].iconCode[index] ),
 				description: forecast.narrative[index]

@@ -146,6 +146,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			weather.forecast.push( {
 				temp_min: current.daily.temperature_2m_min[day],
 				temp_max: current.daily.temperature_2m_max[day],
+				precip: current.daily.precipitation_sum[day],
 				date: current.daily.time[day],
 				icon: this.getWMOIconCode( current.daily.weathercode[day] ).icon,
 				description: this.getWMOIconCode( current.daily.weathercode[day] ).desc,

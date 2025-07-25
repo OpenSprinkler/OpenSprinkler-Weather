@@ -132,6 +132,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			weather.forecast.push( {
 				temp_min: Math.floor( forecast.daily.data[ index ].temperatureMin ),
 				temp_max: Math.floor( forecast.daily.data[ index ].temperatureMax ),
+				precip: forecast.daily.data[ index ].precipIntensity * 24,
 				date: forecast.daily.data[ index ].time,
 				icon: this.getOWMIconCode( forecast.daily.data[ index ].icon ),
 				description: forecast.daily.data[ index ].summary
