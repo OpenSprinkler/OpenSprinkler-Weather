@@ -5,7 +5,7 @@ import * as SunCalc from "suncalc";
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { WateringData, GeoCoordinates, PWS, TimeData, WeatherData, Restrictions } from "../types";
+import { WateringData, GeoCoordinates, PWS, TimeData, WeatherData, RestrictionOptions } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
 import WateringScaleCache, { CachedScale } from "../WateringScaleCache";
@@ -115,14 +115,15 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  *
  * - California watering restriction prevents watering if precipitation over two days is greater than 0.1" over the past
  * 48 hours.
- * @param restrictions A Restrictions object that defines which restrictions are enabled to check during this run.
+ * @param cali A boolean to enable the California restriction based on the old method.
  * @param wateringData Watering data to use to determine if any restrictions apply.
+ * @param restrictions Data used to determine weather restricitons should be in place.
  * @param weather Weather data to use to determine if any restrictions apply.
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
-function checkWeatherRestriction( restrictions: Restrictions, wateringData?: WateringData[], weather?: WeatherData ): boolean {
+function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], restrictions?: RestrictionOptions, weather?: WeatherData ): boolean {
 
-	if ( restrictions.california ) {
+	if ( cali || restrictions.cali) {
 		// With the revamp of watering data, the most recent two days are the end of the array, giving 48 hours. If not, only the last one (24 hours) is used.
 		const len = wateringData.length;
 		let rain = wateringData[len-1].precip;
@@ -134,6 +135,19 @@ function checkWeatherRestriction( restrictions: Restrictions, wateringData?: Wat
 			return true;
 		}
 	}
+
+	//TODO: Add rain
+	if ( restrictions.rainAmt > 0 && restrictions.rainDays ) {
+		// Currently, the only rain data provided is for the current day. So until I revamp the getWeatherData function it will only check today.
+		// TODO: Check if amount of data or raindays is greater before looping
+		//const days = weather.forecast.length > adjustmentOptions.restrictions.rainDays ? adjustmentOptions.restrictions.rainDays : weather.forecast.length;
+
+		if ( weather.precip > restrictions.rainAmt ){
+			return true;
+		}
+	}
+
+	//TODO: Add temp
 
 	return false;
 }
@@ -219,7 +233,6 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
 	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ req.params[ 0 ] & ~( 1 << 7 ) ],
-		checkRestrictions: boolean			= ( ( req.params[ 0 ] >> 7 ) & 1 ) > 0,
 		adjustmentOptionsString: string		= getParameter(req.query.wto),
 		location: string | GeoCoordinates	= getParameter(req.query.loc),
 		outputFormat: string				= getParameter(req.query.format),
@@ -248,6 +261,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ), adjustmentMethod != ManualAdjustmentMethod );
 		return;
 	}
+
+	const checkRestrictions: boolean = ( ( req.params[ 0 ] >> 7 ) & 1 ) > 0 || typeof adjustmentOptions.restrictions !== undefined;
 
 	// Attempt to resolve provided location to GPS coordinates.
 	let coordinates: GeoCoordinates;
@@ -352,18 +367,19 @@ export const getWateringData = async function( req: express.Request, res: expres
 				wateringData = dataArr[dataArr.length-1];
 			}
 
-			const restrictions: Restrictions = {
-				california: false,
-				rain: false,
-				temp: false
-			};
-
-			// Check California restriction enable
-			if ( (req.params[ 0 ] >> 7) & 1 )
-				restrictions.california = true;
+			let weatherData: WeatherData | undefined = undefined;
+			// TODO: If rain or temp call weather
+			if ( adjustmentOptions.restrictions.rainAmt > 0 && adjustmentOptions.restrictions.rainDays ) { //TODO: add temp to this
+				try {
+					weatherData = await weatherProvider.getWeatherData( coordinates, pws );
+				} catch ( err ) {
+					res.send( "Error: " + err );
+					return;
+				}
+			}
 
 			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-			if ( checkWeatherRestriction( restrictions, wateringData, undefined ) ) {
+			if ( checkWeatherRestriction( ((req.params[ 0 ] >> 7) & 1) ? true : false, wateringData, adjustmentOptions.restrictions ? adjustmentOptions.restrictions : undefined, weatherData ) ) {
 				data.scale = 0;
 			}
 		}

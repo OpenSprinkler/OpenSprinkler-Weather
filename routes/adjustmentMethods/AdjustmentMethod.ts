@@ -1,4 +1,4 @@
-import { WateringData, GeoCoordinates, PWS } from "../../types";
+import { WateringData, GeoCoordinates, PWS, RestrictionOptions } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 
 
@@ -58,8 +58,6 @@ export interface AdjustmentOptions {
 	provider?: string;
 	/** Flag used to indicate if historical weather data is used. */
 	hwt?: number;
-	/** The maximum amount of rain that can be forecasted before watering stops */
-	rainAmt?: number;
-	/** The amount of days checked for the above rain amount */
-	rainDays?: number;
+	/** Object for the restriction options. */
+	restrictions?: RestrictionOptions;
 }
