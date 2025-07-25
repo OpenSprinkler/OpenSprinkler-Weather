@@ -123,7 +123,7 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  */
 function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], restrictions?: RestrictionOptions, weather?: WeatherData ): boolean {
 
-	if ( cali || restrictions.cali) {
+	if ( cali || (restrictions && restrictions.cali)) {
 		// With the revamp of watering data, the most recent two days are the end of the array, giving 48 hours. If not, only the last one (24 hours) is used.
 		const len = wateringData.length;
 		let rain = wateringData[len-1].precip;
@@ -136,19 +136,27 @@ function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], 
 		}
 	}
 
-	if ( restrictions.rainAmt > 0 && restrictions.rainDays ) {
-		const days = weather.forecast.length > restrictions.rainDays ? restrictions.rainDays : weather.forecast.length;
-		let precip = 0;
-		for ( let i = 0; i < days; i++ ) {
-			precip += weather.forecast[i].precip;
+	if ( restrictions ) {
+
+		if ( restrictions.rainAmt && restrictions.rainAmt > 0 && restrictions.rainDays ) {
+			const days = weather.forecast.length > restrictions.rainDays ? restrictions.rainDays : weather.forecast.length;
+			let precip = 0;
+			for ( let i = 0; i < days; i++ ) {
+				precip += weather.forecast[i].precip;
+			}
+
+			if ( precip > restrictions.rainAmt ){
+				return true;
+			}
 		}
 
-		if ( precip > restrictions.rainAmt ){
-			return true;
+		if ( restrictions.minTemp && restrictions.minTemp < 100 ) {
+			if ( weather.temp < restrictions.minTemp ) {
+				return true;
+			}
 		}
+
 	}
-
-	//TODO: Add temp
 
 	return false;
 }
@@ -369,8 +377,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 			}
 
 			let weatherData: WeatherData | undefined = undefined;
-			// TODO: If rain or temp call weather
-			if ( adjustmentOptions.restrictions && (adjustmentOptions.restrictions.rainAmt && adjustmentOptions.restrictions.rainAmt > 0 && adjustmentOptions.restrictions.rainDays) ) { //TODO: add temp to this
+			if ( adjustmentOptions.restrictions && ((adjustmentOptions.restrictions.rainAmt && adjustmentOptions.restrictions.rainAmt > 0 && adjustmentOptions.restrictions.rainDays) || adjustmentOptions.restrictions.minTemp && adjustmentOptions.restrictions.minTemp < 100 ) ) {
 				try {
 					weatherData = await weatherProvider.getWeatherData( coordinates, pws );
 				} catch ( err ) {

@@ -101,6 +101,8 @@ export interface RestrictionOptions {
     rainAmt: number;
     /** Number of days to check for rain restriction. */
     rainDays: number;
+    /** Minimum temperature for temp restriction. */
+    minTemp: number;
 }
 
 export type WeatherProviderId = "OWM" | "PirateWeather" | "local" | "mock" | "WUnderground" | "DWD" | "OpenMeteo" | "AccuWeather" | "Apple";
