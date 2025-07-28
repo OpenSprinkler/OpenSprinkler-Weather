@@ -150,7 +150,7 @@ function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], 
 			}
 		}
 
-		if ( restrictions.minTemp && restrictions.minTemp < 100 ) {
+		if ( restrictions.minTemp && restrictions.minTemp != -40 ) {
 			if ( weather.temp < restrictions.minTemp ) {
 				return true;
 			}
