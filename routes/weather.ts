@@ -164,7 +164,7 @@ function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], 
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
 	let adjustmentOptionsString: string	= getParameter(req.query.wto),
-		adjustmentOptions: AdjustmentOptions;;
+		adjustmentOptions: AdjustmentOptions;
 
 	// Parse weather adjustment options
 	try {
@@ -210,7 +210,12 @@ export const getWeatherData = async function( req: express.Request, res: express
 	}
 
 	let WEATHER_PROVIDER: WeatherProvider;
-	const provider: string = adjustmentOptions.provider;
+	let provider: string = adjustmentOptions.provider;
+
+	if ( !provider && process.env.WEATHER_PROVIDER ) {
+		provider = process.env.WEATHER_PROVIDER;
+	}
+
  	 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
   	  WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
   	} else {
@@ -309,10 +314,15 @@ export const getWateringData = async function( req: express.Request, res: expres
 	}
 
 	let weatherProvider: WeatherProvider;
+	let provider: string = adjustmentOptions.provider;
+
+	if ( !provider && process.env.WEATHER_PROVIDER ) {
+		provider = process.env.WEATHER_PROVIDER;
+	}
+
 	if( pws && pws.id ){
 		weatherProvider = PWS_WEATHER_PROVIDER;
 	}else{
-		const provider: string = adjustmentOptions.provider;
  		 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
   		  weatherProvider = WEATHER_PROVIDERS[provider];
   		} else {
