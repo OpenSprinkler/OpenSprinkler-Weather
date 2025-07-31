@@ -24,6 +24,7 @@ const WEATHER_PROVIDERS: { [method: string] : WeatherProvider} = {
 	"OpenMeteo": new ( require("./weatherProviders/OpenMeteo" ).default )(),
 	"DWD": new ( require("./weatherProviders/DWD" ).default )(),
 	"WU": new ( require("./weatherProviders/WUnderground" ).default )(),
+	"local": new ( require("./weatherProviders/local" ).default )(),
   };
 
 const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
