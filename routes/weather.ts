@@ -94,7 +94,7 @@ export async function httpJSONRequest(url: string, headers?, body?): Promise< an
  * @return The TimeData for the specified coordinates.
  */
 function getTimeData( coordinates: GeoCoordinates ): TimeData {
-	const timezone = moment().tz( geoTZ( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
+	const timezone = moment().tz( geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
 	const tzOffset: number = getTimezone( timezone, true );
 
 	// Calculate sunrise and sunset since Weather Underground does not provide it
