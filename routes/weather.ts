@@ -277,7 +277,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		return;
 	}
 
-	const checkRestrictions: boolean = ( ( req.params[ 0 ] >> 7 ) & 1 ) > 0 || typeof adjustmentOptions.restrictions !== undefined;
+	const checkRestrictions: boolean = ( ( req.params[ 0 ] >> 7 ) & 1 ) > 0 || typeof adjustmentOptions.restrictions !== "undefined";
 
 	// Attempt to resolve provided location to GPS coordinates.
 	let coordinates: GeoCoordinates;
