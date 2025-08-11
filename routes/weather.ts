@@ -378,7 +378,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 			// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
 			if ( checkRestrictions && !wateringData ) {
 				try {
-					dataArr = await weatherProvider.getWateringData( coordinates );
+					dataArr = await weatherProvider.getWateringData( coordinates, pws );
 				} catch ( err ) {
 					sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
 					return;
