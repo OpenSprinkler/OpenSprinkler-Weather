@@ -11,7 +11,7 @@ async function calculateManualWateringScale( ): Promise< AdjustmentMethodRespons
 			wp: "Manual",
 		},
 		wateringData: undefined,
-        ttl: 0
+		ttl: 0
 	}
 }
 

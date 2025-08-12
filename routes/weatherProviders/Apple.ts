@@ -16,33 +16,34 @@ export default class AppleWeatherProvider extends WeatherProvider {
 	public constructor() {
 		super();
 
-        if (!process.env.APPLE_PRIVATE_KEY) {
-            return;
+		if (!process.env.APPLE_PRIVATE_KEY) {
+			return;
 	}
 
 		this.API_KEY = jwt.sign(
-            { sub: process.env.APPLE_SERVICE_ID },
-            process.env.APPLE_PRIVATE_KEY,
-            {
-              jwtid: `${process.env.APPLE_TEAM_ID}.${process.env.APPLE_SERVICE_ID}`,
-              issuer: process.env.APPLE_TEAM_ID,
-              expiresIn: "10y",
-              keyid: process.env.APPLE_KEY_ID,
-              algorithm: "ES256",
-              header: { id: `${process.env.APPLE_TEAM_ID}.${process.env.APPLE_SERVICE_ID}` }
-            }
-          );
+			{ sub: process.env.APPLE_SERVICE_ID },
+			process.env.APPLE_PRIVATE_KEY,
+			{
+				jwtid: `${process.env.APPLE_TEAM_ID}.${process.env.APPLE_SERVICE_ID}`,
+				issuer: process.env.APPLE_TEAM_ID,
+				expiresIn: "10y",
+				keyid: process.env.APPLE_KEY_ID,
+				algorithm: "ES256",
+				header: { id: `${process.env.APPLE_TEAM_ID}.${process.env.APPLE_SERVICE_ID}` }
+			}
+			);
 	}
 
 	protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WateringData[]> {
 		// The Unix timestamp of 10 days ago.
+		console.log("Apple: getWateringDataINternal");
 		const historicTimestamp: string = moment().tz(geoTZ.find(coordinates[0], coordinates[1])[0]).startOf("day").subtract( 240, "hours" ).toISOString();
 
-        const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${historicTimestamp}&hourlyEnd=${moment().toISOString()}&dailyStart=${historicTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
+		const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${historicTimestamp}&hourlyEnd=${moment().toISOString()}&dailyStart=${historicTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
 
 		let historicData;
 		try {
-            historicData = await httpJSONRequest( historicUrl, {Authorization: `Bearer ${this.API_KEY}`} );
+			historicData = await httpJSONRequest( historicUrl, {Authorization: `Bearer ${this.API_KEY}`} );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from Apple:", err );
 			throw new CodedError( ErrorCode.WeatherApiError );
@@ -55,7 +56,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		const hours = historicData.forecastHourly.hours;
 		const days = historicData.forecastDaily.days;
 
-        // Fail if not enough data is available.
+		// Fail if not enough data is available.
 		// There will only be 23 samples on the day that daylight saving time begins.
 		if ( hours.length < 23 ) {
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
@@ -130,7 +131,8 @@ export default class AppleWeatherProvider extends WeatherProvider {
 	}
 
 	protected async getWeatherDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WeatherData> {
-        const forecastUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=currentWeather,forecastDaily&timezone=UTC`
+		console.log("Apple getForecastInternal");
+		const forecastUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=currentWeather,forecastDaily&timezone=UTC`
 
 		let forecast;
 		try {
@@ -181,39 +183,39 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
 	private getOWMIconCode(icon: string) {
 		switch(icon.toLowerCase()) {
-            case "mostlyclear":
+			case "mostlyclear":
 			case "partlycloudy":
 				return "02n";
-            case "mostlycloudy":
+			case "mostlycloudy":
 			case "cloudy":
-            case "smokey":
+			case "smokey":
 				return "03d";
 			case "foggy":
-            case "haze":
+			case "haze":
 			case "windy":
-            case "breezy":
+			case "breezy":
 				return "50d";
 			case "sleet":
 			case "snow":
-            case "frigid":
-            case "hail":
-            case "flurries":
-            case "sunflurries":
-            case "wintrymix":
-            case "blizzard":
-            case "blowingsnow":
-            case "freezingdrizzle":
-            case "freezingrain":
-            case "heavysnow":
+			case "frigid":
+			case "hail":
+			case "flurries":
+			case "sunflurries":
+			case "wintrymix":
+			case "blizzard":
+			case "blowingsnow":
+			case "freezingdrizzle":
+			case "freezingrain":
+			case "heavysnow":
 				return "13d";
 			case "rain":
-            case "drizzle":
-            case "heavyrain":
-            case "isolatedthunderstorms":
-            case "sunshowers":
-            case "scatteredthunderstorms":
-            case "strongstorms":
-            case "thunderstorms":
+			case "drizzle":
+			case "heavyrain":
+			case "isolatedthunderstorms":
+			case "sunshowers":
+			case "scatteredthunderstorms":
+			case "strongstorms":
+			case "thunderstorms":
 				return "10d";
 			case "clear":
 			default:
@@ -221,16 +223,16 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		}
 	}
 
-    private celsiusToFahrenheit(celsius) {
-        return (celsius * 9/5) + 32;
-    }
+	private celsiusToFahrenheit(celsius) {
+		return (celsius * 9/5) + 32;
+	}
 
-    private mmToInchesPerHour(mmPerHour) {
-        return  mmPerHour * 0.03937007874;
-    }
+	private mmToInchesPerHour(mmPerHour) {
+		return mmPerHour * 0.03937007874;
+	}
 
-    private kphToMph(kph) {
-        return kph * 0.621371;
-      }
+	private kphToMph(kph) {
+		return kph * 0.621371;
+		}
 
 }

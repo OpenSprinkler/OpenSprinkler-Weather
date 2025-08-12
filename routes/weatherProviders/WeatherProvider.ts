@@ -17,16 +17,16 @@ export class WeatherProvider {
 	 * does not support this method).
 	 */
 	getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< CachedResult<WateringData[]> > {
-        const key = this.getCacheKey(coordinates, pws);
-        if (!this.wateringDataCache[key]) {
-            this.wateringDataCache[key] = new Cached();
-        }
+		const key = this.getCacheKey(coordinates, pws);
+		if (!this.wateringDataCache[key]) {
+			this.wateringDataCache[key] = new Cached();
+		}
 
-        let tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+		let tz = geoTZ.find(coordinates[0], coordinates[1])[0];
 
-        const expiresAt = addDays(startOfDay(TZDate.tz(tz)), 1);
+		const expiresAt = addDays(startOfDay(TZDate.tz(tz)), 1);
 
-        return this.wateringDataCache[key].get(() => this.getWateringDataInternal(coordinates, pws), expiresAt);
+		return this.wateringDataCache[key].get(() => this.getWateringDataInternal(coordinates, pws), expiresAt);
 	}
 
 	/**
@@ -37,17 +37,17 @@ export class WeatherProvider {
 	 * not support this method.
 	 */
 	getWeatherData( coordinates : GeoCoordinates, pws?: PWS ): Promise< CachedResult<WeatherData> > {
-        const key = this.getCacheKey(coordinates, pws);
-        if (!this.weatherDataCache[key]) {
-            this.weatherDataCache[key] = new Cached();
-        }
+		const key = this.getCacheKey(coordinates, pws);
+		if (!this.weatherDataCache[key]) {
+			this.weatherDataCache[key] = new Cached();
+		}
 
-        let tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+		let tz = geoTZ.find(coordinates[0], coordinates[1])[0];
 
-        const date = TZDate.tz(tz);
-        const expiresAt = addHours(startOfDay(date), (Math.floor(date.getHours() / 6) + 1) * 6);
+		const date = TZDate.tz(tz);
+		const expiresAt = addHours(startOfDay(date), (Math.floor(date.getHours() / 6) + 1) * 6);
 
-        return this.weatherDataCache[key].get(() => this.getWeatherDataInternal(coordinates, pws), expiresAt);
+		return this.weatherDataCache[key].get(() => this.getWeatherDataInternal(coordinates, pws), expiresAt);
 	}
 
 	/**
@@ -59,18 +59,18 @@ export class WeatherProvider {
 		return false;
 	}
 
-    private wateringDataCache: {[key: string]: Cached<WateringData[]>} = {};
-    private weatherDataCache: {[key: string]: Cached<WeatherData>} = {};
+	private wateringDataCache: {[key: string]: Cached<WateringData[]>} = {};
+	private weatherDataCache: {[key: string]: Cached<WeatherData>} = {};
 
-    private getCacheKey(coordinates: GeoCoordinates, pws?: PWS): string {
-        return pws?.id || `${coordinates[0]};s${coordinates[1]}`
-    }
+	private getCacheKey(coordinates: GeoCoordinates, pws?: PWS): string {
+		return pws?.id || `${coordinates[0]};s${coordinates[1]}`
+	}
 
-    protected async getWeatherDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WeatherData> {
-        throw "Selected WeatherProvider does not support getWeatherData";
-    }
+	protected async getWeatherDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WeatherData> {
+		throw "Selected WeatherProvider does not support getWeatherData";
+	}
 
-    protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WateringData[]> {
-        throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
-    }
+	protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WateringData[]> {
+		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
+	}
 }

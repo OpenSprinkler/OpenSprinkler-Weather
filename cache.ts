@@ -2,8 +2,8 @@ import { isAfter, addMilliseconds, differenceInMilliseconds, DateArg, DateValues
 import { Mutex } from 'async-mutex';
 
 export type CachedResult<T> = {
-    value: T,
-    ttl: number,
+	value: T,
+	ttl: number,
 }
 
 export class Cached<T> {
@@ -23,6 +23,7 @@ export class Cached<T> {
 		const release = await this.mutex.acquire();
 		if (!this.value) {
 			this.value = getter().then((value) => {
+				console.log("new value");
 				this.expiresAt = expiresAt;
 				return value;
 			});
@@ -30,9 +31,9 @@ export class Cached<T> {
 
 		release();
 		return {
-            value: await this.value,
-            ttl: differenceInMilliseconds(this.expiresAt, new Date()),
-        };
+			value: await this.value,
+			ttl: differenceInMilliseconds(this.expiresAt, new Date()),
+		};
 	}
 
 	async invalidate(): Promise<void> {

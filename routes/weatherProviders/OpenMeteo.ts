@@ -47,7 +47,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				wind: number = 0, solar: number = 0;
 			const now: number = moment().unix();
 
-			for (let index = i*24 + offset;  index < ((i+1)*24 + offset); index++ ) {
+			for (let index = i*24 + offset; index < ((i+1)*24 + offset); index++ ) {
 				if (historicData.hourly.time[index] > now) {
 					maxIndex = index-1;
 					raining = historicData.hourly.precipitation[maxIndex] > 0 || historicData.hourly.precipitation[index] > 0;
@@ -55,7 +55,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				}
 				temp += historicData.hourly.temperature_2m[index];
 				humidity += historicData.hourly.relativehumidity_2m[index];
-				precip += historicData.hourly.precipitation[index]  || 0;
+				precip += historicData.hourly.precipitation[index] || 0;
 
 				minTemp = minTemp < historicData.hourly.temperature_2m[index] ? minTemp : historicData.hourly.temperature_2m[index];
 				maxTemp = maxTemp > historicData.hourly.temperature_2m[index] ? maxTemp : historicData.hourly.temperature_2m[index];

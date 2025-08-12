@@ -26,7 +26,7 @@ const WEATHER_PROVIDERS: { [method: string] : WeatherProvider} = {
 	"DWD": new ( require("./weatherProviders/DWD" ).default )(),
 	"WU": new ( require("./weatherProviders/WUnderground" ).default )(),
 	"local": new ( require("./weatherProviders/local" ).default )(),
-  };
+};
 
 const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
 const GEOCODER: Geocoder = new ( require("./geocoders/" + ( process.env.GEOCODER || "WUnderground" ) ).default )();
@@ -212,16 +212,16 @@ export const getWeatherData = async function( req: express.Request, res: express
 		provider = process.env.WEATHER_PROVIDER;
 	}
 
- 	 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
-  	  WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
-  	} else {
-   	 WEATHER_PROVIDER = WEATHER_PROVIDERS['Apple'];
-  	}
+	if (typeof WEATHER_PROVIDERS[provider] === 'object') {
+		WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
+	} else {
+		WEATHER_PROVIDER = WEATHER_PROVIDERS['Apple'];
+	}
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
 	let weatherData: CachedResult<WeatherData>;
 
-    if (weatherData == undefined) {
+	if (weatherData == undefined) {
 	try {
 		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates, pws );
 	} catch ( err ) {
@@ -232,7 +232,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 	res.json( {
 		...timeData,
 		...weatherData.value,
-        ttl: weatherData.ttl,
+		ttl: weatherData.ttl,
 		location: coordinates,
 	} );
 };
@@ -241,7 +241,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 // adjustment method which is encoded to also carry the watering
 // restriction and therefore must be decoded
 export const getWateringData = async function( req: express.Request, res: express.Response ) {
-    const wateringParam = Number.parseInt(req.params[0]);
+	const wateringParam = Number.parseInt(req.params[0]);
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
@@ -322,11 +322,11 @@ export const getWateringData = async function( req: express.Request, res: expres
 	if( pws && pws.id ){
 		weatherProvider = PWS_WEATHER_PROVIDER;
 	}else{
- 		 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
-  		  weatherProvider = WEATHER_PROVIDERS[provider];
-  		} else {
-   		 weatherProvider = WEATHER_PROVIDERS['Apple'];
-  		}
+		if (typeof WEATHER_PROVIDERS[provider] === 'object') {
+			weatherProvider = WEATHER_PROVIDERS[provider];
+		} else {
+			weatherProvider = WEATHER_PROVIDERS['Apple'];
+		}
 	}
 
 
@@ -340,55 +340,55 @@ export const getWateringData = async function( req: express.Request, res: expres
 		rawData:	undefined,
 		errCode:	0,
 		scales:		undefined,
-        ttl:        0,
+		ttl:		0,
 	};
 
-    // Calculate the watering scale if it wasn't found in the cache.
-    let adjustmentMethodResponse: AdjustmentMethodResponse;
-    try {
-        adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
-            adjustmentOptions, coordinates, weatherProvider, pws
-        );
-    } catch ( err ) {
-        sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
-        return;
-    }
+	// Calculate the watering scale if it wasn't found in the cache.
+	let adjustmentMethodResponse: AdjustmentMethodResponse;
+	try {
+		adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
+			adjustmentOptions, coordinates, weatherProvider, pws
+		);
+	} catch ( err ) {
+		sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
+		return;
+	}
 
-    data.scale = adjustmentMethodResponse.scale;
-    data.rd = adjustmentMethodResponse.rainDelay;
-    data.rawData = adjustmentMethodResponse.rawData;
-    data.scales = adjustmentMethodResponse.scales;
-    data.ttl = adjustmentMethodResponse.ttl;
+	data.scale = adjustmentMethodResponse.scale;
+	data.rd = adjustmentMethodResponse.rainDelay;
+	data.rawData = adjustmentMethodResponse.rawData;
+	data.scales = adjustmentMethodResponse.scales;
+	data.ttl = adjustmentMethodResponse.ttl;
 
-    if ( checkRestrictions ) {
-        let wateringData: WateringData[] = adjustmentMethodResponse.wateringData;
-        let dataArr;
-        // Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
-        if ( checkRestrictions && !wateringData ) {
-            try {
-                dataArr = await weatherProvider.getWateringData( coordinates, pws );
-            } catch ( err ) {
-                sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
-                return;
-            }
-            // Last in data array in most recent.
-            wateringData = dataArr[dataArr.length-1];
-        }
+	if ( checkRestrictions ) {
+		let wateringData: WateringData[] = adjustmentMethodResponse.wateringData;
+		let dataArr;
+		// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
+		if ( checkRestrictions && !wateringData ) {
+			try {
+				dataArr = await weatherProvider.getWateringData( coordinates, pws );
+			} catch ( err ) {
+				sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
+				return;
+			}
+			// Last in data array in most recent.
+			wateringData = dataArr[dataArr.length-1];
+		}
 
-        let weatherData: WeatherData | undefined = undefined;
-        if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) ) {
-            try {
-                weatherData = (await weatherProvider.getWeatherData( coordinates, pws )).value;
-            } catch ( err ) {
-                res.send( "Error: " + err );
-                return;
-            }
-        }
+		let weatherData: WeatherData | undefined = undefined;
+		if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) ) {
+			try {
+				weatherData = (await weatherProvider.getWeatherData( coordinates, pws )).value;
+			} catch ( err ) {
+				res.send( "Error: " + err );
+				return;
+			}
+		}
 
-        // Check for any user-set restrictions and change the scale to 0 if the criteria is met
-        if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
-            data.scale = 0;
-        }
+		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
+		if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
+			data.scale = 0;
+		}
 	}
 
 	sendWateringData( res, data, outputFormat === "json" );
@@ -464,18 +464,18 @@ async function httpRequest( url: string, headers?, body? ): Promise< string > {
 		const splitUrl: string[] = url.match( filters.url );
 		const isHttps = url.startsWith("https");
 
-        if (body) {
-            headers = headers || {};
-            headers['Content-Type'] = 'application/json';
-            headers['Content-Length'] = Buffer.byteLength(body);
-        }
+		if (body) {
+			headers = headers || {};
+			headers['Content-Type'] = 'application/json';
+			headers['Content-Length'] = Buffer.byteLength(body);
+		}
 
 		const options = {
 			host: splitUrl[ 1 ],
 			port: splitUrl[ 2 ] || ( isHttps ? 443 : 80 ),
 			path: splitUrl[ 3 ],
-            method: 'GET',
-            headers
+			method: 'GET',
+			headers
 		};
 
 		const request = ( isHttps ? https : http ).request( options, ( response ) => {
@@ -501,11 +501,11 @@ async function httpRequest( url: string, headers?, body? ): Promise< string > {
 			reject( err );
 		} );
 
-        if (body) {
-            request.write(body);
-        }
+		if (body) {
+			request.write(body);
+		}
 
-        request.end();
+		request.end();
 	} );
 }
 
@@ -579,8 +579,8 @@ function getTimezone( time: number | string, useMinutes: boolean = false ): numb
  * @return The integer representation of the IP address.
  */
 function ipToInt( ip: string ): number {
-    const split = ip.split( "." );
-    return ( ( ( ( ( ( +split[ 0 ] ) * 256 ) + ( +split[ 1 ] ) ) * 256 ) + ( +split[ 2 ] ) ) * 256 ) + ( +split[ 3 ] );
+	const split = ip.split( "." );
+	return ( ( ( ( ( ( +split[ 0 ] ) * 256 ) + ( +split[ 1 ] ) ) * 256 ) + ( +split[ 2 ] ) ) * 256 ) + ( +split[ 3 ] );
 }
 
 /**
@@ -595,9 +595,9 @@ export function getParameter( parameter: string | ParsedQs | (string | ParsedQs)
 		parameter = parameter[0];
 	}
 
-    if (typeof parameter == "object") {
-        parameter = "";
-    }
+	if (typeof parameter == "object") {
+		parameter = "";
+	}
 
 	// Return an empty string if the parameter is undefined.
 	return parameter || "";

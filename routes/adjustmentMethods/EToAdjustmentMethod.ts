@@ -70,7 +70,7 @@ async function calculateEToWateringScale(
 	});
 
 	// Compute scale for most recent day for old firmware
-	const scale =  scales[0]
+	const scale = scales[0]
 	return {
 		scale: scale,
 		rawData: {
@@ -86,7 +86,7 @@ async function calculateEToWateringScale(
 		},
 		wateringData: wateringData,
 		scales: scales,
-        ttl: data.ttl,
+		ttl: data.ttl,
 	}
 }
 

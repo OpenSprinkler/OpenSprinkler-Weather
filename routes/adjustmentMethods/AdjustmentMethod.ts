@@ -61,12 +61,12 @@ export interface AdjustmentOptions {
 	/** Flag used to indicate if historical weather data is used. */
 	hwt?: number;
 	/** Flag for the California restriction. */
-    cali: boolean;
-    /** Maximum amount of rain allowed in rain restriction. */
-    rainAmt: number;
-    /** Number of days to check for rain restriction. */
-    rainDays: number;
-    /** Minimum temperature for temp restriction. */
-    minTemp: number;
+	cali: boolean;
+	/** Maximum amount of rain allowed in rain restriction. */
+	rainAmt: number;
+	/** Number of days to check for rain restriction. */
+	rainDays: number;
+	/** Minimum temperature for temp restriction. */
+	minTemp: number;
 
 }
