@@ -124,7 +124,7 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  */
 function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], adjustmentOptions?: AdjustmentOptions, weather?: WeatherData ): boolean {
 
-	if ( cali || ( adjustmentOptions.cali ) ) {
+	if ( ( cali || (adjustmentOptions && adjustmentOptions.cali ) ) && wateringData && wateringData.length ) {
 		// With the revamp of watering data, the most recent two days are the end of the array, giving 48 hours. If not, only the last one (24 hours) is used.
 		const len = wateringData.length;
 		let rain = wateringData[len-1].precip;
@@ -149,7 +149,7 @@ function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], 
 		}
 	}
 
-	if ( adjustmentOptions.minTemp && adjustmentOptions.minTemp != -40 ) {
+	if ( adjustmentOptions.minTemp !== undefined && adjustmentOptions.minTemp != -40 ) {
 		if ( weather.temp < adjustmentOptions.minTemp ) {
 			return true;
 		}
@@ -384,7 +384,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 			}
 
 			let weatherData: WeatherData | undefined = undefined;
-			if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainAmt > 0 && adjustmentOptions.rainDays ) || ( adjustmentOptions.minTemp && adjustmentOptions.minTemp !== -40 ) ) {
+			if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( adjustmentOptions.minTemp !== undefined && adjustmentOptions.minTemp !== -40 ) ) {
 				try {
 					weatherData = await weatherProvider.getWeatherData( coordinates, pws );
 				} catch ( err ) {
