@@ -15,6 +15,7 @@ import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMe
 import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
+import { ParsedQs } from "qs";
 
 const WEATHER_PROVIDERS: { [method: string] : WeatherProvider} = {
 	"AW": new ( require("./weatherProviders/AccuWeather" ).default )(),
@@ -239,11 +240,11 @@ export const getWeatherData = async function( req: express.Request, res: express
 // adjustment method which is encoded to also carry the watering
 // restriction and therefore must be decoded
 export const getWateringData = async function( req: express.Request, res: express.Response ) {
-
+    const wateringParam = Number.parseInt(req.params[0]);
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
-	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ req.params[ 0 ] & ~( 1 << 7 ) ],
+	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ wateringParam & ~( 1 << 7 ) ],
 		adjustmentOptionsString: string		= getParameter(req.query.wto),
 		location: string | GeoCoordinates	= getParameter(req.query.loc),
 		outputFormat: string				= getParameter(req.query.format),
@@ -273,7 +274,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		return;
 	}
 
-	const checkRestrictions: boolean = ( ( req.params[ 0 ] >> 7 ) & 1 ) > 0 || typeof adjustmentOptions.cali !== "undefined" || ( typeof adjustmentOptions.rainAmt !== "undefined" && typeof adjustmentOptions.rainDays !== "undefined" ) || typeof adjustmentOptions.minTemp !== "undefined";
+	const checkRestrictions: boolean = ( ( wateringParam >> 7 ) & 1 ) > 0 || typeof adjustmentOptions.cali !== "undefined" || ( typeof adjustmentOptions.rainAmt !== "undefined" && typeof adjustmentOptions.rainDays !== "undefined" ) || typeof adjustmentOptions.minTemp !== "undefined";
 
 	// Attempt to resolve provided location to GPS coordinates.
 	let coordinates: GeoCoordinates;
@@ -342,7 +343,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	let cachedScale: CachedScale;
 	if ( weatherProvider.shouldCacheWateringScale() ) {
-		cachedScale = cache.getWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions );
+		cachedScale = cache.getWateringScale( wateringParam, coordinates, pws, adjustmentOptions );
 	}
 
 	if ( cachedScale ) {
@@ -394,14 +395,14 @@ export const getWateringData = async function( req: express.Request, res: expres
 			}
 
 			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-			if ( checkWeatherRestriction( ((req.params[ 0 ] >> 7) & 1) ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
+			if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
 				data.scale = 0;
 			}
 		}
 
 		// Cache the watering scale if caching is enabled and no error occurred.
 		if ( weatherProvider.shouldCacheWateringScale() ) {
-			cache.storeWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions, {
+			cache.storeWateringScale( wateringParam, coordinates, pws, adjustmentOptions, {
 				scale: data.scale,
 				rawData: data.rawData,
 				rainDelay: data.rd,
@@ -609,10 +610,14 @@ function ipToInt( ip: string ): number {
  * @param parameter An array of parameters or a single parameter value.
  * @return The first element in the array of parameter or the single parameter provided.
  */
-export function getParameter( parameter: string | string[] ): string {
+export function getParameter( parameter: string | ParsedQs | (string | ParsedQs)[] | null | undefined ): string {
 	if ( Array.isArray( parameter ) ) {
 		parameter = parameter[0];
 	}
+
+    if (typeof parameter == "object") {
+        parameter = "";
+    }
 
 	// Return an empty string if the parameter is undefined.
 	return parameter || "";
