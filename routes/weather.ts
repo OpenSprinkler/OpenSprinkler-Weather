@@ -8,7 +8,6 @@ import * as geoTZ from "geo-tz";
 import { WateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
-import WateringScaleCache, { CachedScale } from "../WateringScaleCache";
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
@@ -47,8 +46,6 @@ const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
 	2: RainDelayAdjustmentMethod,
 	3: EToAdjustmentMethod
 };
-
-const cache = new WateringScaleCache();
 
 /**
  * Resolves a location description to geographic coordinates.
@@ -222,12 +219,14 @@ export const getWeatherData = async function( req: express.Request, res: express
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
 	let weatherData: WeatherData;
+
+    if (weatherData == undefined) {
 	try {
 		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates, pws );
 	} catch ( err ) {
 		res.send( "Error: " + err );
 		return;
-	}
+	}}
 
 	res.json( {
 		...timeData,
@@ -341,74 +340,51 @@ export const getWateringData = async function( req: express.Request, res: expres
 		scales:		undefined
 	};
 
-	let cachedScale: CachedScale;
-	if ( weatherProvider.shouldCacheWateringScale() ) {
-		cachedScale = cache.getWateringScale( wateringParam, coordinates, pws, adjustmentOptions );
-	}
+    // Calculate the watering scale if it wasn't found in the cache.
+    let adjustmentMethodResponse: AdjustmentMethodResponse;
+    try {
+        adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
+            adjustmentOptions, coordinates, weatherProvider, pws
+        );
+    } catch ( err ) {
+        sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
+        return;
+    }
 
-	if ( cachedScale ) {
-		// Use the cached data if it exists.
-		data.scale = cachedScale.scale;
-		data.rawData = cachedScale.rawData;
-		data.rd = cachedScale.rainDelay;
-		data.scales = cachedScale.scales;
-	} else {
-		// Calculate the watering scale if it wasn't found in the cache.
-		let adjustmentMethodResponse: AdjustmentMethodResponse;
-		try {
-			adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
-				adjustmentOptions, coordinates, weatherProvider, pws
-			);
-		} catch ( err ) {
-			sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
-			return;
-		}
+    data.scale = adjustmentMethodResponse.scale;
+    data.rd = adjustmentMethodResponse.rainDelay;
+    data.rawData = adjustmentMethodResponse.rawData;
+    data.scales = adjustmentMethodResponse.scales;
 
-		data.scale = adjustmentMethodResponse.scale;
-		data.rd = adjustmentMethodResponse.rainDelay;
-		data.rawData = adjustmentMethodResponse.rawData;
-		data.scales = adjustmentMethodResponse.scales;
+    if ( checkRestrictions ) {
+        let wateringData: WateringData[] = adjustmentMethodResponse.wateringData;
+        let dataArr;
+        // Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
+        if ( checkRestrictions && !wateringData ) {
+            try {
+                dataArr = await weatherProvider.getWateringData( coordinates, pws );
+            } catch ( err ) {
+                sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
+                return;
+            }
+            // Last in data array in most recent.
+            wateringData = dataArr[dataArr.length-1];
+        }
 
-		if ( checkRestrictions ) {
-			let wateringData: WateringData[] = adjustmentMethodResponse.wateringData;
-			let dataArr;
-			// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
-			if ( checkRestrictions && !wateringData ) {
-				try {
-					dataArr = await weatherProvider.getWateringData( coordinates, pws );
-				} catch ( err ) {
-					sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
-					return;
-				}
-				// Last in data array in most recent.
-				wateringData = dataArr[dataArr.length-1];
-			}
+        let weatherData: WeatherData | undefined = undefined;
+        if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) ) {
+            try {
+                weatherData = await weatherProvider.getWeatherData( coordinates, pws );
+            } catch ( err ) {
+                res.send( "Error: " + err );
+                return;
+            }
+        }
 
-			let weatherData: WeatherData | undefined = undefined;
-			if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) ) {
-				try {
-					weatherData = await weatherProvider.getWeatherData( coordinates, pws );
-				} catch ( err ) {
-					res.send( "Error: " + err );
-					return;
-				}
-			}
-
-			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-			if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
-				data.scale = 0;
-			}
-		}
-
-		// Cache the watering scale if caching is enabled and no error occurred.
-		if ( weatherProvider.shouldCacheWateringScale() ) {
-			cache.storeWateringScale( wateringParam, coordinates, pws, adjustmentOptions, {
-				scale: data.scale,
-				rawData: data.rawData,
-				rainDelay: data.rd,
-				scales: data.scales
-			} );
-		}
+        // Check for any user-set restrictions and change the scale to 0 if the criteria is met
+        if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
+            data.scale = 0;
+        }
 	}
 
 	sendWateringData( res, data, outputFormat === "json" );
