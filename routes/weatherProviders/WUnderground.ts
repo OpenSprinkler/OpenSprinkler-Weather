@@ -10,8 +10,6 @@ export default class WUnderground extends WeatherProvider {
 			throw new CodedError( ErrorCode.NoPwsProvided );
 		}
 
-		console.log("WU getWateringData request for coordinates: %s", coordinates);
-
 		const historicUrl = `https://api.weather.com/v2/pws/observations/hourly/7day?stationId=${ pws.id }&format=json&units=e&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
 		let historicData;
 		try {
@@ -92,8 +90,6 @@ export default class WUnderground extends WeatherProvider {
 		if ( !pws ) {
 			throw new CodedError( ErrorCode.NoPwsProvided );
 		}
-
-		console.log("WU getWeatherData request for coordinates: %s", coordinates);
 
 		const forecastURL = `https://api.weather.com/v3/wx/forecast/daily/5day?geocode=${ coordinates[ 0 ] },${ coordinates[ 1 ] }&format=json&language=en-US&units=e&apiKey=${ pws.apiKey }`;
 

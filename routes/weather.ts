@@ -150,7 +150,7 @@ function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], 
 		}
 	}
 
-	if ( adjustmentOptions.minTemp !== undefined && adjustmentOptions.minTemp != -40 ) {
+	if ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp != -40 ) {
 		if ( weather.temp < adjustmentOptions.minTemp ) {
 			return true;
 		}
@@ -385,7 +385,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 			}
 
 			let weatherData: WeatherData | undefined = undefined;
-			if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( adjustmentOptions.minTemp !== undefined && adjustmentOptions.minTemp !== -40 ) ) {
+			if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) ) {
 				try {
 					weatherData = await weatherProvider.getWeatherData( coordinates, pws );
 				} catch ( err ) {
