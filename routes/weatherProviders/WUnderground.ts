@@ -5,7 +5,7 @@ import { CodedError, ErrorCode } from "../../errors";
 
 export default class WUnderground extends WeatherProvider {
 
-	async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WateringData[] > {
+	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 		if ( !pws ) {
 			throw new CodedError( ErrorCode.NoPwsProvided );
 		}
@@ -86,7 +86,7 @@ export default class WUnderground extends WeatherProvider {
 
 	}
 
-	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
+	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
 		if ( !pws ) {
 			throw new CodedError( ErrorCode.NoPwsProvided );
 		}

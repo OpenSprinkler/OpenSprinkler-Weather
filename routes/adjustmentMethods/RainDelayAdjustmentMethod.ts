@@ -12,7 +12,8 @@ async function calculateRainDelayWateringScale(
 	weatherProvider: WeatherProvider,
 	pws?: PWS
 ): Promise< AdjustmentMethodResponse > {
-	const weatherData: WeatherData = await weatherProvider.getWeatherData( coordinates, pws );
+    const data = await weatherProvider.getWeatherData( coordinates, pws );
+	const weatherData: WeatherData = data.value;
 	const raining = weatherData && weatherData.raining;
 	const d = adjustmentOptions.hasOwnProperty( "d" ) ? adjustmentOptions.d : 24;
 	return {
@@ -22,7 +23,8 @@ async function calculateRainDelayWateringScale(
 			raining: raining ? 1 : 0,
 			},
 		rainDelay: raining ? d : undefined,
-		wateringData: null
+		wateringData: null,
+        ttl: data.ttl
 	}
 }
 

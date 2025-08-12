@@ -47,6 +47,8 @@ export interface AdjustmentMethodResponse {
 	wateringData: WateringData[];
 	/** A list of scales for multiple day data usage. */
 	scales?: number[];
+	/** How long the data is cached for. */
+	ttl: number;
 }
 
 export interface AdjustmentOptions {

@@ -15,7 +15,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		this.API_KEY = process.env.ACCUWEATHER_API_KEY;
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WateringData[] > {
+	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 
 		const localKey = keyToUse(this.API_KEY, pws);
 
@@ -102,8 +102,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		}];
 	}
 
-	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
-
+	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
 		const localKey = keyToUse(this.API_KEY, pws);
 
 		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;

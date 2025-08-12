@@ -34,27 +34,26 @@ export default class AppleWeatherProvider extends WeatherProvider {
           );
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WateringData[] > {
+	protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WateringData[]> {
 		// The Unix timestamp of 10 days ago.
 		const historicTimestamp: string = moment().tz(geoTZ.find(coordinates[0], coordinates[1])[0]).startOf("day").subtract( 240, "hours" ).toISOString();
 
         const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${historicTimestamp}&hourlyEnd=${moment().toISOString()}&dailyStart=${historicTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
 
-		let historicDataCache: CachedResult<any>;
-		// let historicData;
+		let historicData;
 		try {
-            historicDataCache = await this.getHistorical(coordinates, pws, historicUrl, {Authorization: `Bearer ${this.API_KEY}`});
+            historicData = await httpJSONRequest( historicUrl, {Authorization: `Bearer ${this.API_KEY}`} );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from Apple:", err );
 			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
-		if ( !historicDataCache.value.forecastHourly || !historicDataCache.value.forecastHourly.hours ) {
+		if ( !historicData.forecastHourly || !historicData.forecastHourly.hours ) {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
-		const hours = historicDataCache.value.forecastHourly.hours;
-		const days = historicDataCache.value.forecastDaily.days;
+		const hours = historicData.forecastHourly.hours;
+		const days = historicData.forecastDaily.days;
 
         // Fail if not enough data is available.
 		// There will only be 23 samples on the day that daylight saving time begins.
@@ -114,15 +113,15 @@ export default class AppleWeatherProvider extends WeatherProvider {
 				temp: temp / length,
 				humidity: humidity / length * 100,
 				raining: (i < daysInHours.length - 1) ? false : daysInHours[i][length-1].precipitationIntensity > 0,
-				periodStartTime: moment(historicDataCache.value.forecastDaily.days[ i ].forecastStart).unix(),
-				minTemp: this.celsiusToFahrenheit( historicDataCache.value.forecastDaily.days[ i ].temperatureMin ),
-				maxTemp: this.celsiusToFahrenheit( historicDataCache.value.forecastDaily.days[ i ].temperatureMax ),
+				periodStartTime: moment(historicData.forecastDaily.days[ i ].forecastStart).unix(),
+				minTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ i ].temperatureMin ),
+				maxTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ i ].temperatureMax ),
 				minHumidity: minHumidity * 100,
 				maxHumidity: maxHumidity * 100,
 				solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
 				// Assume wind speed measurements are taken at 2 meters.
 				windSpeed: this.kphToMph( windSpeed ),
-				precip: this.mmToInchesPerHour( historicDataCache.value.forecastDaily.days[ i ].precipitationAmount || 0 )
+				precip: this.mmToInchesPerHour( historicData.forecastDaily.days[ i ].precipitationAmount || 0 )
 			});
 		}
 
@@ -130,47 +129,46 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
 	}
 
-	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
+	protected async getWeatherDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WeatherData> {
         const forecastUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=currentWeather,forecastDaily&timezone=UTC`
 
-		let forecastCache: CachedResult<any>;
+		let forecast;
 		try {
-			// forecast = await httpJSONRequest( forecastUrl, {Authorization: `Bearer ${this.API_KEY}`} );
-            forecastCache = await this.getForcast(coordinates, pws, forecastUrl, {Authorization: `Bearer ${this.API_KEY}`});
+			forecast = await httpJSONRequest( forecastUrl, {Authorization: `Bearer ${this.API_KEY}`} );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from Apple:", err );
 			throw "An error occurred while retrieving weather information from Apple."
 		}
 
-		if ( !forecastCache.value.currentWeather || !forecastCache.value.forecastDaily || !forecastCache.value.forecastDaily.days ) {
+		if ( !forecast.currentWeather || !forecast.forecastDaily || !forecast.forecastDaily.days ) {
 			throw "Necessary field(s) were missing from weather information returned by Apple.";
 		}
 
 		const weather: WeatherData = {
 			weatherProvider: "Apple",
-			temp: Math.floor( this.celsiusToFahrenheit( forecastCache.value.currentWeather.temperature ) ),
-			humidity: Math.floor( forecastCache.value.currentWeather.humidity * 100 ),
-			wind: Math.floor( this.kphToMph( forecastCache.value.currentWeather.windSpeed ) ),
-			raining: forecastCache.value.currentWeather.precipitationIntensity > 0,
-			description: forecastCache.value.currentWeather.conditionCode,
-			icon: this.getOWMIconCode( forecastCache.value.currentWeather.conditionCode ),
+			temp: Math.floor( this.celsiusToFahrenheit( forecast.currentWeather.temperature ) ),
+			humidity: Math.floor( forecast.currentWeather.humidity * 100 ),
+			wind: Math.floor( this.kphToMph( forecast.currentWeather.windSpeed ) ),
+			raining: forecast.currentWeather.precipitationIntensity > 0,
+			description: forecast.currentWeather.conditionCode,
+			icon: this.getOWMIconCode( forecast.currentWeather.conditionCode ),
 
 			region: "",
 			city: "",
-			minTemp: Math.floor( this.celsiusToFahrenheit( forecastCache.value.forecastDaily.days[ 0 ].temperatureMin ) ),
-			maxTemp: Math.floor( this.celsiusToFahrenheit( forecastCache.value.forecastDaily.days[ 0 ].temperatureMax ) ),
-			precip: this.mmToInchesPerHour( forecastCache.value.forecastDaily.days[0].precipitationAmount ),
+			minTemp: Math.floor( this.celsiusToFahrenheit( forecast.forecastDaily.days[ 0 ].temperatureMin ) ),
+			maxTemp: Math.floor( this.celsiusToFahrenheit( forecast.forecastDaily.days[ 0 ].temperatureMax ) ),
+			precip: this.mmToInchesPerHour( forecast.forecastDaily.days[0].precipitationAmount ),
 			forecast: []
 		};
 
-		for ( let index = 0; index < forecastCache.value.forecastDaily.days.length; index++ ) {
+		for ( let index = 0; index < forecast.forecastDaily.days.length; index++ ) {
 			weather.forecast.push( {
-				temp_min: Math.floor( this.celsiusToFahrenheit( forecastCache.value.forecastDaily.days[ index ].temperatureMin ) ),
-				temp_max: Math.floor( this.celsiusToFahrenheit( forecastCache.value.forecastDaily.days[ index ].temperatureMax ) ),
-				precip: this.mmToInchesPerHour( forecastCache.value.forecastDaily.days[ index ].precipitationAmount),
-				date: moment(forecastCache.value.forecastDaily.days[ index ].forecastStart).unix(),
-				icon: this.getOWMIconCode( forecastCache.value.forecastDaily.days[ index ].conditionCode ),
-				description: forecastCache.value.forecastDaily.days[ index ].conditionCode
+				temp_min: Math.floor( this.celsiusToFahrenheit( forecast.forecastDaily.days[ index ].temperatureMin ) ),
+				temp_max: Math.floor( this.celsiusToFahrenheit( forecast.forecastDaily.days[ index ].temperatureMax ) ),
+				precip: this.mmToInchesPerHour( forecast.forecastDaily.days[ index ].precipitationAmount),
+				date: moment(forecast.forecastDaily.days[ index ].forecastStart).unix(),
+				icon: this.getOWMIconCode( forecast.forecastDaily.days[ index ].conditionCode ),
+				description: forecast.forecastDaily.days[ index ].conditionCode
 			} );
 		}
 

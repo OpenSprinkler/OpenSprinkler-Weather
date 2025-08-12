@@ -15,7 +15,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		this.API_KEY = process.env.PIRATEWEATHER_API_KEY;
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WateringData[] > {
+	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 		// The Unix timestamp of 24 hours ago.
 		const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
 
@@ -93,7 +93,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		}];
 	}
 
-	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
+	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
 
 		const localKey = keyToUse( this.API_KEY, pws);
 

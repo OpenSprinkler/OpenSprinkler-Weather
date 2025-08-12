@@ -15,6 +15,7 @@ import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
 import { ParsedQs } from "qs";
+import { CachedResult } from "../cache";
 
 const WEATHER_PROVIDERS: { [method: string] : WeatherProvider} = {
 	"AW": new ( require("./weatherProviders/AccuWeather" ).default )(),
@@ -218,7 +219,7 @@ export const getWeatherData = async function( req: express.Request, res: express
   	}
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
-	let weatherData: WeatherData;
+	let weatherData: CachedResult<WeatherData>;
 
     if (weatherData == undefined) {
 	try {
@@ -230,8 +231,9 @@ export const getWeatherData = async function( req: express.Request, res: express
 
 	res.json( {
 		...timeData,
-		...weatherData,
-		location: coordinates
+		...weatherData.value,
+        ttl: weatherData.ttl,
+		location: coordinates,
 	} );
 };
 
@@ -337,7 +339,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 		eip:		ipToInt( remoteAddress ),
 		rawData:	undefined,
 		errCode:	0,
-		scales:		undefined
+		scales:		undefined,
+        ttl:        0,
 	};
 
     // Calculate the watering scale if it wasn't found in the cache.
@@ -355,6 +358,7 @@ export const getWateringData = async function( req: express.Request, res: expres
     data.rd = adjustmentMethodResponse.rainDelay;
     data.rawData = adjustmentMethodResponse.rawData;
     data.scales = adjustmentMethodResponse.scales;
+    data.ttl = adjustmentMethodResponse.ttl;
 
     if ( checkRestrictions ) {
         let wateringData: WateringData[] = adjustmentMethodResponse.wateringData;
@@ -374,7 +378,7 @@ export const getWateringData = async function( req: express.Request, res: expres
         let weatherData: WeatherData | undefined = undefined;
         if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) ) {
             try {
-                weatherData = await weatherProvider.getWeatherData( coordinates, pws );
+                weatherData = (await weatherProvider.getWeatherData( coordinates, pws )).value;
             } catch ( err ) {
                 res.send( "Error: " + err );
                 return;

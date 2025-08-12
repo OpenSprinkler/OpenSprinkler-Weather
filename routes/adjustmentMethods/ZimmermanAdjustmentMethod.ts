@@ -15,7 +15,8 @@ async function calculateZimmermanWateringScale(
 	weatherProvider: WeatherProvider,
 	pws?: PWS
 ): Promise< AdjustmentMethodResponse > {
-	const wateringData: WateringData[] = await weatherProvider.getWateringData( coordinates, pws );
+    const data = await weatherProvider.getWateringData( coordinates, pws );
+	const wateringData: WateringData[] = data.value;
 
 	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
 	/*
@@ -96,7 +97,8 @@ async function calculateZimmermanWateringScale(
 		scale: scales[0],
 		rawData: rawData[0],
 		wateringData: wateringData,
-		scales: scales
+		scales: scales,
+        ttl: data.ttl,
 	}
 }
 

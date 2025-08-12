@@ -1,7 +1,7 @@
 import * as moment from "moment-timezone";
 import * as geoTZ from "geo-tz";
 
-import { GeoCoordinates, WeatherData, WateringData } from "../../types";
+import { GeoCoordinates, WeatherData, WateringData, PWS } from "../../types";
 import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
@@ -15,7 +15,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		super();
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData[] > {
+	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 		//console.log("OM getWateringData request for coordinates: %s", coordinates);
 
 		const start: string = moment().subtract( 10, "day" ).format("YYYY-MM-DD");
@@ -103,7 +103,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		return data;
 	}
 
-	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
+	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
 
 		//console.log("OM getWeatherData request for coordinates: %s", coordinates);
 

@@ -2,7 +2,7 @@ import * as express	from "express";
 import * as moment from "moment";
 import * as fs from "fs";
 
-import { GeoCoordinates, WeatherData, WateringData } from "../../types";
+import { GeoCoordinates, WeatherData, WateringData, PWS } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
 import { getParameter } from "../weather";
@@ -39,7 +39,7 @@ export const captureWUStream = async function( req: express.Request, res: expres
 
 export default class LocalWeatherProvider extends WeatherProvider {
 
-	public async getWeatherData( coordinates: GeoCoordinates ): Promise< WeatherData > {
+	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
 		queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
 
 		if ( queue.length == 0 ) {
@@ -70,7 +70,7 @@ export default class LocalWeatherProvider extends WeatherProvider {
 		return weather;
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates ): Promise< WateringData[] > {
+	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 
 		queue = queue.filter( obs => moment().unix() - obs.timestamp  < 24*60*60 );
 

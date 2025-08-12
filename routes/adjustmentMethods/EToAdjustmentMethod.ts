@@ -32,7 +32,8 @@ async function calculateEToWateringScale(
 	 */
 
 	// This will throw a CodedError if ETo data cannot be retrieved.
-	const wateringData: WateringData[] = await weatherProvider.getWateringData( coordinates, pws );
+	const data = await weatherProvider.getWateringData( coordinates, pws );
+	const wateringData: WateringData[] = data.value;
 
 	let baseETo: number;
 	// Default elevation is based on data from https://www.pnas.org/content/95/24/14009.
@@ -84,7 +85,8 @@ async function calculateEToWateringScale(
 			p: Math.round( wateringData[0].precip * 100 ) / 100
 		},
 		wateringData: wateringData,
-		scales: scales
+		scales: scales,
+        ttl: data.ttl,
 	}
 }
 
