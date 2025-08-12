@@ -98,7 +98,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			maxHumidity: maxHumidity,
 			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
 			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: avgWindSpeed
+			windSpeed: avgWindSpeed / historicData.length
 		}];
 	}
 
