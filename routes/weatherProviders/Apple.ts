@@ -36,7 +36,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		// The Unix timestamp of 10 days ago.
 		const historicTimestamp: string = moment().subtract( 240, "hours" ).toISOString();
 
-        const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${historicTimestamp}&dailyStart=${historicTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
+        const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${historicTimestamp}&hourlyEnd=${moment().toISOString()}&dailyStart=${historicTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
 
 		let historicData;
 		try {
