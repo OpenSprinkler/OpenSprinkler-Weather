@@ -1,5 +1,10 @@
+import * as geoTZ from "geo-tz";
+import { TZDate } from "@date-fns/tz";
 import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
 import { CodedError, ErrorCode } from "../../errors";
+import { Cached, CachedResult } from "../../cache";
+import { httpJSONRequest } from "../weather";
+import { addDays, addHours, endOfDay, startOfDay } from "date-fns";
 
 export class WeatherProvider {
 	/**
@@ -34,4 +39,38 @@ export class WeatherProvider {
 	shouldCacheWateringScale(): boolean {
 		return false;
 	}
+
+    private forcastCache: {[key: string]: Cached<object>} = {};
+    private historicalCache: {[key: string]: Cached<object>} = {};
+
+    private getCacheKey(coordinates: GeoCoordinates, pws?: PWS): string {
+        return pws?.id || `${coordinates[0]};s${coordinates[1]}`
+    }
+
+    protected async getForcast(coordinates: GeoCoordinates, pws: PWS | undefined, url: string, headers?: any, body?: any): Promise<CachedResult<object>> {
+        const key = this.getCacheKey(coordinates, pws);
+        if (!this.forcastCache[key]) {
+            this.forcastCache[key] = new Cached();
+        }
+
+        let tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+
+        const date = TZDate.tz(tz);
+        const expiresAt = addHours(startOfDay(date), (Math.floor(date.getHours() / 6) + 1) * 6);
+
+        return this.forcastCache[key].get(() => httpJSONRequest(url, headers, body), expiresAt);
+    }
+
+    protected async getHistorical(coordinates: GeoCoordinates, pws: PWS | undefined, url: string, headers?: any, body?: any): Promise<CachedResult<object>> {
+        const key = this.getCacheKey(coordinates, pws);
+        if (!this.forcastCache[key]) {
+            this.forcastCache[key] = new Cached();
+        }
+
+        let tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+
+        const expiresAt = addDays(startOfDay(TZDate.tz(tz)), 1);
+
+        return this.forcastCache[key].get(() => httpJSONRequest(url, headers, body), expiresAt);
+    }
 }
