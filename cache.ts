@@ -1,4 +1,4 @@
-import { isAfter, addMilliseconds, differenceInMilliseconds, DateArg, DateValues } from 'date-fns';
+import { isAfter, differenceInMilliseconds } from 'date-fns';
 import { Mutex } from 'async-mutex';
 
 export type CachedResult<T> = {
@@ -9,13 +9,13 @@ export type CachedResult<T> = {
 export class Cached<T> {
 	private mutex: Mutex;
 	private value: Promise<T> | null = null;
-	private expiresAt: DateArg<Date> | null = null;
+	private expiresAt: Date | null = null;
 
 	constructor() {
 		this.mutex = new Mutex();
 	}
 
-	async get(getter: () => Promise<T>, expiresAt: DateArg<Date>): Promise<CachedResult<T>> {
+	async get(getter: () => Promise<T>, expiresAt: Date): Promise<CachedResult<T>> {
 		if (this.expiresAt && isAfter(new Date(), this.expiresAt)) {
 			await this.invalidate();
 		}

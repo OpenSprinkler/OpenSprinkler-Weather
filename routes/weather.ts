@@ -4,9 +4,19 @@ import https from "https";
 import SunCalc from "suncalc";
 import geoTZ from "geo-tz";
 
-import { WateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
+import {
+    WateringData,
+    GeoCoordinates,
+    PWS,
+    TimeData,
+    WeatherData,
+} from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
-import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
+import {
+    AdjustmentMethod,
+    AdjustmentMethodResponse,
+    AdjustmentOptions,
+} from "./adjustmentMethods/AdjustmentMethod";
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
@@ -25,42 +35,48 @@ import OpenMeteoWeatherProvider from "./weatherProviders/OpenMeteo";
 import PirateWeatherWeatherProvider from "./weatherProviders/PirateWeather";
 import GoogleMapsGeocoder from "./geocoders/GoogleMaps";
 import WUndergroundGeocoder from "./geocoders/WUnderground";
+import { TZDate } from "@date-fns/tz";
 
-const WEATHER_PROVIDERS: {[name: string]: WeatherProvider} = {
-    "Apple": new AppleWeatherProvider(),
-    "AccuWeather": new AccuWeatherWeatherProvider(),
-    "DWD": new DWDWeatherProvider(),
-    "local": new LocalWeatherProvider(),
-    "OpenMeteo": new OpenMeteoWeatherProvider(),
-    "OWM": new OWMWeatherProvider(),
-    "PirateWeather": new PirateWeatherWeatherProvider(),
-    "WUnderground": new WUndergroundWeatherProvider(),
+const WEATHER_PROVIDERS: { [name: string]: WeatherProvider } = {
+    Apple: new AppleWeatherProvider(),
+    AccuWeather: new AccuWeatherWeatherProvider(),
+    DWD: new DWDWeatherProvider(),
+    local: new LocalWeatherProvider(),
+    OpenMeteo: new OpenMeteoWeatherProvider(),
+    OWM: new OWMWeatherProvider(),
+    PirateWeather: new PirateWeatherWeatherProvider(),
+    WUnderground: new WUndergroundWeatherProvider(),
 };
 
-const GEOCODERS: {[name: string]: Geocoder} = {
-    "GoogleMaps": new GoogleMapsGeocoder(),
-    "WUnderground": new WUndergroundGeocoder(),
+const GEOCODERS: { [name: string]: Geocoder } = {
+    GoogleMaps: new GoogleMapsGeocoder(),
+    WUnderground: new WUndergroundGeocoder(),
 };
 
-const WEATHER_PROVIDER: WeatherProvider = WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["Apple"];
-const PWS_WEATHER_PROVIDER: WeatherProvider = WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["WUnderground"];
-const GEOCODER: Geocoder = GEOCODERS[process.env.GEOCODER] || GEOCODERS["WUnderground"];
+const WEATHER_PROVIDER: WeatherProvider =
+    WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] ||
+    WEATHER_PROVIDERS["Apple"];
+const PWS_WEATHER_PROVIDER: WeatherProvider =
+    WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] ||
+    WEATHER_PROVIDERS["WUnderground"];
+const GEOCODER: Geocoder =
+    GEOCODERS[process.env.GEOCODER] || GEOCODERS["WUnderground"];
 
 // Define regex filters to match against location
 const filters = {
-	gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
-	pws: /^(?:pws|icao|zmw):/,
-	url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
-	time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
-	timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
+    gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
+    pws: /^(?:pws|icao|zmw):/,
+    url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
+    time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
+    timezone: /^()()()()()()([+-])(\d{2})(\d{2})/,
 };
 
 /** AdjustmentMethods mapped to their numeric IDs. */
-const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
-	0: ManualAdjustmentMethod,
-	1: ZimmermanAdjustmentMethod,
-	2: RainDelayAdjustmentMethod,
-	3: EToAdjustmentMethod
+const ADJUSTMENT_METHOD: { [key: number]: AdjustmentMethod } = {
+    0: ManualAdjustmentMethod,
+    1: ZimmermanAdjustmentMethod,
+    2: RainDelayAdjustmentMethod,
+    3: EToAdjustmentMethod,
 };
 
 /**
@@ -69,20 +85,21 @@ const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
  * @return A promise that will be resolved with the coordinates of the best match for the specified location, or
  * rejected with a CodedError if unable to resolve the location.
  */
-export async function resolveCoordinates( location: string ): Promise< GeoCoordinates > {
+export async function resolveCoordinates(
+    location: string
+): Promise<GeoCoordinates> {
+    if (!location) {
+        throw new CodedError(ErrorCode.InvalidLocationFormat);
+    }
 
-	if ( !location ) {
-		throw new CodedError( ErrorCode.InvalidLocationFormat );
-	}
-
-	if ( filters.pws.test( location ) ) {
-		throw new CodedError( ErrorCode.InvalidLocationFormat );
-	} else if ( filters.gps.test( location ) ) {
-		const split: string[] = location.split( "," );
-		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
-	} else {
-		return GEOCODER.getLocation( location );
-	}
+    if (filters.pws.test(location)) {
+        throw new CodedError(ErrorCode.InvalidLocationFormat);
+    } else if (filters.gps.test(location)) {
+        const split: string[] = location.split(",");
+        return [parseFloat(split[0]), parseFloat(split[1])];
+    } else {
+        return GEOCODER.getLocation(location);
+    }
 }
 
 /**
@@ -92,14 +109,40 @@ export async function resolveCoordinates( location: string ): Promise< GeoCoordi
  * with an error if the request or JSON parsing fails. This error may contain information about the HTTP request or,
  * response including API keys and other sensitive information.
  */
-export async function httpJSONRequest(url: string, headers?, body?): Promise< any > {
-	try {
-		const data: string = await httpRequest(url, headers, body);
-		return JSON.parse(data);
-	} catch (err) {
-		// Reject the promise if there was an error making the request or parsing the JSON.
-		throw err;
-	}
+export async function httpJSONRequest(
+    url: string,
+    headers?,
+    body?
+): Promise<any> {
+    try {
+        const data: string = await httpRequest(url, headers, body);
+        return JSON.parse(data);
+    } catch (err) {
+        // Reject the promise if there was an error making the request or parsing the JSON.
+        throw err;
+    }
+}
+
+/**
+ * Gets the coordinates for specified coordinates
+ * @param coordinates The coordinates to use to calculate timezone.
+ * @returns The timezone for the coordinates
+ */
+export function getTZ(coordinates: GeoCoordinates): string {
+    return geoTZ.find(coordinates[0], coordinates[1])[0];
+}
+
+/**
+ * Gets the local date object for specified coordinates in the correct timezone
+ * @param coordinates The coordinates to use to calculate timezone.
+ * @returns The date object which is the current time in the timezone
+ */
+export function localTime(coordinates: GeoCoordinates, date?: Date): Date {
+    if (!date) {
+        date = new Date();
+    }
+
+    return TZDate.tz(getTZ(coordinates), date);
 }
 
 /**
@@ -107,21 +150,32 @@ export async function httpJSONRequest(url: string, headers?, body?): Promise< an
  * @param coordinates The coordinates to use to calculate time data.
  * @return The TimeData for the specified coordinates.
  */
-function getTimeData( coordinates: GeoCoordinates ): TimeData {
-	const timezone = moment().tz( geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
-	const tzOffset: number = getTimezone( timezone, true );
+function getTimeData(coordinates: GeoCoordinates): TimeData {
+    // const timezone = moment()
+    //     .tz(geoTZ.find(coordinates[0], coordinates[1])[0])
+    //     .utcOffset();
+    const timezone = -localTime(coordinates).getTimezoneOffset();
 
-	// Calculate sunrise and sunset since Weather Underground does not provide it
-	const sunData = SunCalc.getTimes( new Date(), coordinates[ 0 ], coordinates[ 1 ] );
+    const tzOffset: number = getTimezone(timezone, true);
 
-	sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
-	sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
+    // Calculate sunrise and sunset since Weather Underground does not provide it
+    const sunData = SunCalc.getTimes(
+        new Date(),
+        coordinates[0],
+        coordinates[1]
+    );
 
-	return {
-		timezone:	timezone,
-		sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
-		sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() )
-	};
+    sunData.sunrise.setUTCMinutes(sunData.sunrise.getUTCMinutes() + tzOffset);
+    sunData.sunset.setUTCMinutes(sunData.sunset.getUTCMinutes() + tzOffset);
+
+    return {
+        timezone: timezone,
+        sunrise:
+            sunData.sunrise.getUTCHours() * 60 +
+            sunData.sunrise.getUTCMinutes(),
+        sunset:
+            sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes(),
+    };
 }
 
 /**
@@ -136,267 +190,369 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  * @param weather Weather data to use to determine if any restrictions apply.
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
-function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], adjustmentOptions?: AdjustmentOptions, weather?: WeatherData ): boolean {
+function checkWeatherRestriction(
+    cali: boolean,
+    wateringData?: WateringData[],
+    adjustmentOptions?: AdjustmentOptions,
+    weather?: WeatherData
+): boolean {
+    if (
+        (cali || (adjustmentOptions && adjustmentOptions.cali)) &&
+        wateringData &&
+        wateringData.length
+    ) {
+        // With the revamp of watering data, the most recent two days are the end of the array, giving 48 hours. If not, only the last one (24 hours) is used.
+        const len = wateringData.length;
+        let rain = wateringData[len - 1].precip;
+        if (len > 1) {
+            rain += wateringData[len - 2].precip;
+        }
 
-	if ( ( cali || (adjustmentOptions && adjustmentOptions.cali ) ) && wateringData && wateringData.length ) {
-		// With the revamp of watering data, the most recent two days are the end of the array, giving 48 hours. If not, only the last one (24 hours) is used.
-		const len = wateringData.length;
-		let rain = wateringData[len-1].precip;
-		if ( len > 1 ){
-			rain += wateringData[len-2].precip;
-		}
+        if (rain > 0.1) {
+            return true;
+        }
+    }
 
-		if ( rain > 0.1 ) {
-			return true;
-		}
-	}
+    if (
+        adjustmentOptions.rainAmt &&
+        adjustmentOptions.rainAmt > 0 &&
+        adjustmentOptions.rainDays
+    ) {
+        const days =
+            weather.forecast.length > adjustmentOptions.rainDays
+                ? adjustmentOptions.rainDays
+                : weather.forecast.length;
+        let precip = 0;
+        for (let i = 0; i < days; i++) {
+            precip += weather.forecast[i].precip;
+        }
 
-	if ( adjustmentOptions.rainAmt && adjustmentOptions.rainAmt > 0 && adjustmentOptions.rainDays ) {
-		const days = weather.forecast.length > adjustmentOptions.rainDays ? adjustmentOptions.rainDays : weather.forecast.length;
-		let precip = 0;
-		for ( let i = 0; i < days; i++ ) {
-			precip += weather.forecast[i].precip;
-		}
+        if (precip > adjustmentOptions.rainAmt) {
+            return true;
+        }
+    }
 
-		if ( precip > adjustmentOptions.rainAmt ){
-			return true;
-		}
-	}
+    if (
+        typeof adjustmentOptions.minTemp !== "undefined" &&
+        adjustmentOptions.minTemp != -40
+    ) {
+        if (weather.temp < adjustmentOptions.minTemp) {
+            return true;
+        }
+    }
 
-	if ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp != -40 ) {
-		if ( weather.temp < adjustmentOptions.minTemp ) {
-			return true;
-		}
-	}
-
-	return false;
+    return false;
 }
 
-export const getWeatherData = async function( req: express.Request, res: express.Response ) {
-	const location: string = getParameter(req.query.loc);
-	let adjustmentOptionsString: string	= getParameter(req.query.wto),
-		adjustmentOptions: AdjustmentOptions;
+export const getWeatherData = async function (
+    req: express.Request,
+    res: express.Response
+) {
+    const location: string = getParameter(req.query.loc);
+    let adjustmentOptionsString: string = getParameter(req.query.wto),
+        adjustmentOptions: AdjustmentOptions;
 
-	// Parse weather adjustment options
-	try {
-		// Parse data that may be encoded
-		adjustmentOptionsString = decodeURIComponent( adjustmentOptionsString.replace( /\\x/g, "%" ) );
+    // Parse weather adjustment options
+    try {
+        // Parse data that may be encoded
+        adjustmentOptionsString = decodeURIComponent(
+            adjustmentOptionsString.replace(/\\x/g, "%")
+        );
 
-		// Reconstruct JSON string from deformed controller output
-		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
-	} catch ( err ) {
-		// If the JSON is not valid then abort the calculation
-		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ));
-		return;
-	}
+        // Reconstruct JSON string from deformed controller output
+        adjustmentOptions = JSON.parse("{" + adjustmentOptionsString + "}");
+    } catch (err) {
+        // If the JSON is not valid then abort the calculation
+        sendWateringError(
+            res,
+            new CodedError(ErrorCode.MalformedAdjustmentOptions)
+        );
+        return;
+    }
 
-	let coordinates: GeoCoordinates;
-	try {
-		coordinates = await resolveCoordinates( location );
-	} catch (err) {
-		res.send(`Error: Unable to resolve location (${err})`);
-		return;
-	}
+    let coordinates: GeoCoordinates;
+    try {
+        coordinates = await resolveCoordinates(location);
+    } catch (err) {
+        res.send(`Error: Unable to resolve location (${err})`);
+        return;
+    }
 
-	let pws: PWS | undefined = undefined;
-	if ( adjustmentOptions.provider === "WU" && adjustmentOptions.pws && adjustmentOptions.key ) {
-		const idMatch = adjustmentOptions.pws.match( /^[a-zA-Z\d]+$/ );
-		const pwsId = idMatch ? idMatch[ 0 ] : undefined;
-		const keyMatch = adjustmentOptions.key.match( /^[a-f\d]{32}$/ );
-		const apiKey = keyMatch ? keyMatch[ 0 ] : undefined;
+    let pws: PWS | undefined = undefined;
+    if (
+        adjustmentOptions.provider === "WU" &&
+        adjustmentOptions.pws &&
+        adjustmentOptions.key
+    ) {
+        const idMatch = adjustmentOptions.pws.match(/^[a-zA-Z\d]+$/);
+        const pwsId = idMatch ? idMatch[0] : undefined;
+        const keyMatch = adjustmentOptions.key.match(/^[a-f\d]{32}$/);
+        const apiKey = keyMatch ? keyMatch[0] : undefined;
 
-		// Make sure that the PWS ID and API key look valid.
-		if ( !pwsId ) {
-			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsId ) );
-			return;
-		}
-		if ( !apiKey ) {
-			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsApiKey ) );
-			return;
-		}
+        // Make sure that the PWS ID and API key look valid.
+        if (!pwsId) {
+            sendWateringError(res, new CodedError(ErrorCode.InvalidPwsId));
+            return;
+        }
+        if (!apiKey) {
+            sendWateringError(res, new CodedError(ErrorCode.InvalidPwsApiKey));
+            return;
+        }
 
-		pws = { id: pwsId, apiKey: apiKey };
-	}else if ( adjustmentOptions.key ){
-		pws = {apiKey: adjustmentOptions.key};
-	}
+        pws = { id: pwsId, apiKey: apiKey };
+    } else if (adjustmentOptions.key) {
+        pws = { apiKey: adjustmentOptions.key };
+    }
 
-	let WEATHER_PROVIDER: WeatherProvider;
-	let provider: string = adjustmentOptions.provider;
+    let WEATHER_PROVIDER: WeatherProvider;
+    let provider: string = adjustmentOptions.provider;
 
-	if ( !provider && process.env.WEATHER_PROVIDER ) {
-		provider = process.env.WEATHER_PROVIDER;
-	}
+    if (!provider && process.env.WEATHER_PROVIDER) {
+        provider = process.env.WEATHER_PROVIDER;
+    }
 
-	if (typeof WEATHER_PROVIDERS[provider] === 'object') {
-		WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
-	} else {
-		WEATHER_PROVIDER = WEATHER_PROVIDERS['Apple'];
-	}
-	// Continue with the weather request
-	const timeData: TimeData = getTimeData( coordinates );
-	let weatherData: CachedResult<WeatherData>;
+    if (typeof WEATHER_PROVIDERS[provider] === "object") {
+        WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
+    } else {
+        WEATHER_PROVIDER = WEATHER_PROVIDERS["Apple"];
+    }
+    // Continue with the weather request
+    const timeData: TimeData = getTimeData(coordinates);
+    let weatherData: CachedResult<WeatherData>;
 
-	if (weatherData == undefined) {
-	try {
-		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates, pws );
-	} catch ( err ) {
-		res.send( "Error: " + err );
-		return;
-	}}
+    if (weatherData == undefined) {
+        try {
+            weatherData = await WEATHER_PROVIDER.getWeatherData(
+                coordinates,
+                pws
+            );
+        } catch (err) {
+            res.send("Error: " + err);
+            return;
+        }
+    }
 
-	res.json( {
-		...timeData,
-		...weatherData.value,
-		ttl: weatherData.ttl,
-		location: coordinates,
-	} );
+    res.json({
+        ...timeData,
+        ...weatherData.value,
+        ttl: weatherData.ttl,
+        location: coordinates,
+    });
 };
 
 // API Handler when using the weatherX.py where X represents the
 // adjustment method which is encoded to also carry the watering
 // restriction and therefore must be decoded
-export const getWateringData = async function( req: express.Request, res: express.Response ) {
-	const wateringParam = Number.parseInt(req.params[0]);
-	// The adjustment method is encoded by the OpenSprinkler firmware and must be
-	// parsed. This allows the adjustment method and the restriction type to both
-	// be saved in the same byte.
-	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ wateringParam & ~( 1 << 7 ) ],
-		adjustmentOptionsString: string		= getParameter(req.query.wto),
-		location: string | GeoCoordinates	= getParameter(req.query.loc),
-		outputFormat: string				= getParameter(req.query.format),
-		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
-		adjustmentOptions: AdjustmentOptions;
+export const getWateringData = async function (
+    req: express.Request,
+    res: express.Response
+) {
+    const wateringParam = Number.parseInt(req.params[0]);
+    // The adjustment method is encoded by the OpenSprinkler firmware and must be
+    // parsed. This allows the adjustment method and the restriction type to both
+    // be saved in the same byte.
+    let adjustmentMethod: AdjustmentMethod =
+            ADJUSTMENT_METHOD[wateringParam & ~(1 << 7)],
+        adjustmentOptionsString: string = getParameter(req.query.wto),
+        location: string | GeoCoordinates = getParameter(req.query.loc),
+        outputFormat: string = getParameter(req.query.format),
+        remoteAddress: string =
+            getParameter(req.headers["x-forwarded-for"]) ||
+            req.connection.remoteAddress,
+        adjustmentOptions: AdjustmentOptions;
 
-	// X-Forwarded-For header may contain more than one IP address and therefore
-	// the string is split against a comma and the first value is selected
-	remoteAddress = remoteAddress.split( "," )[ 0 ];
+    // X-Forwarded-For header may contain more than one IP address and therefore
+    // the string is split against a comma and the first value is selected
+    remoteAddress = remoteAddress.split(",")[0];
 
-	if ( !adjustmentMethod ) {
-		sendWateringError( res, new CodedError( ErrorCode.InvalidAdjustmentMethod ));
-		return;
-	}
+    if (!adjustmentMethod) {
+        sendWateringError(
+            res,
+            new CodedError(ErrorCode.InvalidAdjustmentMethod)
+        );
+        return;
+    }
 
-	// Parse weather adjustment options
-	try {
+    // Parse weather adjustment options
+    try {
+        // Parse data that may be encoded
+        adjustmentOptionsString = decodeURIComponent(
+            adjustmentOptionsString.replace(/\\x/g, "%")
+        );
 
-		// Parse data that may be encoded
-		adjustmentOptionsString = decodeURIComponent( adjustmentOptionsString.replace( /\\x/g, "%" ) );
+        // Reconstruct JSON string from deformed controller output
+        adjustmentOptions = JSON.parse("{" + adjustmentOptionsString + "}");
+    } catch (err) {
+        // If the JSON is not valid then abort the calculation
+        sendWateringError(
+            res,
+            new CodedError(ErrorCode.MalformedAdjustmentOptions),
+            adjustmentMethod != ManualAdjustmentMethod
+        );
+        return;
+    }
 
-		// Reconstruct JSON string from deformed controller output
-		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
-	} catch ( err ) {
-		// If the JSON is not valid then abort the calculation
-		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ), adjustmentMethod != ManualAdjustmentMethod );
-		return;
-	}
+    const checkRestrictions: boolean =
+        ((wateringParam >> 7) & 1) > 0 ||
+        typeof adjustmentOptions.cali !== "undefined" ||
+        (typeof adjustmentOptions.rainAmt !== "undefined" &&
+            typeof adjustmentOptions.rainDays !== "undefined") ||
+        typeof adjustmentOptions.minTemp !== "undefined";
 
-	const checkRestrictions: boolean = ( ( wateringParam >> 7 ) & 1 ) > 0 || typeof adjustmentOptions.cali !== "undefined" || ( typeof adjustmentOptions.rainAmt !== "undefined" && typeof adjustmentOptions.rainDays !== "undefined" ) || typeof adjustmentOptions.minTemp !== "undefined";
+    // Attempt to resolve provided location to GPS coordinates.
+    let coordinates: GeoCoordinates;
+    try {
+        coordinates = await resolveCoordinates(location);
+    } catch (err) {
+        sendWateringError(
+            res,
+            makeCodedError(err),
+            adjustmentMethod != ManualAdjustmentMethod
+        );
+        return;
+    }
 
-	// Attempt to resolve provided location to GPS coordinates.
-	let coordinates: GeoCoordinates;
-	try {
-		coordinates = await resolveCoordinates( location );
-	} catch ( err ) {
-		sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
-		return;
-	}
+    let timeData: TimeData = getTimeData(coordinates);
 
-	let timeData: TimeData = getTimeData( coordinates );
+    // Parse the PWS information.
+    let pws: PWS | undefined = undefined;
+    if (
+        adjustmentOptions.provider === "WU" &&
+        adjustmentOptions.pws &&
+        adjustmentOptions.key
+    ) {
+        const idMatch = adjustmentOptions.pws.match(/^[a-zA-Z\d]+$/);
+        const pwsId = idMatch ? idMatch[0] : undefined;
+        const keyMatch = adjustmentOptions.key.match(/^[a-f\d]{32}$/);
+        const apiKey = keyMatch ? keyMatch[0] : undefined;
 
-	// Parse the PWS information.
-	let pws: PWS | undefined = undefined;
-	if ( adjustmentOptions.provider === "WU" && adjustmentOptions.pws && adjustmentOptions.key ) {
+        // Make sure that the PWS ID and API key look valid.
+        if (!pwsId) {
+            sendWateringError(
+                res,
+                new CodedError(ErrorCode.InvalidPwsId),
+                adjustmentMethod != ManualAdjustmentMethod
+            );
+            return;
+        }
+        if (!apiKey) {
+            sendWateringError(
+                res,
+                new CodedError(ErrorCode.InvalidPwsApiKey),
+                adjustmentMethod != ManualAdjustmentMethod
+            );
+            return;
+        }
 
-		const idMatch = adjustmentOptions.pws.match( /^[a-zA-Z\d]+$/ );
-		const pwsId = idMatch ? idMatch[ 0 ] : undefined;
-		const keyMatch = adjustmentOptions.key.match( /^[a-f\d]{32}$/ );
-		const apiKey = keyMatch ? keyMatch[ 0 ] : undefined;
-
-		// Make sure that the PWS ID and API key look valid.
-		if ( !pwsId ) {
-			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsId ), adjustmentMethod != ManualAdjustmentMethod );
-			return;
-		}
-		if ( !apiKey ) {
-			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsApiKey ), adjustmentMethod != ManualAdjustmentMethod );
-			return;
-		}
-
-		pws = { id: pwsId, apiKey: apiKey };
-	} else if ( adjustmentOptions.key ){
-		pws = {apiKey: adjustmentOptions.key};
-	}
+        pws = { id: pwsId, apiKey: apiKey };
+    } else if (adjustmentOptions.key) {
+        pws = { apiKey: adjustmentOptions.key };
+    }
 
     let weatherProvider: WeatherProvider;
-	if( pws && pws.id ){
-		weatherProvider = PWS_WEATHER_PROVIDER;
-	}else{
-		const provider: string = adjustmentOptions.provider;
-  		  weatherProvider = WEATHER_PROVIDERS[provider] || WEATHER_PROVIDER;
-	}
+    if (pws && pws.id) {
+        weatherProvider = PWS_WEATHER_PROVIDER;
+    } else {
+        const provider: string = adjustmentOptions.provider;
+        weatherProvider = WEATHER_PROVIDERS[provider] || WEATHER_PROVIDER;
+    }
 
-	const data = {
-		scale:		undefined,
-		rd:			undefined,
-		tz:			getTimezone( timeData.timezone, undefined ),
-		sunrise:	timeData.sunrise,
-		sunset:		timeData.sunset,
-		eip:		ipToInt( remoteAddress ),
-		rawData:	undefined,
-		errCode:	0,
-		scales:		undefined,
-		ttl:		0,
-	};
+    const data = {
+        scale: undefined,
+        rd: undefined,
+        tz: getTimezone(timeData.timezone, undefined),
+        sunrise: timeData.sunrise,
+        sunset: timeData.sunset,
+        eip: ipToInt(remoteAddress),
+        rawData: undefined,
+        errCode: 0,
+        scales: undefined,
+        ttl: 0,
+    };
 
-	// Calculate the watering scale if it wasn't found in the cache.
-	let adjustmentMethodResponse: AdjustmentMethodResponse;
-	try {
-		adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
-			adjustmentOptions, coordinates, weatherProvider, pws
-		);
-	} catch ( err ) {
-		sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
-		return;
-	}
+    // Calculate the watering scale if it wasn't found in the cache.
+    let adjustmentMethodResponse: AdjustmentMethodResponse;
+    try {
+        adjustmentMethodResponse =
+            await adjustmentMethod.calculateWateringScale(
+                adjustmentOptions,
+                coordinates,
+                weatherProvider,
+                pws
+            );
+    } catch (err) {
+        sendWateringError(
+            res,
+            makeCodedError(err),
+            adjustmentMethod != ManualAdjustmentMethod
+        );
+        return;
+    }
 
-	data.scale = adjustmentMethodResponse.scale;
-	data.rd = adjustmentMethodResponse.rainDelay;
-	data.rawData = adjustmentMethodResponse.rawData;
-	data.scales = adjustmentMethodResponse.scales;
-	data.ttl = adjustmentMethodResponse.ttl;
+    data.scale = adjustmentMethodResponse.scale;
+    data.rd = adjustmentMethodResponse.rainDelay;
+    data.rawData = adjustmentMethodResponse.rawData;
+    data.scales = adjustmentMethodResponse.scales;
+    data.ttl = adjustmentMethodResponse.ttl;
 
-	if ( checkRestrictions ) {
-		let wateringData: WateringData[] = adjustmentMethodResponse.wateringData;
-		let dataArr;
-		// Fetch the watering data if the AdjustmentMethod didn't fetch it and the california restriction is being checked.
-		if ( ( ( ( wateringParam >> 7 ) & 1 ) > 0 || ( typeof adjustmentOptions.cali !== "undefined" && adjustmentOptions.cali ) ) && !wateringData ) {
-			try {
-				dataArr = await weatherProvider.getWateringData( coordinates, pws );
-			} catch ( err ) {
-				sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
-				return;
-			}
-			// Last in data array in most recent.
-			wateringData = dataArr[dataArr.length-1];
-		}
+    if (checkRestrictions) {
+        let wateringData: WateringData[] =
+            adjustmentMethodResponse.wateringData;
+        let dataArr;
+        // Fetch the watering data if the AdjustmentMethod didn't fetch it and the california restriction is being checked.
+        if (
+            (((wateringParam >> 7) & 1) > 0 ||
+                (typeof adjustmentOptions.cali !== "undefined" &&
+                    adjustmentOptions.cali)) &&
+            !wateringData
+        ) {
+            try {
+                dataArr = await weatherProvider.getWateringData(
+                    coordinates,
+                    pws
+                );
+            } catch (err) {
+                sendWateringError(
+                    res,
+                    makeCodedError(err),
+                    adjustmentMethod != ManualAdjustmentMethod
+                );
+                return;
+            }
+            // Last in data array in most recent.
+            wateringData = dataArr[dataArr.length - 1];
+        }
 
-		let weatherData: WeatherData | undefined = undefined;
-		if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) ) {
-			try {
-				weatherData = (await weatherProvider.getWeatherData( coordinates, pws )).value;
-			} catch ( err ) {
-				res.send( "Error: " + err );
-				return;
-			}
-		}
+        let weatherData: WeatherData | undefined = undefined;
+        if (
+            (adjustmentOptions.rainAmt && adjustmentOptions.rainDays) ||
+            (typeof adjustmentOptions.minTemp !== "undefined" &&
+                adjustmentOptions.minTemp !== -40)
+        ) {
+            try {
+                weatherData = (
+                    await weatherProvider.getWeatherData(coordinates, pws)
+                ).value;
+            } catch (err) {
+                res.send("Error: " + err);
+                return;
+            }
+        }
 
-		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-		if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
-			data.scale = 0;
-		}
-	}
+        // Check for any user-set restrictions and change the scale to 0 if the criteria is met
+        if (
+            checkWeatherRestriction(
+                (wateringParam >> 7) & 1 ? true : false,
+                wateringData,
+                adjustmentOptions,
+                weatherData
+            )
+        ) {
+            data.scale = 0;
+        }
+    }
 
-	sendWateringData( res, data, outputFormat === "json" );
+    sendWateringData(res, data, outputFormat === "json");
 };
 
 /**
@@ -408,12 +564,20 @@ export const getWateringData = async function( req: express.Request, res: expres
  * occurred, but older firmware versions will still update the watering scale accordingly.
  * @param useJson Indicates if the response body should use a JSON format instead of a format similar to URL query strings.
  */
-function sendWateringError( res: express.Response, error: CodedError, resetScale: boolean = true, useJson: boolean = false ) {
-	if ( error.errCode === ErrorCode.UnexpectedError ) {
-		console.error( `An unexpected error occurred:`, error );
-	}
+function sendWateringError(
+    res: express.Response,
+    error: CodedError,
+    resetScale: boolean = true,
+    useJson: boolean = false
+) {
+    if (error.errCode === ErrorCode.UnexpectedError) {
+        console.error(`An unexpected error occurred:`, error);
+    }
 
-	sendWateringData( res, { errCode: error.errCode, scale: resetScale ? 100 : undefined } );
+    sendWateringData(res, {
+        errCode: error.errCode,
+        scale: resetScale ? 100 : undefined,
+    });
 }
 
 /**
@@ -422,38 +586,45 @@ function sendWateringError( res: express.Response, error: CodedError, resetScale
  * @param data An object containing key/value pairs that should be formatted in the response body.
  * @param useJson Indicates if the response body should use a JSON format instead of a format similar to URL query strings.
  */
-function sendWateringData( res: express.Response, data: object, useJson: boolean = false ) {
-	if ( useJson ) {
-		res.json( data );
-	} else {
-		// Return the data formatted as a URL query string.
-		let formatted = "";
-		for ( const key in data ) {
-			// Skip inherited properties.
-			if ( !data.hasOwnProperty( key ) ) {
-				continue;
-			}
+function sendWateringData(
+    res: express.Response,
+    data: object,
+    useJson: boolean = false
+) {
+    if (useJson) {
+        res.json(data);
+    } else {
+        // Return the data formatted as a URL query string.
+        let formatted = "";
+        for (const key in data) {
+            // Skip inherited properties.
+            if (!data.hasOwnProperty(key)) {
+                continue;
+            }
 
-			let value = data[ key ];
-			switch ( typeof value ) {
-				case "undefined":
-					// Skip undefined properties.
-					continue;
-				case "object":
-					// Convert objects to JSON.
-					value = JSON.stringify( value );
-				// Fallthrough.
-				case "string":
-					/* URL encode strings. Since the OS firmware uses a primitive version of query string parsing and
+            let value = data[key];
+            switch (typeof value) {
+                case "undefined":
+                    // Skip undefined properties.
+                    continue;
+                case "object":
+                    // Convert objects to JSON.
+                    value = JSON.stringify(value);
+                // Fallthrough.
+                case "string":
+                    /* URL encode strings. Since the OS firmware uses a primitive version of query string parsing and
 					decoding, only some characters need to be escaped and only spaces ("+" or "%20") will be decoded. */
-					value = value.replace( / /g, "+" ).replace( /\n/g, "\\n" ).replace( /&/g, "AMPERSAND" );
-					break;
-			}
+                    value = value
+                        .replace(/ /g, "+")
+                        .replace(/\n/g, "\\n")
+                        .replace(/&/g, "AMPERSAND");
+                    break;
+            }
 
-			formatted += `&${ key }=${ value }`;
-		}
-		res.send( formatted );
-	}
+            formatted += `&${key}=${value}`;
+        }
+        res.send(formatted);
+    }
 }
 
 /**
@@ -463,55 +634,57 @@ function sendWateringData( res: express.Response, data: object, useJson: boolean
  * error if the request fails or returns a non-200 status code. This error may contain information about the HTTP
  * request or, response including API keys and other sensitive information.
  */
-async function httpRequest( url: string, headers?, body? ): Promise< string > {
-	return new Promise< any >( ( resolve, reject ) => {
+async function httpRequest(url: string, headers?, body?): Promise<string> {
+    return new Promise<any>((resolve, reject) => {
+        const splitUrl: string[] = url.match(filters.url);
+        const isHttps = url.startsWith("https");
 
-		const splitUrl: string[] = url.match( filters.url );
-		const isHttps = url.startsWith("https");
+        if (body) {
+            headers = headers || {};
+            headers["Content-Type"] = "application/json";
+            headers["Content-Length"] = Buffer.byteLength(body);
+        }
 
-		if (body) {
-			headers = headers || {};
-			headers['Content-Type'] = 'application/json';
-			headers['Content-Length'] = Buffer.byteLength(body);
-		}
+        const options = {
+            host: splitUrl[1],
+            port: splitUrl[2] || (isHttps ? 443 : 80),
+            path: splitUrl[3],
+            method: "GET",
+            headers,
+        };
 
-		const options = {
-			host: splitUrl[ 1 ],
-			port: splitUrl[ 2 ] || ( isHttps ? 443 : 80 ),
-			path: splitUrl[ 3 ],
-			method: 'GET',
-			headers
-		};
+        const request = (isHttps ? https : http)
+            .request(options, (response) => {
+                if (response.statusCode !== 200) {
+                    reject(
+                        `Received ${response.statusCode} status code for URL '${url}'.`
+                    );
+                    return;
+                }
 
-		const request = ( isHttps ? https : http ).request( options, ( response ) => {
-			if ( response.statusCode !== 200 ) {
-				reject( `Received ${ response.statusCode } status code for URL '${ url }'.` );
-				return;
-			}
+                let data = "";
 
-			let data = "";
+                // Reassemble the data as it comes in
+                response.on("data", (chunk) => {
+                    data += chunk;
+                });
 
-			// Reassemble the data as it comes in
-			response.on( "data", ( chunk ) => {
-				data += chunk;
-			} );
+                // Once the data is completely received, resolve the promise
+                response.on("end", () => {
+                    resolve(data);
+                });
+            })
+            .on("error", (err) => {
+                // If the HTTP request fails, reject the promise
+                reject(err);
+            });
 
-			// Once the data is completely received, resolve the promise
-			response.on( "end", () => {
-				resolve( data );
-			} );
-		} ).on( "error", ( err ) => {
+        if (body) {
+            request.write(body);
+        }
 
-			// If the HTTP request fails, reject the promise
-			reject( err );
-		} );
-
-		if (body) {
-			request.write(body);
-		}
-
-		request.end();
-	} );
+        request.end();
+    });
 }
 
 /**
@@ -520,27 +693,33 @@ async function httpRequest( url: string, headers?, body? ): Promise< string > {
  * @param obj The object to check.
  * @return A boolean indicating if the object has numeric values for all of the specified keys.
  */
-export function validateValues( keys: string[], obj: object ): boolean {
-	let key: string;
+export function validateValues(keys: string[], obj: object): boolean {
+    let key: string;
 
-	// Return false if the object is null/undefined.
-	if ( !obj ) {
-		return false;
-	}
+    // Return false if the object is null/undefined.
+    if (!obj) {
+        return false;
+    }
 
-	for ( key in keys ) {
-		if ( !keys.hasOwnProperty( key ) ) {
-			continue;
-		}
+    for (key in keys) {
+        if (!keys.hasOwnProperty(key)) {
+            continue;
+        }
 
-		key = keys[ key ];
+        key = keys[key];
 
-		if ( !obj.hasOwnProperty( key ) || typeof obj[ key ] !== "number" || isNaN( obj[ key ] ) || obj[ key ] === null || obj[ key ] === -999 ) {
-			return false;
-		}
-	}
+        if (
+            !obj.hasOwnProperty(key) ||
+            typeof obj[key] !== "number" ||
+            isNaN(obj[key]) ||
+            obj[key] === null ||
+            obj[key] === -999
+        ) {
+            return false;
+        }
+    }
 
-	return true;
+    return true;
 }
 
 /**
@@ -550,32 +729,33 @@ export function validateValues( keys: string[], obj: object ): boolean {
  * @return The offset of the specified timezone in either minutes or OpenSprinkler encoded format (depending on the
  * value of useMinutes).
  */
-function getTimezone( time: number | string, useMinutes: boolean = false ): number {
+function getTimezone(
+    time: number | string,
+    useMinutes: boolean = false
+): number {
+    let hour, minute;
 
-	let hour, minute;
+    if (typeof time === "number") {
+        hour = Math.floor(time / 60);
+        minute = time % 60;
+    } else {
+        // Match the provided time string against a regex for parsing
+        let splitTime =
+            time.match(filters.time) || time.match(filters.timezone);
 
-	if ( typeof time === "number" ) {
-		hour = Math.floor( time / 60 );
-		minute = time % 60;
-	} else {
+        hour = parseInt(splitTime[7] + splitTime[8]);
+        minute = parseInt(splitTime[9]);
+    }
 
-		// Match the provided time string against a regex for parsing
-		let splitTime = time.match( filters.time ) || time.match( filters.timezone );
+    if (useMinutes) {
+        return hour * 60 + minute;
+    } else {
+        // Convert the timezone into the OpenSprinkler encoded format
+        minute = ((minute / 15) >> 0) / 4;
+        hour = hour + (hour >= 0 ? minute : -minute);
 
-		hour = parseInt( splitTime[ 7 ] + splitTime[ 8 ] );
-		minute = parseInt( splitTime[ 9 ] );
-	}
-
-	if ( useMinutes ) {
-		return ( hour * 60 ) + minute;
-	} else {
-
-		// Convert the timezone into the OpenSprinkler encoded format
-		minute = ( minute / 15 >> 0 ) / 4;
-		hour = hour + ( hour >= 0 ? minute : -minute );
-
-		return ( ( hour + 12 ) * 4 ) >> 0;
-	}
+        return ((hour + 12) * 4) >> 0;
+    }
 }
 
 /**
@@ -583,9 +763,9 @@ function getTimezone( time: number | string, useMinutes: boolean = false ): numb
  * @param ip The string representation of the IP address.
  * @return The integer representation of the IP address.
  */
-function ipToInt( ip: string ): number {
-	const split = ip.split( "." );
-	return ( ( ( ( ( ( +split[ 0 ] ) * 256 ) + ( +split[ 1 ] ) ) * 256 ) + ( +split[ 2 ] ) ) * 256 ) + ( +split[ 3 ] );
+function ipToInt(ip: string): number {
+    const split = ip.split(".");
+    return ((+split[0] * 256 + +split[1]) * 256 + +split[2]) * 256 + +split[3];
 }
 
 /**
@@ -595,25 +775,27 @@ function ipToInt( ip: string ): number {
  * @param parameter An array of parameters or a single parameter value.
  * @return The first element in the array of parameter or the single parameter provided.
  */
-export function getParameter( parameter: string | ParsedQs | (string | ParsedQs)[] | null | undefined ): string {
-	if ( Array.isArray( parameter ) ) {
-		parameter = parameter[0];
-	}
+export function getParameter(
+    parameter: string | ParsedQs | (string | ParsedQs)[] | null | undefined
+): string {
+    if (Array.isArray(parameter)) {
+        parameter = parameter[0];
+    }
 
-	if (typeof parameter == "object") {
-		parameter = "";
-	}
+    if (typeof parameter == "object") {
+        parameter = "";
+    }
 
-	// Return an empty string if the parameter is undefined.
-	return parameter || "";
+    // Return an empty string if the parameter is undefined.
+    return parameter || "";
 }
 
-export function keyToUse( defaultKey: string, pws: PWS ): string {
-	if(pws && pws.apiKey){
-		return pws.apiKey;
-	}else if(defaultKey){
-		return defaultKey;
-	}else{
-		throw new CodedError( ErrorCode.NoAPIKeyProvided );
-	}
+export function keyToUse(defaultKey: string, pws: PWS): string {
+    if (pws && pws.apiKey) {
+        return pws.apiKey;
+    } else if (defaultKey) {
+        return defaultKey;
+    } else {
+        throw new CodedError(ErrorCode.NoAPIKeyProvided);
+    }
 }

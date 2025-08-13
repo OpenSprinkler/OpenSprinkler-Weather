@@ -3,12 +3,37 @@ import 'dotenv/config'
 import express from "express";
 import cors from "cors";
 
-import { getWateringData, getWeatherData } from "./routes/weather";
+import { getWateringData, getWeatherData, localTime, resolveCoordinates } from "./routes/weather";
 import { captureWUStream } from "./routes/weatherProviders/local";
 import { getBaselineETo } from "./routes/baselineETo";
 import {default as packageJson} from "./package.json";
 import { pinoHttp } from "pino-http";
 import { pino, LevelWithSilent } from "pino";
+
+import SunCalc from "suncalc";
+
+
+
+async function test() {
+    let coords = await resolveCoordinates('0');
+console.log(localTime(coords).getTimezoneOffset());
+
+
+console.log(SunCalc.getTimes(
+        new Date(),
+        coords[0],
+        coords[1]
+    ));
+
+console.log(SunCalc.getTimes(
+        localTime(coords),
+        coords[0],
+        coords[1]
+    ));
+}
+
+test();
+
 
 function getLogLevel(): LevelWithSilent {
     switch (process.env.LOG_LEVEL) {
