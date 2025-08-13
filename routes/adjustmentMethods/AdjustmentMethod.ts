@@ -59,7 +59,7 @@ export interface AdjustmentOptions {
 	/** The provider selected using the UI. */
 	provider?: string;
 	/** Flag used to indicate if historical weather data is used. */
-	hwt?: number;
+	mda?: number;
 	/** Flag for the California restriction. */
 	cali: boolean;
 	/** Maximum amount of rain allowed in rain restriction. */
