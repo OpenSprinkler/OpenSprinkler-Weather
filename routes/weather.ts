@@ -363,8 +363,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 	if ( checkRestrictions ) {
 		let wateringData: WateringData[] = adjustmentMethodResponse.wateringData;
 		let dataArr;
-		// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
-		if ( checkRestrictions && !wateringData ) {
+		// Fetch the watering data if the AdjustmentMethod didn't fetch it and the california restriction is being checked.
+		if ( ( ( ( wateringParam >> 7 ) & 1 ) > 0 || ( typeof adjustmentOptions.cali !== "undefined" && adjustmentOptions.cali ) ) && !wateringData ) {
 			try {
 				dataArr = await weatherProvider.getWateringData( coordinates, pws );
 			} catch ( err ) {
