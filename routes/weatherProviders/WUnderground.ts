@@ -11,6 +11,7 @@ export default class WUnderground extends WeatherProvider {
 		}
 
 		const historicUrl = `https://api.weather.com/v2/pws/observations/hourly/7day?stationId=${ pws.id }&format=json&units=e&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
+
 		let historicData;
 		try {
 			historicData = await httpJSONRequest( historicUrl );
@@ -25,8 +26,9 @@ export default class WUnderground extends WeatherProvider {
 
 		const hours = historicData.observations;
 
-		// Cut hours into 24 hour sections up to most recent
-		hours.splice(0, hours.length % 24);
+		// Cut hours into 24 hour sections up to the end of day yesterday
+		hours.length -= (hours.length % 24); // remove the ending remainder since data starts from midnight 7 days ago
+
 		const daysInHours = [];
 		for (let i = 0; i < hours.length; i+=24){
 			daysInHours.push(hours.slice(i, i+24));

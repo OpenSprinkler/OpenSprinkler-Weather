@@ -21,7 +21,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 
 		//Get previous date by using UTC
 		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
-		const yesterdayTimestamp: string = moment().tz(tz).startOf("day").subtract( 1, "day" ).utc().format("YYYY-MM-DD");
+		const yesterdayTimestamp: string = moment().tz(tz).startOf("day").subtract( 1, "day" ).format("YYYY-MM-DD");
 
 		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${yesterdayTimestamp}`;
 		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ localKey }`;
