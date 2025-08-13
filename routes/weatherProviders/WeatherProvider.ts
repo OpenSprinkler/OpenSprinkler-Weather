@@ -66,10 +66,22 @@ export class WeatherProvider {
 		return pws?.id || `${coordinates[0]};s${coordinates[1]}`
 	}
 
+    /**
+     * Internal command to get the weather data from an API, will be cached when anything outside calls it
+     * @param coordinates Coordinates of requested data
+     * @param pws PWS data which includes the apikey
+     * @returns Returns weather data (should not be mutated)
+     */
 	protected async getWeatherDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WeatherData> {
 		throw "Selected WeatherProvider does not support getWeatherData";
 	}
 
+    /**
+     * Internal command to get the watering data from an API, will be cached when anything outside calls it
+     * @param coordinates Coordinates of requested data
+     * @param pws PWS data which includes the apikey
+     * @returns Returns watering data array in reverse chronological order (array should not be mutated)
+     */
 	protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<readonly WateringData[]> {
 		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
 	}
