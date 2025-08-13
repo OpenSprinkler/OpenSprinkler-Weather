@@ -6,7 +6,7 @@ import fs from "fs";
 import { GeoCoordinates } from "../types";
 import { getParameter, resolveCoordinates } from "./weather";
 
-const DATA_FILE = __dirname + "/../../baselineEToData/Baseline_ETo_Data.bin";
+const DATA_FILE = __dirname + "/../baselineEToData/Baseline_ETo_Data.bin";
 let FILE_META: FileMeta;
 
 readFileHeader().then( ( fileMeta ) => {

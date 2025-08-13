@@ -11,6 +11,12 @@ importers:
       '@date-fns/tz':
         specifier: ^1.2.0
         version: 1.2.0
+      '@types/qs':
+        specifier: ^6.14.0
+        version: 6.14.0
+      async-mutex:
+        specifier: ^0.5.0
+        version: 0.5.0
       cors:
         specifier: ^2.8.5
         version: 2.8.5
@@ -35,15 +41,15 @@ importers:
       mockdate:
         specifier: ^2.0.5
         version: 2.0.5
-      node-cache:
-        specifier: ^4.2.1
-        version: 4.2.1
       pino:
         specifier: ^9.7.0
         version: 9.7.0
       pino-http:
         specifier: ^10.4.0
         version: 10.4.0
+      qs:
+        specifier: ^6.14.0
+        version: 6.14.0
       suncalc:
         specifier: ^1.9.0
         version: 1.9.0
@@ -378,6 +384,9 @@ packages:
   assertion-error@1.1.0:
     resolution: {integrity: sha512-jgsaNduz+ndvGyFt3uSuWqvy4lCnIJiovtouQN5JZHOKCS2QuhEdbcQHFhVksz2N2U9hXJo8odG7ETyWlEeuDw==}
 
+  async-mutex@0.5.0:
+    resolution: {integrity: sha512-1A94B18jkJ3DYq284ohPxoXbfTA5HsQ7/Mf4DEhcyLx3Bz27Rh59iScbB6EPiP+B+joue6YCxcMXSbFC1tZKwA==}
+
   atomic-sleep@1.0.0:
     resolution: {integrity: sha512-kNOjDqAh7px0XWNI+4QbzoiR/nTkHAWNud2uvnJquD1/x5a7EQZMJT0AczqK0Qn67oY/TTQ1LbUKajZpp3I9tQ==}
     engines: {node: '>=8.0.0'}
@@ -449,10 +458,6 @@ packages:
 
   cliui@7.0.4:
     resolution: {integrity: sha512-OcRE68cOsVMXp1Yvonl/fzkQOyjLSu/8bhPDfQt0e0/Eb283TKP20Fs2MqoPsr9SwA595rRCA+QMzYc9nBP+JQ==}
-
-  clone@2.1.2:
-    resolution: {integrity: sha512-3Pe/CF1Nn94hyhIYpjtiLhdCoEoz0DqQ+988E9gmeEdQZlojxnOb74wctFyuwWQHzqyf9X7C7MG8juUpqBJT8w==}
-    engines: {node: '>=0.8'}
 
   color-convert@2.0.1:
     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
@@ -953,10 +958,6 @@ packages:
   nock@10.0.6:
     resolution: {integrity: sha512-b47OWj1qf/LqSQYnmokNWM8D88KvUl2y7jT0567NB3ZBAZFz2bWp2PC81Xn7u8F2/vJxzkzNZybnemeFa7AZ2w==}
     engines: {node: '>= 6.0'}
-
-  node-cache@4.2.1:
-    resolution: {integrity: sha512-BOb67bWg2dTyax5kdef5WfU3X8xu4wPg+zHzkvls0Q/QpYycIFRLEEIdAx9Wma43DxG6Qzn4illdZoYseKWa4A==}
-    engines: {node: '>= 0.4.6'}
 
   node-watch@0.6.4:
     resolution: {integrity: sha512-cI6CHzivIFESe8djiK3Wh90CtWQBxLwMem8x8S+2GSvCvFgoMuOKVlfJtQ/2v3Afg3wOnHl/+tXotEs8z5vOrg==}
@@ -1558,6 +1559,10 @@ snapshots:
 
   assertion-error@1.1.0: {}
 
+  async-mutex@0.5.0:
+    dependencies:
+      tslib: 2.8.1
+
   atomic-sleep@1.0.0: {}
 
   balanced-match@1.0.2: {}
@@ -1657,8 +1662,6 @@ snapshots:
       string-width: 4.2.3
       strip-ansi: 6.0.1
       wrap-ansi: 7.0.0
-
-  clone@2.1.2: {}
 
   color-convert@2.0.1:
     dependencies:
@@ -2214,11 +2217,6 @@ snapshots:
       semver: 5.7.2
     transitivePeerDependencies:
       - supports-color
-
-  node-cache@4.2.1:
-    dependencies:
-      clone: 2.1.2
-      lodash: 4.17.21
 
   node-watch@0.6.4: {}
 

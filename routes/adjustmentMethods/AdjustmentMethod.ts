@@ -1,4 +1,4 @@
-import { BaseWateringData, GeoCoordinates, PWS } from "../../types";
+import { WateringData, GeoCoordinates, PWS } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 
 
@@ -44,7 +44,11 @@ export interface AdjustmentMethodResponse {
 	 */
 	rainDelay?: number;
 	/** The data that was used to calculate the watering scale, or undefined if no data was used. */
-	wateringData: BaseWateringData;
+	wateringData: WateringData[];
+	/** A list of scales for multiple day data usage. */
+	scales?: number[];
+	/** How long the data is cached for. */
+	ttl: number;
 }
 
 export interface AdjustmentOptions {
@@ -54,4 +58,15 @@ export interface AdjustmentOptions {
 	key?: string;
 	/** The provider selected using the UI. */
 	provider?: string;
+	/** Flag used to indicate if historical weather data is used. */
+	mda?: number;
+	/** Flag for the California restriction. */
+	cali: boolean;
+	/** Maximum amount of rain allowed in rain restriction. */
+	rainAmt: number;
+	/** Number of days to check for rain restriction. */
+	rainDays: number;
+	/** Minimum temperature for temp restriction. */
+	minTemp: number;
+
 }

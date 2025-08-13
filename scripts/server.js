@@ -25,10 +25,10 @@ watch( routesPath, { recursive: true }, recompile );
 watch( serverPath, { recursive: true }, recompile );
 
 function recompile() {
-    console.log( "Changes detected, reloading..." );
-    compile();
+	console.log( "Changes detected, reloading..." );
+	compile();
 }
 
 function compile() {
-    exec( `npm run compile` );
+	exec( `npm run compile` );
 }

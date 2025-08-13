@@ -1,5 +1,5 @@
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./AdjustmentMethod";
-import { GeoCoordinates, PWS, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, PWS, WeatherData } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 
 
@@ -12,17 +12,19 @@ async function calculateRainDelayWateringScale(
 	weatherProvider: WeatherProvider,
 	pws?: PWS
 ): Promise< AdjustmentMethodResponse > {
-	const wateringData: ZimmermanWateringData = await weatherProvider.getWateringData( coordinates, pws );
-	const raining = wateringData && wateringData.raining;
+	const data = await weatherProvider.getWeatherData( coordinates, pws );
+	const weatherData: WeatherData = data.value;
+	const raining = weatherData && weatherData.raining;
 	const d = adjustmentOptions.hasOwnProperty( "d" ) ? adjustmentOptions.d : 24;
 	return {
 		scale: undefined,
 		rawData: {
-			wp: wateringData.weatherProvider,
+			wp: weatherData.weatherProvider,
 			raining: raining ? 1 : 0,
 			},
 		rainDelay: raining ? d : undefined,
-		wateringData: wateringData
+		wateringData: null,
+		ttl: data.ttl
 	}
 }
 

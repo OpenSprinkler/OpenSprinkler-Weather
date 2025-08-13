@@ -4,16 +4,17 @@ import https from "https";
 import SunCalc from "suncalc";
 import geoTZ from "geo-tz";
 
-import { BaseWateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
+import { WateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
-import WateringScaleCache, { CachedScale } from "../WateringScaleCache";
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
 import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
+import { ParsedQs } from "qs";
+import { CachedResult } from "../cache";
 import OWMWeatherProvider from "./weatherProviders/OWM";
 import WUndergroundWeatherProvider from "./weatherProviders/WUnderground";
 import AppleWeatherProvider from "./weatherProviders/Apple";
@@ -25,27 +26,25 @@ import PirateWeatherWeatherProvider from "./weatherProviders/PirateWeather";
 import GoogleMapsGeocoder from "./geocoders/GoogleMaps";
 import WUndergroundGeocoder from "./geocoders/WUnderground";
 
-type ClassType<T = any> = new (...args: any[]) => T;
-
-const WEATHER_PROVIDERS: {[name: string]: ClassType<WeatherProvider>} = {
-    "Apple": AppleWeatherProvider,
-    "AccuWeather": AccuWeatherWeatherProvider,
-    "DWD": DWDWeatherProvider,
-    "local": LocalWeatherProvider,
-    "OpenMeteo": OpenMeteoWeatherProvider,
-    "OWM": OWMWeatherProvider,
-    "PirateWeather": PirateWeatherWeatherProvider,
-    "WUnderground": WUndergroundWeatherProvider,
+const WEATHER_PROVIDERS: {[name: string]: WeatherProvider} = {
+    "Apple": new AppleWeatherProvider(),
+    "AccuWeather": new AccuWeatherWeatherProvider(),
+    "DWD": new DWDWeatherProvider(),
+    "local": new LocalWeatherProvider(),
+    "OpenMeteo": new OpenMeteoWeatherProvider(),
+    "OWM": new OWMWeatherProvider(),
+    "PirateWeather": new PirateWeatherWeatherProvider(),
+    "WUnderground": new WUndergroundWeatherProvider(),
 };
 
-const GEOCODERS: {[name: string]: ClassType<Geocoder>} = {
-    "GoogleMaps": GoogleMapsGeocoder,
-    "WUnderground": WUndergroundGeocoder,
+const GEOCODERS: {[name: string]: Geocoder} = {
+    "GoogleMaps": new GoogleMapsGeocoder(),
+    "WUnderground": new WUndergroundGeocoder(),
 };
 
-const WEATHER_PROVIDER: WeatherProvider = new (WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["OWM"]);
-const PWS_WEATHER_PROVIDER: WeatherProvider = new (WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["WUnderground"]);
-const GEOCODER: Geocoder = new (GEOCODERS[process.env.GEOCODER] || GEOCODERS["WUnderground"]);
+const WEATHER_PROVIDER: WeatherProvider = WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["Apple"];
+const PWS_WEATHER_PROVIDER: WeatherProvider = WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] || WEATHER_PROVIDERS["WUnderground"];
+const GEOCODER: Geocoder = GEOCODERS[process.env.GEOCODER] || GEOCODERS["WUnderground"];
 
 // Define regex filters to match against location
 const filters = {
@@ -63,8 +62,6 @@ const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
 	2: RainDelayAdjustmentMethod,
 	3: EToAdjustmentMethod
 };
-
-const cache = new WateringScaleCache();
 
 /**
  * Resolves a location description to geographic coordinates.
@@ -133,21 +130,41 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  *
  * - California watering restriction prevents watering if precipitation over two days is greater than 0.1" over the past
  * 48 hours.
- * @param adjustmentValue The adjustment value, which indicates which restrictions should be checked.
- * @param weather Watering data to use to determine if any restrictions apply.
+ * @param cali A boolean to enable the California restriction based on the old method.
+ * @param wateringData Watering data to use to determine if any restrictions apply.
+ * @param adjustmentOptions The adjustment options used, which gives restriction information.
+ * @param weather Weather data to use to determine if any restrictions apply.
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
-function checkWeatherRestriction( adjustmentValue: number, weather: BaseWateringData ): boolean {
+function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], adjustmentOptions?: AdjustmentOptions, weather?: WeatherData ): boolean {
 
-	const californiaRestriction = ( adjustmentValue >> 7 ) & 1;
+	if ( ( cali || (adjustmentOptions && adjustmentOptions.cali ) ) && wateringData && wateringData.length ) {
+		// With the revamp of watering data, the most recent two days are the end of the array, giving 48 hours. If not, only the last one (24 hours) is used.
+		const len = wateringData.length;
+		let rain = wateringData[len-1].precip;
+		if ( len > 1 ){
+			rain += wateringData[len-2].precip;
+		}
 
-	if ( californiaRestriction ) {
+		if ( rain > 0.1 ) {
+			return true;
+		}
+	}
 
-		// TODO depending on which WeatherProvider is used, this might be checking if rain is forecasted in th next 24
-		// 	hours rather than checking if it has rained in the past 48 hours.
-		// If the California watering restriction is in use then prevent watering
-		// if more then 0.1" of rain has accumulated in the past 48 hours
-		if ( weather.precip > 0.1 ) {
+	if ( adjustmentOptions.rainAmt && adjustmentOptions.rainAmt > 0 && adjustmentOptions.rainDays ) {
+		const days = weather.forecast.length > adjustmentOptions.rainDays ? adjustmentOptions.rainDays : weather.forecast.length;
+		let precip = 0;
+		for ( let i = 0; i < days; i++ ) {
+			precip += weather.forecast[i].precip;
+		}
+
+		if ( precip > adjustmentOptions.rainAmt ){
+			return true;
+		}
+	}
+
+	if ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp != -40 ) {
+		if ( weather.temp < adjustmentOptions.minTemp ) {
 			return true;
 		}
 	}
@@ -158,7 +175,7 @@ function checkWeatherRestriction( adjustmentValue: number, weather: BaseWatering
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
 	let adjustmentOptionsString: string	= getParameter(req.query.wto),
-		adjustmentOptions: AdjustmentOptions;;
+		adjustmentOptions: AdjustmentOptions;
 
 	// Parse weather adjustment options
 	try {
@@ -204,26 +221,34 @@ export const getWeatherData = async function( req: express.Request, res: express
 	}
 
 	let WEATHER_PROVIDER: WeatherProvider;
-	const provider: string = adjustmentOptions.provider;
- 	 if (typeof WEATHER_PROVIDERS[provider] === 'object') {
-  	  WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
-  	} else {
-   	 WEATHER_PROVIDER = WEATHER_PROVIDERS['Apple'];
-  	}
+	let provider: string = adjustmentOptions.provider;
+
+	if ( !provider && process.env.WEATHER_PROVIDER ) {
+		provider = process.env.WEATHER_PROVIDER;
+	}
+
+	if (typeof WEATHER_PROVIDERS[provider] === 'object') {
+		WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
+	} else {
+		WEATHER_PROVIDER = WEATHER_PROVIDERS['Apple'];
+	}
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
-	let weatherData: WeatherData;
+	let weatherData: CachedResult<WeatherData>;
+
+	if (weatherData == undefined) {
 	try {
 		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates, pws );
 	} catch ( err ) {
 		res.send( "Error: " + err );
 		return;
-	}
+	}}
 
 	res.json( {
 		...timeData,
-		...weatherData,
-		location: coordinates
+		...weatherData.value,
+		ttl: weatherData.ttl,
+		location: coordinates,
 	} );
 };
 
@@ -231,12 +256,11 @@ export const getWeatherData = async function( req: express.Request, res: express
 // adjustment method which is encoded to also carry the watering
 // restriction and therefore must be decoded
 export const getWateringData = async function( req: express.Request, res: express.Response ) {
-
+	const wateringParam = Number.parseInt(req.params[0]);
 	// The adjustment method is encoded by the OpenSprinkler firmware and must be
 	// parsed. This allows the adjustment method and the restriction type to both
 	// be saved in the same byte.
-	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ req.params[ 0 ] & ~( 1 << 7 ) ],
-		checkRestrictions: boolean			= ( ( req.params[ 0 ] >> 7 ) & 1 ) > 0,
+	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ wateringParam & ~( 1 << 7 ) ],
 		adjustmentOptionsString: string		= getParameter(req.query.wto),
 		location: string | GeoCoordinates	= getParameter(req.query.loc),
 		outputFormat: string				= getParameter(req.query.format),
@@ -265,6 +289,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ), adjustmentMethod != ManualAdjustmentMethod );
 		return;
 	}
+
+	const checkRestrictions: boolean = ( ( wateringParam >> 7 ) & 1 ) > 0 || typeof adjustmentOptions.cali !== "undefined" || ( typeof adjustmentOptions.rainAmt !== "undefined" && typeof adjustmentOptions.rainDays !== "undefined" ) || typeof adjustmentOptions.minTemp !== "undefined";
 
 	// Attempt to resolve provided location to GPS coordinates.
 	let coordinates: GeoCoordinates;
@@ -317,60 +343,56 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sunset:		timeData.sunset,
 		eip:		ipToInt( remoteAddress ),
 		rawData:	undefined,
-		errCode:	0
+		errCode:	0,
+		scales:		undefined,
+		ttl:		0,
 	};
 
-	let cachedScale: CachedScale;
-	if ( weatherProvider.shouldCacheWateringScale() ) {
-		cachedScale = cache.getWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions );
+	// Calculate the watering scale if it wasn't found in the cache.
+	let adjustmentMethodResponse: AdjustmentMethodResponse;
+	try {
+		adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
+			adjustmentOptions, coordinates, weatherProvider, pws
+		);
+	} catch ( err ) {
+		sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
+		return;
 	}
 
-	if ( cachedScale ) {
-		// Use the cached data if it exists.
-		data.scale = cachedScale.scale;
-		data.rawData = cachedScale.rawData;
-		data.rd = cachedScale.rainDelay;
-	} else {
-		// Calculate the watering scale if it wasn't found in the cache.
-		let adjustmentMethodResponse: AdjustmentMethodResponse;
-		try {
-			adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
-				adjustmentOptions, coordinates, weatherProvider, pws
-			);
-		} catch ( err ) {
-			sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
-			return;
+	data.scale = adjustmentMethodResponse.scale;
+	data.rd = adjustmentMethodResponse.rainDelay;
+	data.rawData = adjustmentMethodResponse.rawData;
+	data.scales = adjustmentMethodResponse.scales;
+	data.ttl = adjustmentMethodResponse.ttl;
+
+	if ( checkRestrictions ) {
+		let wateringData: WateringData[] = adjustmentMethodResponse.wateringData;
+		let dataArr;
+		// Fetch the watering data if the AdjustmentMethod didn't fetch it and the california restriction is being checked.
+		if ( ( ( ( wateringParam >> 7 ) & 1 ) > 0 || ( typeof adjustmentOptions.cali !== "undefined" && adjustmentOptions.cali ) ) && !wateringData ) {
+			try {
+				dataArr = await weatherProvider.getWateringData( coordinates, pws );
+			} catch ( err ) {
+				sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
+				return;
+			}
+			// Last in data array in most recent.
+			wateringData = dataArr[dataArr.length-1];
 		}
 
-		data.scale = adjustmentMethodResponse.scale;
-		data.rd = adjustmentMethodResponse.rainDelay;
-		data.rawData = adjustmentMethodResponse.rawData;
-
-		if ( checkRestrictions ) {
-			let wateringData: BaseWateringData = adjustmentMethodResponse.wateringData;
-			// Fetch the watering data if the AdjustmentMethod didn't fetch it and restrictions are being checked.
-			if ( checkRestrictions && !wateringData ) {
-				try {
-					wateringData = await weatherProvider.getWateringData( coordinates );
-				} catch ( err ) {
-					sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
-					return;
-				}
-			}
-
-			// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-			if ( checkWeatherRestriction( req.params[ 0 ], wateringData ) ) {
-				data.scale = 0;
+		let weatherData: WeatherData | undefined = undefined;
+		if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) ) {
+			try {
+				weatherData = (await weatherProvider.getWeatherData( coordinates, pws )).value;
+			} catch ( err ) {
+				res.send( "Error: " + err );
+				return;
 			}
 		}
 
-		// Cache the watering scale if caching is enabled and no error occurred.
-		if ( weatherProvider.shouldCacheWateringScale() ) {
-			cache.storeWateringScale( req.params[ 0 ], coordinates, pws, adjustmentOptions, {
-				scale: data.scale,
-				rawData: data.rawData,
-				rainDelay: data.rd
-			} );
+		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
+		if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
+			data.scale = 0;
 		}
 	}
 
@@ -447,18 +469,18 @@ async function httpRequest( url: string, headers?, body? ): Promise< string > {
 		const splitUrl: string[] = url.match( filters.url );
 		const isHttps = url.startsWith("https");
 
-        if (body) {
-            headers = headers || {};
-            headers['Content-Type'] = 'application/json';
-            headers['Content-Length'] = Buffer.byteLength(body);
-        }
+		if (body) {
+			headers = headers || {};
+			headers['Content-Type'] = 'application/json';
+			headers['Content-Length'] = Buffer.byteLength(body);
+		}
 
 		const options = {
 			host: splitUrl[ 1 ],
 			port: splitUrl[ 2 ] || ( isHttps ? 443 : 80 ),
 			path: splitUrl[ 3 ],
-            method: 'GET',
-            headers
+			method: 'GET',
+			headers
 		};
 
 		const request = ( isHttps ? https : http ).request( options, ( response ) => {
@@ -484,11 +506,11 @@ async function httpRequest( url: string, headers?, body? ): Promise< string > {
 			reject( err );
 		} );
 
-        if (body) {
-            request.write(body);
-        }
+		if (body) {
+			request.write(body);
+		}
 
-        request.end();
+		request.end();
 	} );
 }
 
@@ -562,8 +584,8 @@ function getTimezone( time: number | string, useMinutes: boolean = false ): numb
  * @return The integer representation of the IP address.
  */
 function ipToInt( ip: string ): number {
-    const split = ip.split( "." );
-    return ( ( ( ( ( ( +split[ 0 ] ) * 256 ) + ( +split[ 1 ] ) ) * 256 ) + ( +split[ 2 ] ) ) * 256 ) + ( +split[ 3 ] );
+	const split = ip.split( "." );
+	return ( ( ( ( ( ( +split[ 0 ] ) * 256 ) + ( +split[ 1 ] ) ) * 256 ) + ( +split[ 2 ] ) ) * 256 ) + ( +split[ 3 ] );
 }
 
 /**
@@ -573,9 +595,13 @@ function ipToInt( ip: string ): number {
  * @param parameter An array of parameters or a single parameter value.
  * @return The first element in the array of parameter or the single parameter provided.
  */
-export function getParameter( parameter: string | string[] ): string {
+export function getParameter( parameter: string | ParsedQs | (string | ParsedQs)[] | null | undefined ): string {
 	if ( Array.isArray( parameter ) ) {
 		parameter = parameter[0];
+	}
+
+	if (typeof parameter == "object") {
+		parameter = "";
 	}
 
 	// Return an empty string if the parameter is undefined.
