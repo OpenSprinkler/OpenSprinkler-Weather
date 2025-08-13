@@ -18,9 +18,11 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 		//console.log("OM getWateringData request for coordinates: %s", coordinates);
 
-		const start: string = moment().subtract( 10, "day" ).format("YYYY-MM-DD");
-		const end: string = moment().subtract( 0, "day" ).format("YYYY-MM-DD");
-		const historicUrl = `https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime&start_date=${ start }&end_date=${ end }`;
+		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+		const yesterdayTimestamp = moment().tz(tz).startOf("day").subtract( 1, "day" ).unix();
+		const start: string = moment().tz(tz).startOf("day").subtract( 10, "day" ).format("YYYY-MM-DD");
+		const end: string = moment().tz(tz).startOf("day").format("YYYY-MM-DD");
+		const historicUrl = `https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime&start_date=${ start }&end_date=${ end }&timezone=auto`;
 
 		let historicData;
 		try {
@@ -30,7 +32,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
-		if ( !historicData && !historicData.hourly ) {
+		if ( !historicData || !historicData.hourly ) {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 

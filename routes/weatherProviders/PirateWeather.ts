@@ -1,4 +1,5 @@
 import * as moment from "moment-timezone";
+import * as geoTZ from "geo-tz";
 
 import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
 import { httpJSONRequest, keyToUse } from "../weather";
@@ -17,11 +18,12 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 		// The Unix timestamp of 24 hours ago.
-		const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
+		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+		const yesterdayTimestamp = moment().tz(tz).startOf("day").subtract( 1, "day" ).unix();
 
 		const localKey = keyToUse(this.API_KEY, pws);
 
-		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?units=us&exclude=currently,minutely,alerts`;
+		const yesterdayUrl = `https://forcast.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?units=us&exclude=currently,minutely,alerts`;
 
 		let historicData;
 		try {

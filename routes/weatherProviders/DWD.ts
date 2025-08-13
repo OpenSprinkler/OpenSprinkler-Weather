@@ -1,4 +1,6 @@
 import * as moment from "moment-timezone";
+import * as geoTZ from "geo-tz";
+
 
 import { GeoCoordinates, WeatherData, WateringData, PWS } from "../../types";
 import { httpJSONRequest } from "../weather";
@@ -14,8 +16,9 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 
-		const start: string = moment().subtract( 10, "day" ).utc().format("YYYY-MM-DD");
-		const end: string = moment().subtract(0, "day" ).utc().format("YYYY-MM-DD");
+		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+		const start: string = moment().tz(tz).startOf("day").subtract( 10, "day" ).format("YYYY-MM-DD");
+		const end: string = moment().tz(tz).startOf("day").format("YYYY-MM-DD");
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ start }&last_date=${ end }`
 		//console.log("DWD getWateringData request for coordinates: %s", coordinates);
 		//console.log("1: %s", yesterdayUrl);

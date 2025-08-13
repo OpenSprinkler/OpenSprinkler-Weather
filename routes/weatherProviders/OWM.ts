@@ -2,7 +2,8 @@ import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
 import { httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
-import * as moment from "moment";
+import * as moment from "moment-timezone";
+import * as geoTZ from "geo-tz";
 import { CodedError, ErrorCode } from "../../errors";
 
 export default class OWMWeatherProvider extends WeatherProvider {
@@ -19,7 +20,8 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		const localKey = keyToUse(this.API_KEY, pws);
 
 		//Get previous date by using UTC
-		const yesterdayTimestamp: string = moment().subtract( 1, "day" ).utc().format("YYYY-MM-DD");
+		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+		const yesterdayTimestamp: string = moment().tz(tz).startOf("day").subtract( 1, "day" ).utc().format("YYYY-MM-DD");
 
 		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${yesterdayTimestamp}`;
 		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ localKey }`;
