@@ -33,7 +33,7 @@ async function calculateEToWateringScale(
 
 	// This will throw a CodedError if ETo data cannot be retrieved.
 	const data = await weatherProvider.getWateringData( coordinates, pws );
-	const wateringData: WateringData[] = data.value;
+	const wateringData: readonly WateringData[] = data.value;
 
 	let baseETo: number;
 	// Default elevation is based on data from https://www.pnas.org/content/95/24/14009.
@@ -48,10 +48,6 @@ async function calculateEToWateringScale(
 	if ( adjustmentOptions && "elevation" in adjustmentOptions ) {
 		elevation = adjustmentOptions.elevation;
 	}
-
-	// Flip array so in reverse chronological order
-	// Now the order is indexed by days going backwards, with 0 index referring to the most recent day of data.
-	wateringData.reverse();
 
 	// Calculate eto scores per day
 	const etos = wateringData.map(data => calculateETo( data, elevation, coordinates) - data.precip);

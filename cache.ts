@@ -23,7 +23,6 @@ export class Cached<T> {
 		const release = await this.mutex.acquire();
 		if (!this.value) {
 			this.value = getter().then((value) => {
-				console.log("new value");
 				this.expiresAt = expiresAt;
 				return value;
 			});

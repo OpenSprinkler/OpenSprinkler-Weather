@@ -100,7 +100,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			data.push(result);
 		}
 
-		return data;
+		return data.reverse();
 	}
 
 	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {

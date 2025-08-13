@@ -79,8 +79,12 @@ export async function resolveCoordinates( location: string ): Promise< GeoCoordi
  */
 export async function httpJSONRequest(url: string, headers?, body?): Promise< any > {
 	try {
-		const data: string = await httpRequest(url, headers, body);
-		return JSON.parse(data);
+		const res = await fetch(url, {
+			headers,
+			body,
+		});
+
+		return await res.json();
 	} catch (err) {
 		// Reject the promise if there was an error making the request or parsing the JSON.
 		throw err;
@@ -121,7 +125,7 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
  * @param weather Weather data to use to determine if any restrictions apply.
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
-function checkWeatherRestriction( cali: boolean, wateringData?: WateringData[], adjustmentOptions?: AdjustmentOptions, weather?: WeatherData ): boolean {
+function checkWeatherRestriction( cali: boolean, wateringData?: readonly WateringData[], adjustmentOptions?: AdjustmentOptions, weather?: WeatherData ): boolean {
 
 	if ( ( cali || (adjustmentOptions && adjustmentOptions.cali ) ) && wateringData && wateringData.length ) {
 		// With the revamp of watering data, the most recent two days are the end of the array, giving 48 hours. If not, only the last one (24 hours) is used.
@@ -361,7 +365,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	data.ttl = adjustmentMethodResponse.ttl;
 
 	if ( checkRestrictions ) {
-		let wateringData: WateringData[] = adjustmentMethodResponse.wateringData;
+		let wateringData: readonly WateringData[] = adjustmentMethodResponse.wateringData;
 		let dataArr;
 		// Fetch the watering data if the AdjustmentMethod didn't fetch it and the california restriction is being checked.
 		if ( ( ( ( wateringParam >> 7 ) & 1 ) > 0 || ( typeof adjustmentOptions.cali !== "undefined" && adjustmentOptions.cali ) ) && !wateringData ) {
@@ -371,8 +375,8 @@ export const getWateringData = async function( req: express.Request, res: expres
 				sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
 				return;
 			}
-			// Last in data array in most recent.
-			wateringData = dataArr[dataArr.length-1];
+			// First in data array in most recent.
+			wateringData = dataArr[0];
 		}
 
 		let weatherData: WeatherData | undefined = undefined;
@@ -449,64 +453,6 @@ function sendWateringData( res: express.Response, data: object, useJson: boolean
 		}
 		res.send( formatted );
 	}
-}
-
-/**
- * Makes an HTTP/HTTPS GET request to the specified URL and returns the response body.
- * @param url The URL to fetch.
- * @return A Promise that will be resolved the with response body if the request succeeds, or will be rejected with an
- * error if the request fails or returns a non-200 status code. This error may contain information about the HTTP
- * request or, response including API keys and other sensitive information.
- */
-async function httpRequest( url: string, headers?, body? ): Promise< string > {
-	return new Promise< any >( ( resolve, reject ) => {
-
-		const splitUrl: string[] = url.match( filters.url );
-		const isHttps = url.startsWith("https");
-
-		if (body) {
-			headers = headers || {};
-			headers['Content-Type'] = 'application/json';
-			headers['Content-Length'] = Buffer.byteLength(body);
-		}
-
-		const options = {
-			host: splitUrl[ 1 ],
-			port: splitUrl[ 2 ] || ( isHttps ? 443 : 80 ),
-			path: splitUrl[ 3 ],
-			method: 'GET',
-			headers
-		};
-
-		const request = ( isHttps ? https : http ).request( options, ( response ) => {
-			if ( response.statusCode !== 200 ) {
-				reject( `Received ${ response.statusCode } status code for URL '${ url }'.` );
-				return;
-			}
-
-			let data = "";
-
-			// Reassemble the data as it comes in
-			response.on( "data", ( chunk ) => {
-				data += chunk;
-			} );
-
-			// Once the data is completely received, resolve the promise
-			response.on( "end", () => {
-				resolve( data );
-			} );
-		} ).on( "error", ( err ) => {
-
-			// If the HTTP request fails, reject the promise
-			reject( err );
-		} );
-
-		if (body) {
-			request.write(body);
-		}
-
-		request.end();
-	} );
 }
 
 /**

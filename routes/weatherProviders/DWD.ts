@@ -121,7 +121,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			// 	samples[ samples.length - 1 ].precipitation > 0);
 		}
 
-		return data;
+		return data.reverse();
 	}
 
 	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {

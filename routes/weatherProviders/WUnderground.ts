@@ -82,7 +82,7 @@ export default class WUnderground extends WeatherProvider {
 			} );
 		}
 
-		return data;
+		return data.reverse();
 
 	}
 

@@ -16,7 +16,7 @@ export class WeatherProvider {
 	 * or rejected with a CodedError if an error occurs while retrieving the WateringData (or the WeatherProvider
 	 * does not support this method).
 	 */
-	getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< CachedResult<WateringData[]> > {
+	getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< CachedResult<readonly WateringData[]> > {
 		const key = this.getCacheKey(coordinates, pws);
 		if (!this.wateringDataCache[key]) {
 			this.wateringDataCache[key] = new Cached();
@@ -59,7 +59,7 @@ export class WeatherProvider {
 		return false;
 	}
 
-	private wateringDataCache: {[key: string]: Cached<WateringData[]>} = {};
+	private wateringDataCache: {[key: string]: Cached<readonly WateringData[]>} = {};
 	private weatherDataCache: {[key: string]: Cached<WeatherData>} = {};
 
 	private getCacheKey(coordinates: GeoCoordinates, pws?: PWS): string {
@@ -70,7 +70,7 @@ export class WeatherProvider {
 		throw "Selected WeatherProvider does not support getWeatherData";
 	}
 
-	protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WateringData[]> {
+	protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<readonly WateringData[]> {
 		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
 	}
 }

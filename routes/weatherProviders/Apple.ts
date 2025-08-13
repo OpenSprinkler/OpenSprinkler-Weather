@@ -36,10 +36,11 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WateringData[]> {
 		// The Unix timestamp of 10 days ago.
-		console.log("Apple: getWateringDataINternal");
-		const historicTimestamp: string = moment().tz(geoTZ.find(coordinates[0], coordinates[1])[0]).startOf("day").subtract( 240, "hours" ).toISOString();
+		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+		const startOfDay = moment().tz(tz).startOf("day").toISOString();
+		const historicTimestamp: string = moment().tz(tz).startOf("day").subtract( 240, "hours" ).toISOString();
 
-		const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&hourlyStart=${historicTimestamp}&hourlyEnd=${moment().toISOString()}&dailyStart=${historicTimestamp}&dailyEnd=${moment().toISOString()}&timezone=UTC`
+		const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&currentAsOf=${startOfDay}&hourlyStart=${historicTimestamp}&hourlyEnd=${startOfDay}&dailyStart=${historicTimestamp}&dailyEnd=${startOfDay}&timezone=${tz}`
 
 		let historicData;
 		try {
@@ -126,12 +127,11 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			});
 		}
 
-		return data;
+		return data.reverse();
 
 	}
 
 	protected async getWeatherDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WeatherData> {
-		console.log("Apple getForecastInternal");
 		const forecastUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=currentWeather,forecastDaily&timezone=UTC`
 
 		let forecast;
