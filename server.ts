@@ -1,5 +1,4 @@
-import { config as dotenv_config } from "dotenv"
-dotenv_config();
+import 'dotenv/config'
 
 import express from "express";
 import cors from "cors";
@@ -33,8 +32,6 @@ function getLogLevel(): LevelWithSilent {
 }
 
 const logger = pino({ level: getLogLevel() });
-
-dotenv_config();
 
 const host = process.env.HOST || "127.0.0.1";
 const port = parseInt(process.env.HTTP_PORT) || 3000;

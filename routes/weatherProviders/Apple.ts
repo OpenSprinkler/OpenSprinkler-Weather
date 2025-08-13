@@ -6,7 +6,6 @@ import { httpJSONRequest } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
-import { CachedResult } from "../../cache";
 
 export default class AppleWeatherProvider extends WeatherProvider {
 
