@@ -36,12 +36,11 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		const startOfDay = moment().tz(tz).startOf("day").unix();
 
 		const historicCutoff = historicData.hourly.time.findIndex( function( time ) {
-			return time > startOfDay;
+			return time >= startOfDay;
 		} );
 
 		for (const arr in historicData.hourly) {
-			historicData.hourly[arr].length = historicCutoff;
-			historicData.hourly[arr].splice(0, historicData.hourly[arr].length % 24);
+			historicData.hourly[arr].length = historicCutoff - historicCutoff % 24;
 		}
 
 		const data: WateringData[] = [];
