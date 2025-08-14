@@ -35,6 +35,8 @@ async function calculateEToWateringScale(
 		elevation = adjustmentOptions.elevation;
 	}
 
+	// Calculate ETo value for first day to return (precipitation is not a part of it)
+	const returnETo = calculateETo( wateringData[0], elevation, coordinates);
 	// Calculate eto scores per day
 	const etos = wateringData.map(data => calculateETo( data, elevation, coordinates) - data.precip);
 
@@ -57,7 +59,7 @@ async function calculateEToWateringScale(
 		scale: scale,
 		rawData: {
 			wp: wateringData[0].weatherProvider,
-			eto: Math.round( etos[0] * 1000) / 1000,
+			eto: Math.round(returnETo * 1000) / 1000,
 			radiation: Math.round( wateringData[0].solarRadiation * 100) / 100,
 			minT: Math.round( wateringData[0].minTemp ),
 			maxT: Math.round( wateringData[0].maxTemp ),
