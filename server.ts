@@ -15,6 +15,9 @@ let	host	= process.env.HOST || "127.0.0.1",
 export let pws = process.env.PWS || "none";
 export const app = express();
 
+// Disable parsing of nested serach queries to make the argument type string | string[]
+app.use(express.urlencoded({ extended: false }));
+
 // Handle requests matching /weatherID.py where ID corresponds to the
 // weather adjustment method selector.
 // This endpoint is considered deprecated and supported for prior firmware

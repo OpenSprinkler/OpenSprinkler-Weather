@@ -19,7 +19,8 @@ The production version runs on Amazon Elastic Beanstalk (AWS EB) and therefore t
 **routes/*.js** contains all the endpoints for the API service. Currently, only two exists for weather adjustment and logging a PWS observation.
 
 ---
-## Installating a Local Weather Service
+
+## Installing a Local Weather Service
 
 If you would like to choose between different Weather Providers (currently OpenWeatherMap, DarkSky and Apple WeatherKit are supported) or use your local PWS to provide the weather information used by OpenSprinkler then you can install and configure the Weather Service on a device within your own local network.
 
@@ -28,6 +29,7 @@ You will need a 24x7 "always on" machine to host the service (this can be a Wind
 For detailed instructions on setup and configuration of a local Weather Service running on a Raspberry Pi then click [here](docs/local-installation.md)
 
 ---
+
 ## Connecting a Personal Weather Station to a Local Weather Service
 
 If you are running a local instance of the Weather Service then you may be able to send the data directly from your PWS to the Weather Service avoiding any "cloud" based services. The weather data can then be used by the Weather Service to calculate Zimmerman based watering levels.
@@ -67,12 +69,14 @@ It is possible to build a self-contained docker image from this repository.  It 
 without installing any prerequisites or setting up systemd.
 
 ### Building the Docker image
+
 ```shell script
 ./build-docker.sh  # run with -h for other options
 ```
 The above will generate baselineEtoData (if not already done) and then build a complete opensprinkler-weather docker image.
 
 ### Running the Docker image
+
 ```shell script
 docker create --name=osweather -p 3000:3000 --restart unless-stopped opensprinkler-weather
 docker start osweather

@@ -1,9 +1,9 @@
 import * as moment from "moment-timezone";
 
-import { GeoCoordinates, PWS, WeatherData, ZimmermanWateringData } from "../../types";
+import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
 import { httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
-import { approximateSolarRadiation, CloudCoverInfo, EToData } from "../adjustmentMethods/EToAdjustmentMethod";
+import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 
 export default class AccuWeatherWeatherProvider extends WeatherProvider {
@@ -15,7 +15,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		this.API_KEY = process.env.ACCUWEATHER_API_KEY;
 	}
 
-	public async getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< ZimmermanWateringData > {
+	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 
 		const localKey = keyToUse(this.API_KEY, pws);
 
@@ -27,19 +27,18 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		} catch ( err ) {
 			console.error( "Error retrieving location information from AccuWeather:", err );
 		}
-		//console.log("Location key:" + locationData.Key);
 
-		const yesterdayUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
+		const historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
 
-		let yesterdayData;
+		let historicData;
 		try {
-			yesterdayData = await httpJSONRequest( yesterdayUrl );
+			historicData = await httpJSONRequest( historicUrl );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from AccuWeather:", err );
 			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
-		let dataLen = yesterdayData.length;
+		let dataLen = historicData.length;
 		if ( typeof dataLen !== "number" ) {
 			throw "Necessary field(s) were missing from weather information returned by AccuWeather.";
 		}
@@ -47,31 +46,62 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
-		const totals = { temp: 0, humidity: 0, precip: 0 };
-		for ( const sample of yesterdayData ) {
+		const cloudCoverInfo: CloudCoverInfo[] = historicData.map( ( hour ): CloudCoverInfo => {
+			//return empty interval if measurement does not exist
+			if(hour.CloudCover === undefined ){
+				return {
+					startTime: moment.unix( hour.EpochTime ),
+					endTime: moment.unix( hour.EpochTime ),
+					cloudCover: 0
+				}
+			}
+			return {
+				startTime: moment.unix( hour.EpochTime ),
+				endTime: moment.unix( hour.EpochTime ).add( 1, "hours" ),
+				cloudCover: hour.CloudCover / 100
+			};
+		} );
+
+		let temp: number = 0, humidity: number = 0,
+			minHumidity: number = undefined, maxHumidity: number = undefined, avgWindSpeed: number = 0;
+		for ( const hour of historicData ) {
 			/*
 			 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
 			 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
 			 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
 			 * significantly skewed if data is missing for several consecutive hours).
 			 */
-			totals.temp += sample.Temperature.Imperial.Value;
-			totals.humidity += sample.RelativeHumidity;
-			// This field may be missing from the response if it is snowing.
-			totals.precip += sample.Precip1hr.Imperial.Value || 0;
+			temp += hour.Temperature.Imperial.Value;
+			humidity += hour.RelativeHumidity;
+
+			// Skip hours where humidity measurement does not exist to prevent ETo result from being NaN.
+			if ( hour.RelativeHumidity !== undefined ) {
+				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
+				minHumidity = minHumidity < hour.RelativeHumidity ? minHumidity : hour.RelativeHumidity;
+				maxHumidity = maxHumidity > hour.RelativeHumidity ? maxHumidity : hour.RelativeHumidity;
+			}
+
+			avgWindSpeed += hour.Wind.Speed.Imperial.Value || 0;
 		}
 
-		return {
+		// Accuweather returns data in reverse chronological order by hour
+		return [{
 			weatherProvider: "AW",
-			temp: totals.temp / dataLen,
-			humidity: totals.humidity / dataLen,
-			precip: totals.precip,
-			raining: yesterdayData[ dataLen - 1 ].Precip1hr.Imperial.Value > 0
-		};
+			temp: temp / dataLen,
+			humidity: humidity / dataLen,
+			precip: historicData[0].PrecipitationSummary.Past24Hours.Imperial.Value,
+			periodStartTime: historicData[dataLen - 1].EpochTime,
+			minTemp: historicData[0].TemperatureSummary.Past24HourRange.Minimum.Imperial.Value,
+			maxTemp: historicData[0].TemperatureSummary.Past24HourRange.Maximum.Imperial.Value,
+			minHumidity: minHumidity,
+			maxHumidity: maxHumidity,
+			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
+			// Assume wind speed measurements are taken at 2 meters.
+			windSpeed: avgWindSpeed / historicData.length
+		}];
 	}
 
-	public async getWeatherData( coordinates: GeoCoordinates, pws?: PWS ): Promise< WeatherData > {
-
+	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
 		const localKey = keyToUse(this.API_KEY, pws);
 
 		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
@@ -82,7 +112,6 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		} catch ( err ) {
 			console.error( "Error retrieving location information from AccuWeather:", err );
 		}
-		//console.log("Location key:" + locationData.Key);
 
 		const currentUrl = `https://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }?apikey=${ localKey }&details=true`;
 		const forecastUrl = `https://dataservice.accuweather.com/forecasts/v1/daily/5day/${ locationData.Key }?apikey=${ localKey }&details=true`;
@@ -107,6 +136,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			temp: Math.floor( current.Temperature.Imperial.Value ),
 			humidity: Math.floor( current.RelativeHumidity ),
 			wind: Math.floor( current.Wind.Speed.Imperial.Value ),
+			raining: current.Precip1hr.Imperial.Value > 0,
 			description: current.WeatherText,
 			icon: this.getOWMIconCode( current.WeatherIcon ),
 
@@ -122,6 +152,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			weather.forecast.push( {
 				temp_min: Math.floor( daily[ index ].Temperature.Minimum.Value ),
 				temp_max: Math.floor( daily[ index ].Temperature.Maximum.Value ),
+				precip: daily[ index ].Day.Rain.Value + daily[ index ].Night.Rain.Value,
 				date: daily[ index ].EpochDate,
 				icon: this.getOWMIconCode( daily[ index ].Day.Icon ),
 				description: daily[ index ].Day.ShortPhrase
@@ -129,86 +160,6 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 		}
 
 		return weather;
-	}
-
-	public async getEToData( coordinates: GeoCoordinates, pws?: PWS ): Promise< EToData > {
-
-		const localKey = keyToUse(this.API_KEY, pws);
-
-		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
-
-		let locationData;
-		try {
-			locationData = await httpJSONRequest( locationUrl );
-		} catch ( err ) {
-			console.error( "Error retrieving location information from AccuWeather:", err );
-		}
-
-		// The Unix epoch seconds timestamp of 24 hours ago.
-		const timestamp: number = moment().subtract( 1, "day" ).unix();
-
-		const ACCUWEATHER_API_KEY = process.env.ACCUWEATHER_API_KEY,
-			historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
-
-		let historicData;
-		try {
-			historicData = await httpJSONRequest( historicUrl );
-		} catch (err) {
-			throw new CodedError( ErrorCode.WeatherApiError );
-		}
-
-		const cloudCoverInfo: CloudCoverInfo[] = historicData.map( ( hour ): CloudCoverInfo => {
-			//return empty interval if measurement does not exist
-			if(hour.CloudCover === undefined ){
-				return {
-					startTime: moment.unix( hour.EpochTime ),
-					endTime: moment.unix( hour.EpochTime ),
-					cloudCover: 0
-				}
-			}
-			return {
-				startTime: moment.unix( hour.EpochTime ),
-				endTime: moment.unix( hour.EpochTime ).add( 1, "hours" ),
-				cloudCover: hour.CloudCover / 100
-			};
-		} );
-
-
-		let minHumidity: number = undefined, maxHumidity: number = undefined, avgWindSpeed: number = 0, precip: number = 0,
-		minTemp: number = undefined, maxTemp: number = undefined;
-		for ( const hour of historicData ) {
-			// Skip hours where humidity measurement does not exist to prevent result from being NaN.
-			if ( hour.RelativeHumidity !== undefined ) {
-				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-				minHumidity = minHumidity < hour.RelativeHumidity ? minHumidity : hour.RelativeHumidity;
-				maxHumidity = maxHumidity > hour.RelativeHumidity ? maxHumidity : hour.RelativeHumidity;
-			}
-
-			//Skip hours where temperature does not exist to prevent result from being NaN.
-			if ( hour.Temperature.Imperial.Value !== undefined ) {
-				minTemp = minTemp < hour.Temperature.Imperial.Value ? minTemp : hour.Temperature.Imperial.Value;
-				maxTemp = maxTemp > hour.Temperature.Imperial.Value ? maxTemp : hour.Temperature.Imperial.Value;
-			}
-
-			avgWindSpeed += hour.Wind.Speed.Imperial.Value || 0;
-
-			precip += hour.Precip1hr.Imperial.Value || 0;
-		}
-
-		avgWindSpeed = avgWindSpeed / historicData.length;
-
-		return {
-			weatherProvider: "AW",
-			periodStartTime: historicData[0].EpochTime,
-			minTemp: minTemp,
-			maxTemp: maxTemp,
-			minHumidity: minHumidity,
-			maxHumidity: maxHumidity,
-			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
-			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: avgWindSpeed,
-			precip: precip
-		};
 	}
 
 	public shouldCacheWateringScale(): boolean {
