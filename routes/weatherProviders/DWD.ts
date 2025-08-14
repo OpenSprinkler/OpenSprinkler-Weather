@@ -212,12 +212,12 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			} );
 		}
 
-		console.log("DWD 2: temp:%s humidity:%s wind:%s desc:%s city:%s",
+		/*console.log("DWD 2: temp:%s humidity:%s wind:%s desc:%s city:%s",
 			current.weather.temperature,
 			current.weather.relative_humidity,
 			current.weather.wind_speed_30,
 			current.weather.condition,
-			current.sources[0].station_name);
+			current.sources[0].station_name);*/
 
 		return weather;
 	}

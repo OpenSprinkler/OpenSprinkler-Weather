@@ -22,10 +22,13 @@ export class Cached<T> {
 
 		const release = await this.mutex.acquire();
 		if (!this.value) {
-			this.value = getter().then((value) => {
-				this.expiresAt = expiresAt;
-				return value;
-			});
+				this.value = getter().then((value) => {
+					this.expiresAt = expiresAt;
+					return value;
+				}).catch((err) => {
+					this.expiresAt = new Date(0);
+					throw err;
+				});
 		}
 
 		release();
