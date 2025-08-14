@@ -13,4 +13,4 @@ baselineEToData/dataPreparer[.exe]
 observations.json
 geocoderCache.json
 dist
-pnpm-lock.yam
+pnpm-lock.yaml
