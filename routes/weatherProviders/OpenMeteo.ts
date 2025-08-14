@@ -1,9 +1,10 @@
 import geoTZ from "geo-tz";
 
 import { GeoCoordinates, WeatherData, WateringData, PWS } from "../../types";
-import { httpJSONRequest } from "../weather";
+import { getTZ, httpJSONRequest, localTime } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
+import { getUnixTime, startOfDay } from "date-fns";
 
 export default class OpenMeteoWeatherProvider extends WeatherProvider {
 
@@ -31,11 +32,10 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		}
 
 		// Cut data down to 7 days previous (midnight to midnight)
-		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
-		const startOfDay = moment().tz(tz).startOf("day").unix();
+		const start = getUnixTime(startOfDay(localTime(coordinates)));
 
 		const historicCutoff = historicData.hourly.time.findIndex( function( time ) {
-			return time >= startOfDay;
+			return time >= start;
 		} );
 
 		for (const arr in historicData.hourly) {
@@ -96,9 +96,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
 
 		//console.log("OM getWeatherData request for coordinates: %s", coordinates);
-
-		const currentDate: number = moment().unix();
-		const timezone = geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
+		const timezone = getTZ(coordinates);
 
 		const currentUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime`;
 		//console.log(currentUrl);

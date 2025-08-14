@@ -1,8 +1,10 @@
 import { GeoCoordinates, WeatherData, WateringData, PWS } from "../../types";
-import { httpJSONRequest } from "../weather";
+import { getTZ, httpJSONRequest, localTime } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
+import { addDays, addHours, getUnixTime, startOfDay, subDays } from "date-fns";
+import { TZDate } from "@date-fns/tz";
 
 export default class DWDWeatherProvider extends WeatherProvider {
 
@@ -11,11 +13,13 @@ export default class DWDWeatherProvider extends WeatherProvider {
 	}
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
+        const tz = getTZ(coordinates);
+		const currentDay = startOfDay(localTime(coordinates));
 
-		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
-		const end = moment().tz(tz).startOf("day").toISOString(true);
-		const start = moment().tz(tz).startOf("day").subtract( 7, "days" ).toISOString(true);
-		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ start }&last_date=${ end }`
+        const startTimestamp = subDays(currentDay, 7).toISOString();
+        const endTimestamp = currentDay.toISOString();
+
+		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ startTimestamp }&last_date=${ endTimestamp }&tz=${tz}`
 
 		//console.log("DWD getWateringData request for coordinates: %s", coordinates);
 		//console.log("1: %s", yesterdayUrl);
@@ -53,10 +57,10 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 		for(let i = 0; i < daysInHours.length; i++){
 			const cloudCoverInfo: CloudCoverInfo[] = daysInHours[i].map( ( hour ): CloudCoverInfo => {
-
+                const startTime = new TZDate(hour.timestamp, tz);
 				const result : CloudCoverInfo = {
-					startTime: moment( hour.timestamp ),
-					endTime: moment( hour.timestamp ).add( 1, "hours" ),
+					startTime,
+					endTime: addHours(startTime, 1),
 					cloudCover: hour.cloud_cover / 100.0,
 				};
 
@@ -98,7 +102,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				temp: this.C2F(temp / length),
 				humidity: humidity / length,
 				precip: this.mm2inch(precip),
-				periodStartTime: moment( daysInHours[ i ].timestamp).unix(),
+				periodStartTime: getUnixTime(new Date(daysInHours[ i ].timestamp)),
 				minTemp: this.C2F(minTemp),
 				maxTemp: this.C2F(maxTemp),
 				minHumidity: minHumidity,
@@ -128,9 +132,9 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 		//console.log("DWD getWeatherData request for coordinates: %s", coordinates);
 
-		const currentDate: string = moment().format("YYYY-MM-DD");
+		const tz = getTZ(coordinates);
 
-		const currentUrl = `https://api.brightsky.dev/current_weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }`;
+		const currentUrl = `https://api.brightsky.dev/current_weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&tz=${tz}`;
 
 		let current;
 		try {
@@ -161,12 +165,13 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			forecast: [],
 		};
 
+        const local = localTime(coordinates);
+
 		for ( let day = 0; day < 7; day++ ) {
 
-			const date: number = moment().add(day, "day").unix();
-			const dateStr: string = moment().add(day, "day").format("YYYY-MM-DD");
+			const date = addDays(local, day);
 
-			const forecastUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ dateStr }`;
+			const forecastUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ date.toISOString() }`;
 
 			let forecast;
 			try {
@@ -202,7 +207,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				temp_min: this.C2F(minTemp),
 				temp_max: this.C2F(maxTemp),
 				precip: this.mm2inch(precip),
-				date: date,
+				date: getUnixTime(date),
 				icon: this.getOWMIconCode( icon ),
 				description: condition,
 			} );
