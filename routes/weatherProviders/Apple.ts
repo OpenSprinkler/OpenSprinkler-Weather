@@ -281,7 +281,6 @@ export default class AppleWeatherProvider extends WeatherProvider {
 				(hour): CloudCoverInfo => {
                     const startTime = new TZDate(hour.forecastStart, tz);
 
-
 					return {
 						startTime,
 						endTime: addHours(startTime, 1),
@@ -320,13 +319,8 @@ export default class AppleWeatherProvider extends WeatherProvider {
 				weatherProvider: "Apple",
 				temp: temp / length,
 				humidity: (humidity / length) * 100,
-				raining:
-					i < daysInHours.length - 1
-						? false
-						: daysInHours[i][length - 1].precipitationAmount > 0,
-				periodStartTime: getUnixTime(new TZDate(
-					historicData.forecastDaily.days[i].forecastStart,
-                    tz
+				periodStartTime: getUnixTime(new Date(
+					historicData.forecastDaily.days[i].forecastStart
 				)),
 				minTemp: this.celsiusToFahrenheit(
 					historicData.forecastDaily.days[i].temperatureMin

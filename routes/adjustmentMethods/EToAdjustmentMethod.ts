@@ -17,20 +17,6 @@ async function calculateEToWateringScale(
 	pws?: PWS
 ): Promise< AdjustmentMethodResponse > {
 
-	//if ( pws ) {
-	//	throw new CodedError( ErrorCode.PwsNotSupported );
-	//}
-
-	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
-	/*
-	if ( wateringData && wateringData.raining ) {
-		return {
-			scale: 0,
-			rawData: { raining: 1 }
-		}
-	}
-	 */
-
 	// This will throw a CodedError if ETo data cannot be retrieved.
 	const data = await weatherProvider.getWateringData( coordinates, pws );
 	const wateringData: readonly WateringData[] = data.value;
@@ -131,7 +117,7 @@ export function calculateETo( wateringData: WateringData, elevation: number, coo
 
 	const actualVaporPressure = ( minSaturationVaporPressure * wateringData.maxHumidity / 100 + maxSaturationVaporPressure * wateringData.minHumidity / 100 ) / 2;
 
-	const dayOfYear = getDayOfYear(wateringData.periodStartTime);
+	const dayOfYear = getDayOfYear(fromUnixTime(wateringData.periodStartTime));
 
 	const inverseRelativeEarthSunDistance = 1 + 0.033 * Math.cos( 2 * Math.PI / 365 * dayOfYear );
 

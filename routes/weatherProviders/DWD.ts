@@ -12,9 +12,11 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 
-		const start: string = moment().subtract( 10, "day" ).utc().format("YYYY-MM-DD");
-		const end: string = moment().subtract(0, "day" ).utc().format("YYYY-MM-DD");
+		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+		const end = moment().tz(tz).startOf("day").toISOString(true);
+		const start = moment().tz(tz).startOf("day").subtract( 7, "days" ).toISOString(true);
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ start }&last_date=${ end }`
+
 		//console.log("DWD getWateringData request for coordinates: %s", coordinates);
 		//console.log("1: %s", yesterdayUrl);
 
@@ -41,7 +43,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		}
 
 		// Cut down to 24 hour sections
-		hours.splice(0, hours.length % 24);
+		hours.length -= hours.length % 24;
 		const daysInHours = [];
 		for ( let i = 0; i < hours.length; i+=24 ){
 			daysInHours.push(hours.slice(i, i+24));
@@ -71,6 +73,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				* calculated when data is missing from some samples (since they follow diurnal cycles and will be
 				* significantly skewed if data is missing for several consecutive hours).
 				*/
+
 				temp += hour.temperature;
 				humidity += hour.relative_humidity;
 				// This field may be missing from the response if it is snowing.
@@ -95,7 +98,6 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				temp: this.C2F(temp / length),
 				humidity: humidity / length,
 				precip: this.mm2inch(precip),
-				raining: (i < daysInHours.length - 1) ? false : daysInHours[i][length-1].precipitation > 0,
 				periodStartTime: moment( daysInHours[ i ].timestamp).unix(),
 				minTemp: this.C2F(minTemp),
 				maxTemp: this.C2F(maxTemp),

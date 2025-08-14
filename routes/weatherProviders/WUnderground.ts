@@ -11,6 +11,7 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 		}
 
 		const historicUrl = `https://api.weather.com/v2/pws/observations/hourly/7day?stationId=${ pws.id }&format=json&units=e&numericPrecision=decimal&apiKey=${ pws.apiKey }`;
+
 		let historicData;
 		try {
 			historicData = await httpJSONRequest( historicUrl );
@@ -25,8 +26,9 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 
 		const hours = historicData.observations;
 
-		// Cut hours into 24 hour sections up to most recent
-		hours.splice(0, hours.length % 24);
+		// Cut hours into 24 hour sections up to the end of day yesterday
+		hours.length -= (hours.length % 24); // remove the ending remainder since data starts from midnight 7 days ago
+
 		const daysInHours = [];
 		for (let i = 0; i < hours.length; i+=24){
 			daysInHours.push(hours.slice(i, i+24));
@@ -37,7 +39,7 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
-		const data = [];
+		const data: WateringData[] = [];
 		for ( let i = 0; i < daysInHours.length; i++ ){
 			let temp: number = 0, humidity: number = 0, precip: number = 0,
 			minHumidity: number = undefined, maxHumidity: number = undefined,
@@ -70,7 +72,6 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 				temp: temp / 24,
 				humidity: humidity / 24,
 				precip: precip,
-				raining: daysInHours[i][ daysInHours[i].length - 1 ].imperial.precipRate > 0,
 				periodStartTime: daysInHours[i][0].epoch,
 				minTemp: minTemp,
 				maxTemp: maxTemp,

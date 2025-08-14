@@ -18,18 +18,6 @@ async function calculateZimmermanWateringScale(
 	const data = await weatherProvider.getWateringData( coordinates, pws );
 	const wateringData: readonly WateringData[] = data.value;
 
-	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
-	/*
-	// Don't water if it is currently raining.
-	if ( wateringData && wateringData.raining ) {
-		return {
-			scale: 0,
-			rawData: { raining: 1 },
-			wateringData: wateringData
-		}
-	}
-	*/
-
 	// Map data into proper format
 	const rawData = wateringData.map(data => {
 		return {
@@ -37,7 +25,6 @@ async function calculateZimmermanWateringScale(
 			h: data ? Math.round( data.humidity * 100) / 100 : null,
 			p: data ? Math.round( data.precip * 100 ) / 100 : null,
 			t: data ? Math.round( data.temp * 10 ) / 10 : null,
-			raining: data ? ( data.raining ? 1 : 0 ) : null
 		};
 	});
 

@@ -88,7 +88,6 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			temp: temp / dataLen,
 			humidity: humidity / dataLen,
 			precip: historicData[0].PrecipitationSummary.Past24Hours.Imperial.Value,
-			raining: historicData[0].Precip1hr.Imperial.Value > 0,
 			periodStartTime: historicData[dataLen - 1].EpochTime,
 			minTemp: historicData[0].TemperatureSummary.Past24HourRange.Minimum.Imperial.Value,
 			maxTemp: historicData[0].TemperatureSummary.Past24HourRange.Maximum.Imperial.Value,

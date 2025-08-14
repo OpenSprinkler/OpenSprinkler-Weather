@@ -15,10 +15,11 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 		// The Unix timestamp of 24 hours ago.
-		const yesterdayTimestamp: number = moment().subtract( 1, "day" ).unix();
+		const yesterdayTimestamp = moment().subtract( 1, "day" ).unix();
 
 		const localKey = keyToUse(this.API_KEY, pws);
 
+		// PW's timemachine API is broken currently, so we have to use the forecast API, which only gives the most recent 24 hours
 		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?units=us&exclude=currently,minutely,alerts`;
 
 		let historicData;
@@ -79,7 +80,6 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			temp: temp / samples.length,
 			humidity: humidity / samples.length * 100,
 			precip: precip,
-			raining: samples[ samples.length - 1 ].precipIntensity > 0,
 			periodStartTime: historicData.hourly.data[ 0 ].time,
 			minTemp: historicData.daily.data[ 0 ].temperatureMin,
 			maxTemp: historicData.daily.data[ 0 ].temperatureMax,
