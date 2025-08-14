@@ -17,12 +17,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 		//console.log("OM getWateringData request for coordinates: %s", coordinates);
-
-		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
-		const yesterdayTimestamp = moment().tz(tz).startOf("day").subtract( 1, "day" ).unix();
-		const start: string = moment().tz(tz).startOf("day").subtract( 10, "day" ).format("YYYY-MM-DD");
-		const end: string = moment().tz(tz).startOf("day").format("YYYY-MM-DD");
-		const historicUrl = `https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime&start_date=${ start }&end_date=${ end }&timezone=auto`;
+		const historicUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&past_days=7&timezone=auto&timeformat=unixtime&forecast_days=1`;
 
 		let historicData;
 		try {
@@ -36,25 +31,29 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
+		// Cut data down to 7 days previous (midnight to midnight)
+		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
+		const startOfDay = moment().tz(tz).startOf("day").unix();
+
+		const historicCutoff = historicData.hourly.time.findIndex( function( time ) {
+			return time > startOfDay;
+		} );
+
+		for (const arr in historicData.hourly) {
+			historicData.hourly[arr].length = historicCutoff;
+		}
+
 		// Offset makes sure always reach most recent data
 		const offset = historicData.hourly.time.length % 24;
-		const days = Math.floor(historicData.hourly.time.length / 24);
 		const data = [];
 
-		for(let i = 0; i < days; i++){
-			let maxIndex: number = 0;
+		for(let i = 0; i < 7; i++){ //
 			let temp: number = 0, humidity: number = 0, precip: number = 0, raining: boolean = false,
 				minHumidity: number = undefined, maxHumidity: number = undefined,
 				minTemp: number = undefined, maxTemp: number = undefined,
 				wind: number = 0, solar: number = 0;
-			const now: number = moment().unix();
 
-			for (let index = i*24 + offset; index < ((i+1)*24 + offset); index++ ) {
-				if (historicData.hourly.time[index] > now) {
-					maxIndex = index-1;
-					raining = historicData.hourly.precipitation[maxIndex] > 0 || historicData.hourly.precipitation[index] > 0;
-					break;
-				}
+			for (let index = i*24; index < (i+1)*24; index++ ) {
 				temp += historicData.hourly.temperature_2m[index];
 				humidity += historicData.hourly.relativehumidity_2m[index];
 				precip += historicData.hourly.precipitation[index] || 0;
@@ -71,19 +70,12 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				solar += historicData.hourly.direct_radiation[index];
 			}
 
-
-			let hours = 24;
-			if(maxIndex !== 0){
-				// Compute how many hours in non full day
-				hours = maxIndex - (24 * i + offset);
-			}
-
 			const result: WateringData = {
 				weatherProvider: "OpenMeteo",
-				temp: temp / hours,
-				humidity: humidity / hours,
+				temp: temp / 24,
+				humidity: humidity / 24,
 				precip: precip,
-				raining: raining,
+				raining: historicData.hourly.precipitation[historicCutoff-1] > 0 ,
 				periodStartTime: historicData.hourly.time[i*24],
 				minTemp: minTemp,
 				maxTemp: maxTemp,
