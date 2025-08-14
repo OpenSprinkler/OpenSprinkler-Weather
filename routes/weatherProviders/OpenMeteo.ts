@@ -41,11 +41,10 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 
 		for (const arr in historicData.hourly) {
 			historicData.hourly[arr].length = historicCutoff;
+			historicData.hourly[arr].splice(0, historicData.hourly[arr].length % 24);
 		}
 
-		// Offset makes sure always reach most recent data
-		const offset = historicData.hourly.time.length % 24;
-		const data = [];
+		const data: WateringData[] = [];
 
 		for(let i = 0; i < 7; i++){ //
 			let temp: number = 0, humidity: number = 0, precip: number = 0,
