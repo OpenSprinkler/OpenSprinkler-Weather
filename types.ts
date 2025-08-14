@@ -71,8 +71,6 @@ export interface WateringData {
 	temp: number;
 	/** The average humidity over the window (as a percentage). */
 	humidity: number;
-	/** A boolean indicating if it is raining at the time that this data was retrieved. */
-	raining: boolean;
 	/** The Unix epoch seconds timestamp of the start of this 24 hour time window. */
 	periodStartTime: number;
 	/** The minimum temperature over the time period (in Fahrenheit). */

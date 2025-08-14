@@ -69,7 +69,6 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			humidity: (historicData.humidity.afternoon + todayData.current.humidity) / 2,
 			// OWM always returns precip in mm, so it must be converted.
 			precip: historicData.precipitation.total / 25.4,
-			raining: (todayData.current.weather.main === "Rain"),
 			periodStartTime: Number(moment().subtract(1, "day").format("X")),
 			minTemp: (historicData.temperature.min < todayData.current.temp ? historicData.temperature.min : todayData.current.temp),
 			maxTemp: (historicData.temperature.max > todayData.current.temp ? historicData.temperature.max : todayData.current.tmep),

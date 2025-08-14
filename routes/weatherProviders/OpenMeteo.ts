@@ -48,7 +48,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		const data = [];
 
 		for(let i = 0; i < 7; i++){ //
-			let temp: number = 0, humidity: number = 0, precip: number = 0, raining: boolean = false,
+			let temp: number = 0, humidity: number = 0, precip: number = 0,
 				minHumidity: number = undefined, maxHumidity: number = undefined,
 				minTemp: number = undefined, maxTemp: number = undefined,
 				wind: number = 0, solar: number = 0;
@@ -75,7 +75,6 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				temp: temp / 24,
 				humidity: humidity / 24,
 				precip: precip,
-				raining: historicData.hourly.precipitation[historicCutoff-1] > 0 ,
 				periodStartTime: historicData.hourly.time[i*24],
 				minTemp: minTemp,
 				maxTemp: maxTemp,

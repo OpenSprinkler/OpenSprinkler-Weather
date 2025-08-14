@@ -74,7 +74,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		days.splice(0, days.length - daysInHours.length);
 
 		// Pull data for each day of the given interval
-		const data = [];
+		const data: WateringData[] = [];
 		for ( let i = 0; i < daysInHours.length; i++ ){
 			let temp: number = 0, humidity: number = 0,
 				minHumidity: number = undefined, maxHumidity: number = undefined;
@@ -114,7 +114,6 @@ export default class AppleWeatherProvider extends WeatherProvider {
 				weatherProvider: "Apple",
 				temp: temp / length,
 				humidity: humidity / length * 100,
-				raining: (i < daysInHours.length - 1) ? false : daysInHours[i][length-1].precipitationIntensity > 0,
 				periodStartTime: moment(historicData.forecastDaily.days[ i ].forecastStart).unix(),
 				minTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ i ].temperatureMin ),
 				maxTemp: this.celsiusToFahrenheit( historicData.forecastDaily.days[ i ].temperatureMax ),

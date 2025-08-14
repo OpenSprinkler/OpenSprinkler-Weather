@@ -82,7 +82,6 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			temp: temp / samples.length,
 			humidity: humidity / samples.length * 100,
 			precip: precip,
-			raining: samples[ samples.length - 1 ].precipIntensity > 0,
 			periodStartTime: historicData.hourly.data[ 0 ].time,
 			minTemp: historicData.daily.data[ 0 ].temperatureMin,
 			maxTemp: historicData.daily.data[ 0 ].temperatureMax,

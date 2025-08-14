@@ -39,7 +39,7 @@ export default class WUnderground extends WeatherProvider {
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
-		const data = [];
+		const data: WateringData[] = [];
 		for ( let i = 0; i < daysInHours.length; i++ ){
 			let temp: number = 0, humidity: number = 0, precip: number = 0,
 			minHumidity: number = undefined, maxHumidity: number = undefined,
@@ -72,7 +72,6 @@ export default class WUnderground extends WeatherProvider {
 				temp: temp / 24,
 				humidity: humidity / 24,
 				precip: precip,
-				raining: daysInHours[i][ daysInHours[i].length - 1 ].imperial.precipRate > 0,
 				periodStartTime: daysInHours[i][0].epoch,
 				minTemp: minTemp,
 				maxTemp: maxTemp,

@@ -100,7 +100,6 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				temp: this.C2F(temp / length),
 				humidity: humidity / length,
 				precip: this.mm2inch(precip),
-				raining: (i < daysInHours.length - 1) ? false : daysInHours[i][length-1].precipitation > 0,
 				periodStartTime: moment( daysInHours[ i ].timestamp).unix(),
 				minTemp: this.C2F(minTemp),
 				maxTemp: this.C2F(maxTemp),
