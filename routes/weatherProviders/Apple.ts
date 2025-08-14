@@ -38,7 +38,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		// The Unix timestamp of 10 days ago.
 		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
 		const startOfDay = moment().tz(tz).startOf("day").toISOString();
-		const historicTimestamp: string = moment().tz(tz).startOf("day").subtract( 240, "hours" ).toISOString();
+		const historicTimestamp = moment().tz(tz).startOf("day").subtract( 240, "hours" ).toISOString();
 
 		const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${ coordinates[ 0 ] }/${ coordinates[ 1 ] }?dataSets=forecastHourly,forecastDaily&currentAsOf=${startOfDay}&hourlyStart=${historicTimestamp}&hourlyEnd=${startOfDay}&dailyStart=${historicTimestamp}&dailyEnd=${startOfDay}&timezone=${tz}`
 

@@ -17,9 +17,10 @@ export default class DWDWeatherProvider extends WeatherProvider {
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 
 		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
-		const start: string = moment().tz(tz).startOf("day").subtract( 10, "day" ).format("YYYY-MM-DD");
-		const end: string = moment().tz(tz).startOf("day").format("YYYY-MM-DD");
+		const end = moment().tz(tz).startOf("day").toISOString(true);
+		const start = moment().tz(tz).startOf("day").subtract( 240, "hours" ).toISOString(true);
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ start }&last_date=${ end }`
+
 		//console.log("DWD getWateringData request for coordinates: %s", coordinates);
 		//console.log("1: %s", yesterdayUrl);
 
@@ -46,7 +47,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		}
 
 		// Cut down to 24 hour sections
-		hours.splice(0, hours.length % 24);
+		hours.length -= hours.length % 24;
 		const daysInHours = [];
 		for ( let i = 0; i < hours.length; i+=24 ){
 			daysInHours.push(hours.slice(i, i+24));
