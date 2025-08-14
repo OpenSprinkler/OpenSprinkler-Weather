@@ -239,7 +239,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		let historicData: AppleWeather;
 		try {
 			historicData = await httpJSONRequest(historicUrl, {
-				Authorization: `Bearer ${this.API_KEY}`,
+				Authorization: `Bearer ${await this.API_KEY}`,
 			});
 		} catch (err) {
 			console.error("Error retrieving weather information from Apple:", err);
@@ -358,7 +358,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		let forecast: AppleWeather;
 		try {
 			forecast = await httpJSONRequest(forecastUrl, {
-				Authorization: `Bearer ${this.API_KEY}`,
+				Authorization: `Bearer ${await this.API_KEY}`,
 			});
 		} catch (err) {
 			console.error("Error retrieving weather information from Apple:", err);
