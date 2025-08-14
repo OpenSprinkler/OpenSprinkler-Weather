@@ -18,7 +18,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
 		const end = moment().tz(tz).startOf("day").toISOString(true);
-		const start = moment().tz(tz).startOf("day").subtract( 240, "hours" ).toISOString(true);
+		const start = moment().tz(tz).startOf("day").subtract( 7, "days" ).toISOString(true);
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ start }&last_date=${ end }`
 
 		//console.log("DWD getWateringData request for coordinates: %s", coordinates);
@@ -77,6 +77,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				* calculated when data is missing from some samples (since they follow diurnal cycles and will be
 				* significantly skewed if data is missing for several consecutive hours).
 				*/
+
 				temp += hour.temperature;
 				humidity += hour.relative_humidity;
 				// This field may be missing from the response if it is snowing.
