@@ -105,7 +105,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			temp: weatherData.current.temp,
 			humidity: weatherData.current.humidity,
 			wind: weatherData.current.wind_speed,
-			raining: weatherData.current.rain,
+			raining: (weatherData.current.rain?.["1h"] || 0) > 0,
 			description: weatherData.current.weather[0].description,
 			icon: weatherData.current.weather[0].icon,
 
