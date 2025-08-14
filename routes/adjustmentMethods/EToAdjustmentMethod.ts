@@ -84,7 +84,6 @@ async function calculateEToWateringScale(
  * @return The reference potential evapotranspiration (in inches per day).
  */
 export function calculateETo( wateringData: WateringData, elevation: number, coordinates: GeoCoordinates ): number {
-    console.log(JSON.stringify({wateringData, elevation, coordinates}));
 	// Convert to Celsius.
 	const minTemp = ( wateringData.minTemp - 32 ) * 5 / 9;
 	const maxTemp = ( wateringData.maxTemp - 32 ) * 5 / 9;

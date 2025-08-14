@@ -23,7 +23,6 @@ export default class OWMWeatherProvider extends WeatherProvider {
         const yesterday = subDays(startOfDay(localTime(coordinates)), 1);
 
 		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${format(yesterday, "YYYY-MM-DD")}&tz=${format(yesterday, "xxx")}`;
-        console.log(yesterdayUrl)
 
 		// Perform the HTTP request to retrieve the weather data
 		let historicData;
