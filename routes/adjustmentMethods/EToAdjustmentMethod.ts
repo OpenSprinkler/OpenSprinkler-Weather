@@ -184,8 +184,8 @@ SunCalc.addTime( Math.asin( 30 / 990 ) * 180 / Math.PI, "radiationStart", "radia
  */
 export function approximateSolarRadiation(cloudCoverInfo: CloudCoverInfo[], coordinates: GeoCoordinates ): number {
 	return cloudCoverInfo.reduce( ( total, window: CloudCoverInfo ) => {
-		const radiationStart = SunCalc.getTimes( window.endTime, coordinates[0], coordinates[1])["radiationStart"];
-		const radiationEnd = SunCalc.getTimes( window.startTime, coordinates[0], coordinates[1])["radiationEnd"];
+		const radiationStart: Date = SunCalc.getTimes( window.endTime, coordinates[0], coordinates[1])["radiationStart"];
+		const radiationEnd: Date = SunCalc.getTimes( window.startTime, coordinates[0], coordinates[1])["radiationEnd"];
 
 		// Clamp the start and end times of the window within time when the sun was emitting significant radiation.
 		const startTime = isAfter(radiationStart, window.startTime) ? radiationStart : window.startTime;
@@ -199,8 +199,8 @@ export function approximateSolarRadiation(cloudCoverInfo: CloudCoverInfo[], coor
 			return total;
 		}
 
-		const startPosition = SunCalc.getPosition( startTime.toDate(), coordinates[ 0 ], coordinates[ 1 ] );
-		const endPosition = SunCalc.getPosition( endTime.toDate(), coordinates[ 0 ], coordinates[ 1 ] );
+		const startPosition = SunCalc.getPosition( startTime, coordinates[ 0 ], coordinates[ 1 ] );
+		const endPosition = SunCalc.getPosition( endTime, coordinates[ 0 ], coordinates[ 1 ] );
 		const solarElevationAngle = ( startPosition.altitude + endPosition.altitude ) / 2;
 
 		// Calculate radiation and convert from watts to kilowatts.
