@@ -3,7 +3,7 @@ import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from ".
 import { GeoCoordinates, PWS, WateringData } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
-import { fromUnixTime, getDayOfYear, isAfter, isBefore } from "date-fns";
+import { fromUnixTime, getDayOfYear, getUnixTime, isAfter, isBefore } from "date-fns";
 
 
 /**
@@ -98,6 +98,7 @@ async function calculateEToWateringScale(
  * @return The reference potential evapotranspiration (in inches per day).
  */
 export function calculateETo( wateringData: WateringData, elevation: number, coordinates: GeoCoordinates ): number {
+    console.log(JSON.stringify({wateringData, elevation, coordinates}));
 	// Convert to Celsius.
 	const minTemp = ( wateringData.minTemp - 32 ) * 5 / 9;
 	const maxTemp = ( wateringData.maxTemp - 32 ) * 5 / 9;
@@ -130,7 +131,7 @@ export function calculateETo( wateringData: WateringData, elevation: number, coo
 
 	const actualVaporPressure = ( minSaturationVaporPressure * wateringData.maxHumidity / 100 + maxSaturationVaporPressure * wateringData.minHumidity / 100 ) / 2;
 
-	const dayOfYear = getDayOfYear(fromUnixTime(wateringData.periodStartTime));
+	const dayOfYear = getDayOfYear(wateringData.periodStartTime);
 
 	const inverseRelativeEarthSunDistance = 1 + 0.033 * Math.cos( 2 * Math.PI / 365 * dayOfYear );
 
@@ -192,7 +193,7 @@ export function approximateSolarRadiation(cloudCoverInfo: CloudCoverInfo[], coor
 		const endTime = isBefore(radiationEnd, window.endTime) ? radiationEnd: window.endTime;
 
 		// The length of the window that will actually be used (in hours).
-		const windowLength = (endTime.getTime() - startTime.getTime()) / (60 * 60 * 1000);
+		const windowLength = (getUnixTime(endTime) - getUnixTime(startTime)) / (60 * 60);
 
 		// Skip the window if there is no significant radiation during the time period.
 		if ( windowLength <= 0 ) {

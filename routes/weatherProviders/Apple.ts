@@ -227,8 +227,8 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
         const tz = getTZ(coordinates);
 
-		const startTimestamp = subDays(currentDay, 10).toISOString();
-		const endTimestamp = currentDay.toISOString();
+		const startTimestamp = new Date(+subDays(currentDay, 10)).toISOString();
+		const endTimestamp = new Date(+currentDay).toISOString();
 
 		const historicUrl = `https://weatherkit.apple.com/api/v1/weather/en/${
 			coordinates[0]
@@ -279,7 +279,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
 			const cloudCoverInfo: CloudCoverInfo[] = daysInHours[i].map(
 				(hour): CloudCoverInfo => {
-                    const startTime = new TZDate(tz, hour.forecastStart);
+                    const startTime = new TZDate(hour.forecastStart, tz);
 
 
 					return {
@@ -324,8 +324,9 @@ export default class AppleWeatherProvider extends WeatherProvider {
 					i < daysInHours.length - 1
 						? false
 						: daysInHours[i][length - 1].precipitationAmount > 0,
-				periodStartTime: getUnixTime(new TZDate(tz,
-					historicData.forecastDaily.days[i].forecastStart
+				periodStartTime: getUnixTime(new TZDate(
+					historicData.forecastDaily.days[i].forecastStart,
+                    tz
 				)),
 				minTemp: this.celsiusToFahrenheit(
 					historicData.forecastDaily.days[i].temperatureMin
@@ -413,7 +414,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 				precip: this.mmToInchesPerHour(
 					forecast.forecastDaily.days[index].precipitationAmount
 				),
-				date: getUnixTime(new TZDate(tz, forecast.forecastDaily.days[index].forecastStart)),
+				date: getUnixTime(new TZDate(forecast.forecastDaily.days[index].forecastStart, tz)),
 				icon: this.getOWMIconCode(
 					forecast.forecastDaily.days[index].conditionCode
 				),
