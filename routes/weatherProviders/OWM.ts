@@ -23,26 +23,24 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
 		const yesterdayTimestamp: string = moment().tz(tz).startOf("day").subtract( 1, "day" ).format("YYYY-MM-DD");
 
+		// TODO: specific tz to make sure it's using the correct time zone
 		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${yesterdayTimestamp}`;
-		const todayUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,daily,alerts&appid=${ localKey }`;
 
 		// Perform the HTTP request to retrieve the weather data
-		let historicData, todayData;
+		let historicData;
 		try {
 			historicData = await httpJSONRequest(yesterdayUrl);
-			todayData = await httpJSONRequest(todayUrl);
-
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from OWM:", err );
 			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
 		// Indicate watering data could not be retrieved if the forecast data is incomplete.
-		if ( !historicData || !todayData ) {
+		if ( !historicData ) {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
-		let clouds = [historicData.cloud_cover.afternoon, todayData.current.clouds];
+		let clouds = [historicData.cloud_cover.afternoon ];
 
 		const cloudCoverInfo: CloudCoverInfo[] = clouds.map( ( sample ): CloudCoverInfo => {
 			if( sample === undefined ) {
@@ -66,18 +64,18 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		return [{
 			weatherProvider: "OWM",
 			temp: totalTemp / 6,
-			humidity: (historicData.humidity.afternoon + todayData.current.humidity) / 2,
+			humidity: historicData.humidity.afternoon,
 			// OWM always returns precip in mm, so it must be converted.
 			precip: historicData.precipitation.total / 25.4,
 			periodStartTime: Number(moment().subtract(1, "day").format("X")),
-			minTemp: (historicData.temperature.min < todayData.current.temp ? historicData.temperature.min : todayData.current.temp),
-			maxTemp: (historicData.temperature.max > todayData.current.temp ? historicData.temperature.max : todayData.current.tmep),
-			minHumidity: (historicData.humidity.afternoon < todayData.current.humidity ? historicData.humidity.afternoon : todayData.current.humidity),
-			maxHumidity: (historicData.humidity.afternoon > todayData.current.humidity ? historicData.humidity.afternoon : todayData.current.humidity),
+			minTemp: historicData.temperature.min,
+			maxTemp: historicData.temperature.max,
+			minHumidity: historicData.humidity.afternoon,
+			maxHumidity: historicData.humidity.afternoon,
 			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
 			// Assume wind speed measurements are taken at 2 meters.
-			// Use current wind speed as previous day only returns max for the day
-			windSpeed: todayData.current.wind_speed,
+			// Use max of yesterday divided by 2 as ballpark estimate since the API only provides max and not min
+			windSpeed: historicData.wind.max.speed / 2,
 		}];
 	}
 
