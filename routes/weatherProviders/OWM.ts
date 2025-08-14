@@ -40,19 +40,21 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
-		let clouds = [historicData.cloud_cover.afternoon ];
+		let clouds = (new Array(24)).fill(historicData.cloud_cover.afternoon);
 
-		const cloudCoverInfo: CloudCoverInfo[] = clouds.map( ( sample ): CloudCoverInfo => {
+		// TODO: need
+		const cloudCoverInfo: CloudCoverInfo[] = clouds.map( ( sample, i ): CloudCoverInfo => {
+			const start = moment().tz(tz).startOf('day').subtract(1, 'day').add(i, 'hour');
 			if( sample === undefined ) {
 				return {
-					startTime: moment(),
-					endTime: moment(),
+					startTime: start,
+					endTime: start,
 					cloudCover: 0
 				}
 			}
 			return {
-				startTime: moment(),
-				endTime: moment().add( 1, "hours" ),
+				startTime: start,
+				endTime: start.clone().add( 1, "hour" ),
 				cloudCover: sample / 100
 			}
 		});
