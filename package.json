@@ -9,7 +9,7 @@
     "start": "node dist/index.cjs"
   },
   "dependencies": {
-    "@date-fns/tz": "^1.2.0",
+    "@date-fns/tz": "^1.4.1",
     "@types/qs": "^6.14.0",
     "async-mutex": "^0.5.0",
     "cors": "^2.8.5",
@@ -18,34 +18,34 @@
     "dotenv": "^8.6.0",
     "express": "^4.21.2",
     "geo-tz": "^8.1.4",
-    "jsonwebtoken": "^9.0.2",
+    "jose": "^6.0.12",
     "mockdate": "^2.0.5",
-    "pino": "^9.7.0",
-    "pino-http": "^10.4.0",
+    "pino": "^9.9.0",
+    "pino-http": "^10.5.0",
     "qs": "^6.14.0",
     "suncalc": "^1.9.0"
   },
   "devDependencies": {
     "@types/chai": "^4.3.20",
-    "@types/cors": "^2.8.18",
+    "@types/cors": "^2.8.19",
     "@types/cron": "^1.7.3",
     "@types/dotenv": "^6.1.1",
-    "@types/express": "^4.17.22",
-    "@types/jsonwebtoken": "^9.0.9",
+    "@types/express": "^4.17.23",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/mocha": "^5.2.7",
     "@types/mock-express-request": "^0.2.3",
     "@types/nock": "^11.1.0",
     "@types/node": "^10.17.60",
     "@types/suncalc": "^1.9.2",
     "chai": "^4.5.0",
-    "esbuild": "^0.25.5",
-    "mocha": "^10.0.0",
+    "esbuild": "^0.25.9",
+    "mocha": "^10.8.2",
     "mock-express-request": "^0.2.2",
     "mock-express-response": "^0.2.2",
     "nock": "^10.0.6",
     "node-watch": "^0.6.4",
-    "nodemon": "^2.0.16",
+    "nodemon": "^2.0.22",
     "ts-node": "^8.10.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.2"
   }
 }

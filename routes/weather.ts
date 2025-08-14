@@ -151,9 +151,6 @@ export function localTime(coordinates: GeoCoordinates, date?: Date): Date {
  * @return The TimeData for the specified coordinates.
  */
 function getTimeData(coordinates: GeoCoordinates): TimeData {
-    // const timezone = moment()
-    //     .tz(geoTZ.find(coordinates[0], coordinates[1])[0])
-    //     .utcOffset();
     const timezone = -localTime(coordinates).getTimezoneOffset();
 
     const tzOffset: number = getTimezone(timezone, true);

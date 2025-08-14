@@ -3,7 +3,7 @@ import 'dotenv/config'
 import express from "express";
 import cors from "cors";
 
-import { getWateringData, getWeatherData, localTime, resolveCoordinates } from "./routes/weather";
+import { getTZ, getWateringData, getWeatherData, localTime, resolveCoordinates } from "./routes/weather";
 import { captureWUStream } from "./routes/weatherProviders/local";
 import { getBaselineETo } from "./routes/baselineETo";
 import {default as packageJson} from "./package.json";
@@ -13,23 +13,17 @@ import { pino, LevelWithSilent } from "pino";
 import SunCalc from "suncalc";
 
 
-
 async function test() {
-    let coords = await resolveCoordinates('0');
-console.log(localTime(coords).getTimezoneOffset());
+    let coords = await resolveCoordinates('01002');
 
 
-console.log(SunCalc.getTimes(
+let a = SunCalc.getTimes(
         new Date(),
         coords[0],
         coords[1]
-    ));
+    );
 
-console.log(SunCalc.getTimes(
-        localTime(coords),
-        coords[0],
-        coords[1]
-    ));
+    console.log(((a.dusk.getTime()) - (a.dawn.getTime())) / 1000);
 }
 
 test();

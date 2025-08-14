@@ -6,6 +6,7 @@
         ".git": true,
         "node_modules": true,
         "package-lock.json": true,
+        "pnpm-lock.json": true,
         "js": true,
         "weather.zip": true
     },
@@ -13,6 +14,7 @@
         ".git": true,
         "node_modules": true,
         "package-lock.json": true,
+        "pnpm-lock.json": true,
         "js": true,
         "weather.zip": true
     }
