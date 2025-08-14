@@ -16,7 +16,7 @@ export class WeatherProvider {
 	 * or rejected with a CodedError if an error occurs while retrieving the WateringData (or the WeatherProvider
 	 * does not support this method).
 	 */
-	getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< CachedResult<WateringData[]> > {
+	getWateringData( coordinates: GeoCoordinates, pws?: PWS ): Promise< CachedResult<readonly WateringData[]> > {
 		const key = this.getCacheKey(coordinates, pws);
 		if (!this.wateringDataCache[key]) {
 			this.wateringDataCache[key] = new Cached();
@@ -59,18 +59,30 @@ export class WeatherProvider {
 		return false;
 	}
 
-	private wateringDataCache: {[key: string]: Cached<WateringData[]>} = {};
+	private wateringDataCache: {[key: string]: Cached<readonly WateringData[]>} = {};
 	private weatherDataCache: {[key: string]: Cached<WeatherData>} = {};
 
 	private getCacheKey(coordinates: GeoCoordinates, pws?: PWS): string {
 		return pws?.id || `${coordinates[0]};s${coordinates[1]}`
 	}
 
+    /**
+     * Internal command to get the weather data from an API, will be cached when anything outside calls it
+     * @param coordinates Coordinates of requested data
+     * @param pws PWS data which includes the apikey
+     * @returns Returns weather data (should not be mutated)
+     */
 	protected async getWeatherDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WeatherData> {
 		throw "Selected WeatherProvider does not support getWeatherData";
 	}
 
-	protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<WateringData[]> {
+    /**
+     * Internal command to get the watering data from an API, will be cached when anything outside calls it
+     * @param coordinates Coordinates of requested data
+     * @param pws PWS data which includes the apikey
+     * @returns Returns watering data array in reverse chronological order (array should not be mutated)
+     */
+	protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<readonly WateringData[]> {
 		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
 	}
 }

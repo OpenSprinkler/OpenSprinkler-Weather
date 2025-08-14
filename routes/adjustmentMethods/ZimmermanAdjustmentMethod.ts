@@ -16,7 +16,7 @@ async function calculateZimmermanWateringScale(
 	pws?: PWS
 ): Promise< AdjustmentMethodResponse > {
 	const data = await weatherProvider.getWateringData( coordinates, pws );
-	const wateringData: WateringData[] = data.value;
+	const wateringData: readonly WateringData[] = data.value;
 
 	// Temporarily disabled since OWM forecast data is checking if rain is forecasted for 3 hours in the future.
 	/*
@@ -29,10 +29,6 @@ async function calculateZimmermanWateringScale(
 		}
 	}
 	*/
-
-	// Flip the array so it is in reverse chronological order
-	// Now the order is indexed by days going backwards, with 0 index referring to the most recent day of data.
-	wateringData.reverse();
 
 	// Map data into proper format
 	const rawData = wateringData.map(data => {

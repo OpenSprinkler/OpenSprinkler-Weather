@@ -44,7 +44,7 @@ export interface AdjustmentMethodResponse {
 	 */
 	rainDelay?: number;
 	/** The data that was used to calculate the watering scale, or undefined if no data was used. */
-	wateringData: WateringData[];
+	wateringData: readonly WateringData[];
 	/** A list of scales for multiple day data usage. */
 	scales?: number[];
 	/** How long the data is cached for. */
