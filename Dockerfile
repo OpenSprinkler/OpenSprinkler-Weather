@@ -3,8 +3,8 @@ WORKDIR /eto
 
 RUN apk add --no-cache imagemagick gcc libc-dev build-base
 
-COPY /baselineEtoData/dataPreparer.c ./dataPreparer.c
-COPY /baselineEtoData/prepareData.sh ./prepareData.sh
+COPY /baselineEtoData/dataPreparer.c ./
+COPY /baselineEtoData/prepareData.sh ./
 
 RUN chmod +x ./prepareData.sh
 
