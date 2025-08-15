@@ -11,6 +11,7 @@ RUN chmod +x ./prepareData.sh ./baseline.sh
 
 RUN ash ./prepareData.sh 20
 RUN ash ./baseline.sh
+RUN rm Baseline_ETo_Data-Pass_*.bin
 
 FROM node:lts-alpine AS build_node
 WORKDIR /weather
