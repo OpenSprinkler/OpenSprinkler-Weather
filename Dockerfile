@@ -5,10 +5,12 @@ RUN apk add --no-cache tiff imagemagick gcc libc-dev build-base
 
 COPY /baselineEToData/dataPreparer.c ./
 COPY /baselineEToData/prepareData.sh ./
+COPY /baselineEToData/baseline.sh ./
 
-RUN chmod +x ./prepareData.sh
+RUN chmod +x ./prepareData.sh ./baseline.sh
 
 RUN ash ./prepareData.sh 20
+RUN ash ./baseline.sh
 
 FROM node:lts-alpine AS build_node
 WORKDIR /weather
