@@ -128,11 +128,11 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
 function checkWeatherRestriction( cali: boolean, wateringData?: readonly WateringData[], adjustmentOptions?: AdjustmentOptions, weather?: WeatherData ): boolean {
 
 	if ( ( cali || (adjustmentOptions && adjustmentOptions.cali ) ) && wateringData && wateringData.length ) {
-		// With the revamp of watering data, the most recent two days are the end of the array, giving 48 hours. If not, only the last one (24 hours) is used.
+		// The most recent two days are at the beginning of the data array
 		const len = wateringData.length;
-		let rain = wateringData[len-1].precip;
+		let rain = wateringData[0].precip;
 		if ( len > 1 ){
-			rain += wateringData[len-2].precip;
+			rain += wateringData[1].precip;
 		}
 
 		if ( rain > 0.1 ) {
@@ -366,17 +366,16 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	if ( checkRestrictions ) {
 		let wateringData: readonly WateringData[] = adjustmentMethodResponse.wateringData;
-		let dataArr;
+		let dataArr: CachedResult<readonly WateringData[]>;
 		// Fetch the watering data if the AdjustmentMethod didn't fetch it and the california restriction is being checked.
-		if ( ( ( ( wateringParam >> 7 ) & 1 ) > 0 || ( typeof adjustmentOptions.cali !== "undefined" && adjustmentOptions.cali ) ) && !wateringData ) {
+		if ( ( ( ( wateringParam >> 7 ) & 1 ) > 0 || ( typeof adjustmentOptions.cali !== "undefined" && adjustmentOptions.cali ) ) && !adjustmentMethodResponse.wateringData ) {
 			try {
 				dataArr = await weatherProvider.getWateringData( coordinates, pws );
 			} catch ( err ) {
 				sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
 				return;
 			}
-			// First in data array in most recent.
-			wateringData = dataArr[0];
+			wateringData = dataArr.value;
 		}
 
 		let weatherData: WeatherData | undefined = undefined;
@@ -390,7 +389,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 
 		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-		if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
+		if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) > 0 ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
 			data.scale = 0;
 		}
 	}
