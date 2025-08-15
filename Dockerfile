@@ -1,7 +1,7 @@
 FROM alpine:latest AS build_eto
 WORKDIR /eto
 
-RUN apk add --no-cache libtiff imagemagick gcc libc-dev build-base
+RUN apk add --no-cache tiff imagemagick gcc libc-dev build-base
 
 COPY /baselineEToData/dataPreparer.c ./
 COPY /baselineEToData/prepareData.sh ./
