@@ -12,3 +12,5 @@ baselineEToData/*.tif
 baselineEToData/dataPreparer[.exe]
 observations.json
 geocoderCache.json
+dist
+pnpm-lock.yaml

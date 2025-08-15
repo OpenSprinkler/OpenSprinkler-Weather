@@ -1,11 +1,12 @@
-import fs = require("fs");
+import fs from "fs";
+import path from "path";
 
 import { GeoCoordinates } from "../../types";
 import { CodedError, ErrorCode } from "../../errors";
 
 export abstract class Geocoder {
 
-	private static cacheFile: string = __dirname + "/../../../geocoderCache.json";
+	private static cacheFile = process.env.GEOCODER_CACHE_FILE || path.join(__dirname, "..", "geocoderCache.json");
 
 	private cache: Map<string, GeoCoordinates>;
 

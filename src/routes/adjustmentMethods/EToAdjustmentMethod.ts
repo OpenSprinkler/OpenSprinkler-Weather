@@ -1,9 +1,9 @@
-import * as SunCalc from "suncalc";
-import * as moment from "moment";
+import SunCalc from "suncalc";
 import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./AdjustmentMethod";
 import { GeoCoordinates, PWS, WateringData } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
+import { fromUnixTime, getDayOfYear, getUnixTime, isAfter, isBefore } from "date-fns";
 
 
 /**
@@ -118,7 +118,7 @@ export function calculateETo( wateringData: WateringData, elevation: number, coo
 
 	const actualVaporPressure = ( minSaturationVaporPressure * wateringData.maxHumidity / 100 + maxSaturationVaporPressure * wateringData.minHumidity / 100 ) / 2;
 
-	const dayOfYear = moment.unix( wateringData.periodStartTime ).dayOfYear();
+	const dayOfYear = getDayOfYear(fromUnixTime(wateringData.periodStartTime));
 
 	const inverseRelativeEarthSunDistance = 1 + 0.033 * Math.cos( 2 * Math.PI / 365 * dayOfYear );
 
@@ -172,23 +172,23 @@ SunCalc.addTime( Math.asin( 30 / 990 ) * 180 / Math.PI, "radiationStart", "radia
  */
 export function approximateSolarRadiation(cloudCoverInfo: CloudCoverInfo[], coordinates: GeoCoordinates ): number {
 	return cloudCoverInfo.reduce( ( total, window: CloudCoverInfo ) => {
-		const radiationStart: moment.Moment = moment( SunCalc.getTimes( window.endTime.toDate(), coordinates[ 0 ], coordinates[ 1 ])[ "radiationStart" ] );
-		const radiationEnd: moment.Moment = moment( SunCalc.getTimes( window.startTime.toDate(), coordinates[ 0 ], coordinates[ 1 ])[ "radiationEnd" ] );
+		const radiationStart: Date = SunCalc.getTimes( window.endTime, coordinates[0], coordinates[1])["radiationStart"];
+		const radiationEnd: Date = SunCalc.getTimes( window.startTime, coordinates[0], coordinates[1])["radiationEnd"];
 
 		// Clamp the start and end times of the window within time when the sun was emitting significant radiation.
-		const startTime: moment.Moment = radiationStart.isAfter( window.startTime ) ? radiationStart : window.startTime;
-		const endTime: moment.Moment = radiationEnd.isBefore( window.endTime ) ? radiationEnd: window.endTime;
+		const startTime = isAfter(radiationStart, window.startTime) ? radiationStart : window.startTime;
+		const endTime = isBefore(radiationEnd, window.endTime) ? radiationEnd: window.endTime;
 
 		// The length of the window that will actually be used (in hours).
-		const windowLength = ( endTime.unix() - startTime.unix() ) / 60 / 60;
+		const windowLength = (getUnixTime(endTime) - getUnixTime(startTime)) / (60 * 60);
 
 		// Skip the window if there is no significant radiation during the time period.
 		if ( windowLength <= 0 ) {
 			return total;
 		}
 
-		const startPosition = SunCalc.getPosition( startTime.toDate(), coordinates[ 0 ], coordinates[ 1 ] );
-		const endPosition = SunCalc.getPosition( endTime.toDate(), coordinates[ 0 ], coordinates[ 1 ] );
+		const startPosition = SunCalc.getPosition( startTime, coordinates[ 0 ], coordinates[ 1 ] );
+		const endPosition = SunCalc.getPosition( endTime, coordinates[ 0 ], coordinates[ 1 ] );
 		const solarElevationAngle = ( startPosition.altitude + endPosition.altitude ) / 2;
 
 		// Calculate radiation and convert from watts to kilowatts.
@@ -208,9 +208,9 @@ export interface EToScalingAdjustmentOptions extends AdjustmentOptions {
 /** Data about the cloud coverage for a period of time. */
 export interface CloudCoverInfo {
 	/** The start of this period of time. */
-	startTime: moment.Moment;
+	startTime: Date;
 	/** The end of this period of time. */
-	endTime: moment.Moment;
+	endTime: Date;
 	/** The average fraction of the sky covered by clouds during this time period. */
 	cloudCover: number;
 }

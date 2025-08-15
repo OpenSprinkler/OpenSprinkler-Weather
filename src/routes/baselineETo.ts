@@ -1,12 +1,13 @@
 /* This script requires the file Baseline_ETo_Data.bin file to be created in the baselineEToData directory. More
  * information about this is available in /baselineEToData/README.md.
  */
-import * as express from "express";
-import * as fs from "fs";
+import express from "express";
+import fs from "fs";
+import path from "path";
 import { GeoCoordinates } from "../types";
 import { getParameter, resolveCoordinates } from "./weather";
 
-const DATA_FILE = __dirname + "/../../baselineEToData/Baseline_ETo_Data.bin";
+const DATA_FILE = process.env.BASELINE_ETO_FILE || path.join(__dirname, "..", "baselineEToData", "Baseline_ETo_Data.bin");
 let FILE_META: FileMeta;
 
 readFileHeader().then( ( fileMeta ) => {

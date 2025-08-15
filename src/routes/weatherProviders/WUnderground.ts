@@ -3,7 +3,7 @@ import { WeatherProvider } from "./WeatherProvider";
 import { httpJSONRequest } from "../weather";
 import { CodedError, ErrorCode } from "../../errors";
 
-export default class WUnderground extends WeatherProvider {
+export default class WUndergroundWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 		if ( !pws ) {

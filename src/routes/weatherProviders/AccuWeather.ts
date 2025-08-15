@@ -1,10 +1,10 @@
-import * as moment from "moment-timezone";
-
 import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
-import { httpJSONRequest, keyToUse } from "../weather";
+import { getTZ, httpJSONRequest, keyToUse } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
+import { addHours, fromUnixTime } from "date-fns";
+import { tz } from "@date-fns/tz";
 
 export default class AccuWeatherWeatherProvider extends WeatherProvider {
 
@@ -16,7 +16,6 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 	}
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
-
 		const localKey = keyToUse(this.API_KEY, pws);
 
 		const locationUrl = `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${ localKey }&q=${ coordinates[ 0 ] },${ coordinates[ 1 ] }`;
@@ -48,16 +47,17 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 
 		const cloudCoverInfo: CloudCoverInfo[] = historicData.map( ( hour ): CloudCoverInfo => {
 			//return empty interval if measurement does not exist
+            const time = fromUnixTime( hour.EpochTime, {in: tz(getTZ(coordinates))} );
 			if(hour.CloudCover === undefined ){
 				return {
-					startTime: moment.unix( hour.EpochTime ),
-					endTime: moment.unix( hour.EpochTime ),
+					startTime: time,
+					endTime: time,
 					cloudCover: 0
 				}
 			}
 			return {
-				startTime: moment.unix( hour.EpochTime ),
-				endTime: moment.unix( hour.EpochTime ).add( 1, "hours" ),
+				startTime: time,
+				endTime: addHours(time, 1),
 				cloudCover: hour.CloudCover / 100
 			};
 		} );

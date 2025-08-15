@@ -1,17 +1,20 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node10",
     "noImplicitReturns": true,
     "noEmitOnError": true,
     "outDir": "js/",
     "sourceMap": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true
   },
   "include": [
-    "errors.ts",
-    "server.ts",
-    "types.ts",
-    "routes/**/*"
+    "src/errors.ts",
+    "src/server.ts",
+    "src/types.ts",
+    "src/routes/**/*"
   ]
 }

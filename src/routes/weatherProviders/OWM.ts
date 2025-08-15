@@ -1,10 +1,10 @@
 import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
-import { httpJSONRequest, keyToUse } from "../weather";
+import { httpJSONRequest, keyToUse, localTime } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
-import * as moment from "moment-timezone";
-import * as geoTZ from "geo-tz";
+import geoTZ from "geo-tz";
 import { CodedError, ErrorCode } from "../../errors";
+import { addHours, format, getUnixTime, startOfDay, subDays } from "date-fns";
 
 export default class OWMWeatherProvider extends WeatherProvider {
 
@@ -20,11 +20,9 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		const localKey = keyToUse(this.API_KEY, pws);
 
 		//Get previous date by using UTC
-		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
-		const yesterdayTimestamp: string = moment().tz(tz).startOf("day").subtract( 1, "day" ).format("YYYY-MM-DD");
+        const yesterday = subDays(startOfDay(localTime(coordinates)), 1);
 
-		// TODO: specific tz to make sure it's using the correct time zone
-		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${yesterdayTimestamp}`;
+		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${format(yesterday, "yyyy-MM-dd")}&tz=${format(yesterday, "xxx")}`;
 
 		// Perform the HTTP request to retrieve the weather data
 		let historicData;
@@ -42,9 +40,8 @@ export default class OWMWeatherProvider extends WeatherProvider {
 
 		let clouds = (new Array(24)).fill(historicData.cloud_cover.afternoon);
 
-		// TODO: need
 		const cloudCoverInfo: CloudCoverInfo[] = clouds.map( ( sample, i ): CloudCoverInfo => {
-			const start = moment().tz(tz).startOf('day').subtract(1, 'day').add(i, 'hour');
+            const start = addHours(yesterday, i);
 			if( sample === undefined ) {
 				return {
 					startTime: start,
@@ -54,7 +51,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			}
 			return {
 				startTime: start,
-				endTime: start.clone().add( 1, "hour" ),
+				endTime: addHours(start, 1),
 				cloudCover: sample / 100
 			}
 		});
@@ -69,7 +66,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			humidity: historicData.humidity.afternoon,
 			// OWM always returns precip in mm, so it must be converted.
 			precip: historicData.precipitation.total / 25.4,
-			periodStartTime: Number(moment().subtract(1, "day").format("X")),
+			periodStartTime: getUnixTime(yesterday),
 			minTemp: historicData.temperature.min,
 			maxTemp: historicData.temperature.max,
 			minHumidity: historicData.humidity.afternoon,

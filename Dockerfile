@@ -1,14 +1,38 @@
-FROM node
+FROM alpine:latest AS build_eto
+WORKDIR /eto
+
+RUN apk add --no-cache tiff imagemagick gcc libc-dev build-base
+
+COPY /baselineEToData/dataPreparer.c ./
+COPY /baselineEToData/prepareData.sh ./
+COPY /baselineEToData/baseline.sh ./
+
+RUN chmod +x ./prepareData.sh ./baseline.sh
+
+RUN ash ./prepareData.sh 20
+RUN ash ./baseline.sh
+
+FROM node:lts-alpine AS build_node
+WORKDIR /weather
+
+COPY /tsconfig.json ./
+COPY /package.json ./
+COPY /package-lock.json ./
+RUN npm install
+COPY /build.mjs ./
+
+COPY /src ./src
+RUN npm run build
+
+FROM node:lts-alpine
 
 EXPOSE 3000
+EXPOSE 8080
 
-RUN groupadd osweather && useradd --no-log-init -m -g osweather osweather
-USER osweather
+WORKDIR /weather
+COPY /package.json ./
+RUN mkdir baselineEToData
+COPY --from=build_eto /eto/Baseline_ETo_Data.bin ./baselineEToData
+COPY --from=build_node /weather/dist ./dist
 
-ADD --chown=osweather:osweather . weather
-
-WORKDIR weather
-RUN npm install
-RUN npm run compile
-CMD npm start
-
+CMD ["npm", "run", "start"]

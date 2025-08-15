@@ -1,7 +1,7 @@
-import * as moment from "moment";
 import { expect } from "chai";
 import { GeoCoordinates, WateringData } from "../../types";
 import { calculateETo } from "./EToAdjustmentMethod";
+import { addDays, fromUnixTime, getUnixTime } from "date-fns";
 
 
 const testData: TestData[] = require( "../../test/etoTest.json" );
@@ -10,19 +10,19 @@ describe( "ETo AdjustmentMethod", () => {
 	describe( "Should correctly calculate ETo", async () => {
 		for ( const locationData of testData ) {
 			it( "Using data from " + locationData.description, async () => {
-				let date = moment.unix( locationData.startTimestamp );
+				let date = fromUnixTime( locationData.startTimestamp );
 				for ( const entry of locationData.entries ) {
 					const wateringData: WateringData = {
 						...entry.data,
 						precip: 0,
-						periodStartTime: date.unix(),
+						periodStartTime: getUnixTime(date),
 						weatherProvider: "mock"
 					};
 					const calculatedETo = calculateETo( wateringData, locationData.elevation, locationData.coordinates );
 					// Allow a small margin of error for rounding, unit conversions, and approximations.
 					expect( calculatedETo ).approximately( entry.eto, 0.003 );
 
-					date = date.add( 1, "days" );
+					date = addDays(date, 1);
 				}
 			} );
 		}

@@ -83,6 +83,7 @@ export function makeCodedError( err: any ): CodedError {
 	if ( err instanceof CodedError ) {
 		return err;
 	} else {
+        console.error("Unexpected error:", err);
 		return new CodedError( ErrorCode.UnexpectedError );
 	}
 }

@@ -1,10 +1,8 @@
-import * as moment from "moment-timezone";
-import * as geoTZ from "geo-tz";
-
 import { GeoCoordinates, WeatherData, WateringData, PWS } from "../../types";
-import { httpJSONRequest } from "../weather";
+import { getTZ, httpJSONRequest, localTime } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
+import { format, getUnixTime, startOfDay, subDays } from "date-fns";
 
 export default class OpenMeteoWeatherProvider extends WeatherProvider {
 
@@ -16,8 +14,16 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	}
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
-		//console.log("OM getWateringData request for coordinates: %s", coordinates);
-		const historicUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&past_days=7&timezone=auto&timeformat=unixtime&forecast_days=1`;
+		const tz = getTZ(coordinates);
+
+        const currentDay = startOfDay(localTime(coordinates));
+
+        const startTimestamp = format(subDays(currentDay, 7), "yyyy-MM-dd");
+        const endTimestamp = format(currentDay, "yyyy-MM-dd");
+
+
+		const historicUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&start_date=${startTimestamp}&end_date=${endTimestamp}&timezone=${tz}&timeformat=unixtime`;
+        console.log(historicUrl)
 
 		let historicData;
 		try {
@@ -32,11 +38,10 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		}
 
 		// Cut data down to 7 days previous (midnight to midnight)
-		const tz = geoTZ.find(coordinates[0], coordinates[1])[0];
-		const startOfDay = moment().tz(tz).startOf("day").unix();
+		const start = getUnixTime(startOfDay(localTime(coordinates)));
 
 		const historicCutoff = historicData.hourly.time.findIndex( function( time ) {
-			return time >= startOfDay;
+			return time >= start;
 		} );
 
 		for (const arr in historicData.hourly) {
@@ -82,12 +87,6 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				windSpeed: wind
 			}
 
-			/*console.log("OM 1: temp:%s humidity:%s precip:%s raining:%s",
-				this.F2C(result.temp),
-				result.humidity,
-				this.inch2mm(result.precip),
-				result.raining);*/
-
 			data.push(result);
 		}
 
@@ -95,14 +94,9 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	}
 
 	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
-
-		//console.log("OM getWeatherData request for coordinates: %s", coordinates);
-
-		const currentDate: number = moment().unix();
-		const timezone = geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ];
+		const timezone = getTZ(coordinates);
 
 		const currentUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime`;
-		//console.log(currentUrl);
 
 		let current;
 		try {

@@ -1,13 +1,21 @@
-import * as express from "express";
-import * as http from "http";
-import * as https from "https";
-import * as SunCalc from "suncalc";
-import * as moment from "moment-timezone";
-import * as geoTZ from "geo-tz";
+import express from "express";
+import SunCalc from "suncalc";
+import geoTZ from "geo-tz";
 
-import { WateringData, GeoCoordinates, PWS, TimeData, WeatherData } from "../types";
+import {
+    WateringData,
+    GeoCoordinates,
+    PWS,
+    TimeData,
+    WeatherData,
+    WeatherProviderShortId,
+} from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
-import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from "./adjustmentMethods/AdjustmentMethod";
+import {
+    AdjustmentMethod,
+    AdjustmentMethodResponse,
+    AdjustmentOptions,
+} from "./adjustmentMethods/AdjustmentMethod";
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
@@ -16,36 +24,58 @@ import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
 import { ParsedQs } from "qs";
 import { CachedResult } from "../cache";
+import OWMWeatherProvider from "./weatherProviders/OWM";
+import WUndergroundWeatherProvider from "./weatherProviders/WUnderground";
+import AppleWeatherProvider from "./weatherProviders/Apple";
+import AccuWeatherWeatherProvider from "./weatherProviders/AccuWeather";
+import DWDWeatherProvider from "./weatherProviders/DWD";
+import LocalWeatherProvider from "./weatherProviders/local";
+import OpenMeteoWeatherProvider from "./weatherProviders/OpenMeteo";
+import PirateWeatherWeatherProvider from "./weatherProviders/PirateWeather";
+import GoogleMapsGeocoder from "./geocoders/GoogleMaps";
+import WUndergroundGeocoder from "./geocoders/WUnderground";
+import { TZDate } from "@date-fns/tz";
 
-const WEATHER_PROVIDERS: { [method: string] : WeatherProvider} = {
-	"AW": new ( require("./weatherProviders/AccuWeather" ).default )(),
-	"PW": new ( require("./weatherProviders/PirateWeather" ).default )(),
-	"Apple": new ( require("./weatherProviders/Apple" ).default )(),
-	"OWM": new ( require("./weatherProviders/OWM" ).default )(),
-	"OpenMeteo": new ( require("./weatherProviders/OpenMeteo" ).default )(),
-	"DWD": new ( require("./weatherProviders/DWD" ).default )(),
-	"WU": new ( require("./weatherProviders/WUnderground" ).default )(),
-	"local": new ( require("./weatherProviders/local" ).default )(),
+const WEATHER_PROVIDERS: { [K in Exclude<WeatherProviderShortId, "mock">]: WeatherProvider } = {
+    Apple: new AppleWeatherProvider(),
+    AW: new AccuWeatherWeatherProvider(),
+    DWD: new DWDWeatherProvider(),
+    local: new LocalWeatherProvider(),
+    OpenMeteo: new OpenMeteoWeatherProvider(),
+    OWM: new OWMWeatherProvider(),
+    PW: new PirateWeatherWeatherProvider(),
+    WU: new WUndergroundWeatherProvider(),
 };
 
-const PWS_WEATHER_PROVIDER: WeatherProvider = new ( require("./weatherProviders/" + ( process.env.PWS_WEATHER_PROVIDER || "WUnderground" ) ).default )();
-const GEOCODER: Geocoder = new ( require("./geocoders/" + ( process.env.GEOCODER || "WUnderground" ) ).default )();
+const GEOCODERS: { [name: string]: Geocoder } = {
+    GoogleMaps: new GoogleMapsGeocoder(),
+    WU: new WUndergroundGeocoder(),
+};
+
+const WEATHER_PROVIDER: WeatherProvider =
+    WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] ||
+    WEATHER_PROVIDERS["Apple"];
+const PWS_WEATHER_PROVIDER: WeatherProvider =
+    WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] ||
+    WEATHER_PROVIDERS["WU"];
+const GEOCODER: Geocoder =
+    GEOCODERS[process.env.GEOCODER] || GEOCODERS["WU"];
 
 // Define regex filters to match against location
 const filters = {
-	gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
-	pws: /^(?:pws|icao|zmw):/,
-	url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
-	time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
-	timezone: /^()()()()()()([+-])(\d{2})(\d{2})/
+    gps: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/,
+    pws: /^(?:pws|icao|zmw):/,
+    url: /^https?:\/\/([\w\.-]+)(:\d+)?(\/.*)?$/,
+    time: /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})([+-])(\d{2})(\d{2})/,
+    timezone: /^()()()()()()([+-])(\d{2})(\d{2})/,
 };
 
 /** AdjustmentMethods mapped to their numeric IDs. */
-const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
-	0: ManualAdjustmentMethod,
-	1: ZimmermanAdjustmentMethod,
-	2: RainDelayAdjustmentMethod,
-	3: EToAdjustmentMethod
+const ADJUSTMENT_METHOD: { [key: number]: AdjustmentMethod } = {
+    0: ManualAdjustmentMethod,
+    1: ZimmermanAdjustmentMethod,
+    2: RainDelayAdjustmentMethod,
+    3: EToAdjustmentMethod,
 };
 
 /**
@@ -54,30 +84,33 @@ const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
  * @return A promise that will be resolved with the coordinates of the best match for the specified location, or
  * rejected with a CodedError if unable to resolve the location.
  */
-export async function resolveCoordinates( location: string ): Promise< GeoCoordinates > {
+export async function resolveCoordinates(
+    location: string
+): Promise<GeoCoordinates> {
+    if (!location) {
+        throw new CodedError(ErrorCode.InvalidLocationFormat);
+    }
 
-	if ( !location ) {
-		throw new CodedError( ErrorCode.InvalidLocationFormat );
-	}
-
-	if ( filters.pws.test( location ) ) {
-		throw new CodedError( ErrorCode.InvalidLocationFormat );
-	} else if ( filters.gps.test( location ) ) {
-		const split: string[] = location.split( "," );
-		return [ parseFloat( split[ 0 ] ), parseFloat( split[ 1 ] ) ];
-	} else {
-		return GEOCODER.getLocation( location );
-	}
+    if (filters.pws.test(location)) {
+        throw new CodedError(ErrorCode.InvalidLocationFormat);
+    } else if (filters.gps.test(location)) {
+        const split: string[] = location.split(",");
+        return [parseFloat(split[0]), parseFloat(split[1])];
+    } else {
+        return GEOCODER.getLocation(location);
+    }
 }
 
 /**
  * Makes an HTTP/HTTPS GET request to the specified URL and parses the JSON response body.
  * @param url The URL to fetch.
+ * @param headers Headers for the request
+ * @param body Body for the request
  * @return A Promise that will be resolved the with parsed response body if the request succeeds, or will be rejected
  * with an error if the request or JSON parsing fails. This error may contain information about the HTTP request or,
  * response including API keys and other sensitive information.
  */
-export async function httpJSONRequest(url: string, headers?, body?): Promise< any > {
+export async function httpJSONRequest(url: string, headers?: HeadersInit, body?: BodyInit): Promise< any > {
 	try {
 		const res = await fetch(url, {
 			headers,
@@ -92,25 +125,55 @@ export async function httpJSONRequest(url: string, headers?, body?): Promise< an
 }
 
 /**
+ * Gets the coordinates for specified coordinates
+ * @param coordinates The coordinates to use to calculate timezone.
+ * @returns The timezone for the coordinates
+ */
+export function getTZ(coordinates: GeoCoordinates): string {
+    return geoTZ.find(coordinates[0], coordinates[1])[0];
+}
+
+/**
+ * Gets the local date object for specified coordinates in the correct timezone
+ * @param coordinates The coordinates to use to calculate timezone.
+ * @returns The date object which is the current time in the timezone
+ */
+export function localTime(coordinates: GeoCoordinates, date?: Date): Date {
+    if (!date) {
+        date = new Date();
+    }
+
+    return TZDate.tz(getTZ(coordinates), date);
+}
+
+/**
  * Calculates timezone and sunrise/sunset for the specified coordinates.
  * @param coordinates The coordinates to use to calculate time data.
  * @return The TimeData for the specified coordinates.
  */
-function getTimeData( coordinates: GeoCoordinates ): TimeData {
-	const timezone = moment().tz( geoTZ.find( coordinates[ 0 ], coordinates[ 1 ] )[ 0 ] ).utcOffset();
-	const tzOffset: number = getTimezone( timezone, true );
+function getTimeData(coordinates: GeoCoordinates): TimeData {
+    const timezone = -localTime(coordinates).getTimezoneOffset();
 
-	// Calculate sunrise and sunset since Weather Underground does not provide it
-	const sunData = SunCalc.getTimes( new Date(), coordinates[ 0 ], coordinates[ 1 ] );
+    const tzOffset: number = getTimezone(timezone, true);
 
-	sunData.sunrise.setUTCMinutes( sunData.sunrise.getUTCMinutes() + tzOffset );
-	sunData.sunset.setUTCMinutes( sunData.sunset.getUTCMinutes() + tzOffset );
+    // Calculate sunrise and sunset since Weather Underground does not provide it
+    const sunData = SunCalc.getTimes(
+        new Date(),
+        coordinates[0],
+        coordinates[1]
+    );
 
-	return {
-		timezone:	timezone,
-		sunrise:	( sunData.sunrise.getUTCHours() * 60 + sunData.sunrise.getUTCMinutes() ),
-		sunset:		( sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes() )
-	};
+    sunData.sunrise.setUTCMinutes(sunData.sunrise.getUTCMinutes() + tzOffset);
+    sunData.sunset.setUTCMinutes(sunData.sunset.getUTCMinutes() + tzOffset);
+
+    return {
+        timezone: timezone,
+        sunrise:
+            sunData.sunrise.getUTCHours() * 60 +
+            sunData.sunrise.getUTCMinutes(),
+        sunset:
+            sunData.sunset.getUTCHours() * 60 + sunData.sunset.getUTCMinutes(),
+    };
 }
 
 /**
@@ -128,11 +191,11 @@ function getTimeData( coordinates: GeoCoordinates ): TimeData {
 function checkWeatherRestriction( cali: boolean, wateringData?: readonly WateringData[], adjustmentOptions?: AdjustmentOptions, weather?: WeatherData ): boolean {
 
 	if ( ( cali || (adjustmentOptions && adjustmentOptions.cali ) ) && wateringData && wateringData.length ) {
-		// With the revamp of watering data, the most recent two days are the end of the array, giving 48 hours. If not, only the last one (24 hours) is used.
+		// The most recent two days are at the beginning of the data array
 		const len = wateringData.length;
-		let rain = wateringData[len-1].precip;
+		let rain = wateringData[0].precip;
 		if ( len > 1 ){
-			rain += wateringData[len-2].precip;
+			rain += wateringData[1].precip;
 		}
 
 		if ( rain > 0.1 ) {
@@ -366,17 +429,16 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	if ( checkRestrictions ) {
 		let wateringData: readonly WateringData[] = adjustmentMethodResponse.wateringData;
-		let dataArr;
+		let dataArr: CachedResult<readonly WateringData[]>;
 		// Fetch the watering data if the AdjustmentMethod didn't fetch it and the california restriction is being checked.
-		if ( ( ( ( wateringParam >> 7 ) & 1 ) > 0 || ( typeof adjustmentOptions.cali !== "undefined" && adjustmentOptions.cali ) ) && !wateringData ) {
+		if ( ( ( ( wateringParam >> 7 ) & 1 ) > 0 || ( typeof adjustmentOptions.cali !== "undefined" && adjustmentOptions.cali ) ) && !adjustmentMethodResponse.wateringData ) {
 			try {
 				dataArr = await weatherProvider.getWateringData( coordinates, pws );
 			} catch ( err ) {
 				sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
 				return;
 			}
-			// First in data array in most recent.
-			wateringData = dataArr[0];
+			wateringData = dataArr.value;
 		}
 
 		let weatherData: WeatherData | undefined = undefined;
@@ -390,7 +452,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 
 		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-		if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
+		if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) > 0 ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
 			data.scale = 0;
 		}
 	}
@@ -407,12 +469,20 @@ export const getWateringData = async function( req: express.Request, res: expres
  * occurred, but older firmware versions will still update the watering scale accordingly.
  * @param useJson Indicates if the response body should use a JSON format instead of a format similar to URL query strings.
  */
-function sendWateringError( res: express.Response, error: CodedError, resetScale: boolean = true, useJson: boolean = false ) {
-	if ( error.errCode === ErrorCode.UnexpectedError ) {
-		console.error( `An unexpected error occurred:`, error );
-	}
+function sendWateringError(
+    res: express.Response,
+    error: CodedError,
+    resetScale: boolean = true,
+    useJson: boolean = false
+) {
+    if (error.errCode === ErrorCode.UnexpectedError) {
+        console.error(`An unexpected error occurred:`, error);
+    }
 
-	sendWateringData( res, { errCode: error.errCode, scale: resetScale ? 100 : undefined } );
+    sendWateringData(res, {
+        errCode: error.errCode,
+        scale: resetScale ? 100 : undefined,
+    });
 }
 
 /**
@@ -421,38 +491,45 @@ function sendWateringError( res: express.Response, error: CodedError, resetScale
  * @param data An object containing key/value pairs that should be formatted in the response body.
  * @param useJson Indicates if the response body should use a JSON format instead of a format similar to URL query strings.
  */
-function sendWateringData( res: express.Response, data: object, useJson: boolean = false ) {
-	if ( useJson ) {
-		res.json( data );
-	} else {
-		// Return the data formatted as a URL query string.
-		let formatted = "";
-		for ( const key in data ) {
-			// Skip inherited properties.
-			if ( !data.hasOwnProperty( key ) ) {
-				continue;
-			}
+function sendWateringData(
+    res: express.Response,
+    data: object,
+    useJson: boolean = false
+) {
+    if (useJson) {
+        res.json(data);
+    } else {
+        // Return the data formatted as a URL query string.
+        let formatted = "";
+        for (const key in data) {
+            // Skip inherited properties.
+            if (!data.hasOwnProperty(key)) {
+                continue;
+            }
 
-			let value = data[ key ];
-			switch ( typeof value ) {
-				case "undefined":
-					// Skip undefined properties.
-					continue;
-				case "object":
-					// Convert objects to JSON.
-					value = JSON.stringify( value );
-				// Fallthrough.
-				case "string":
-					/* URL encode strings. Since the OS firmware uses a primitive version of query string parsing and
+            let value = data[key];
+            switch (typeof value) {
+                case "undefined":
+                    // Skip undefined properties.
+                    continue;
+                case "object":
+                    // Convert objects to JSON.
+                    value = JSON.stringify(value);
+                // Fallthrough.
+                case "string":
+                    /* URL encode strings. Since the OS firmware uses a primitive version of query string parsing and
 					decoding, only some characters need to be escaped and only spaces ("+" or "%20") will be decoded. */
-					value = value.replace( / /g, "+" ).replace( /\n/g, "\\n" ).replace( /&/g, "AMPERSAND" );
-					break;
-			}
+                    value = value
+                        .replace(/ /g, "+")
+                        .replace(/\n/g, "\\n")
+                        .replace(/&/g, "AMPERSAND");
+                    break;
+            }
 
-			formatted += `&${ key }=${ value }`;
-		}
-		res.send( formatted );
-	}
+            formatted += `&${key}=${value}`;
+        }
+        res.send(formatted);
+    }
 }
 
 /**
@@ -461,27 +538,33 @@ function sendWateringData( res: express.Response, data: object, useJson: boolean
  * @param obj The object to check.
  * @return A boolean indicating if the object has numeric values for all of the specified keys.
  */
-export function validateValues( keys: string[], obj: object ): boolean {
-	let key: string;
+export function validateValues(keys: string[], obj: object): boolean {
+    let key: string;
 
-	// Return false if the object is null/undefined.
-	if ( !obj ) {
-		return false;
-	}
+    // Return false if the object is null/undefined.
+    if (!obj) {
+        return false;
+    }
 
-	for ( key in keys ) {
-		if ( !keys.hasOwnProperty( key ) ) {
-			continue;
-		}
+    for (key in keys) {
+        if (!keys.hasOwnProperty(key)) {
+            continue;
+        }
 
-		key = keys[ key ];
+        key = keys[key];
 
-		if ( !obj.hasOwnProperty( key ) || typeof obj[ key ] !== "number" || isNaN( obj[ key ] ) || obj[ key ] === null || obj[ key ] === -999 ) {
-			return false;
-		}
-	}
+        if (
+            !obj.hasOwnProperty(key) ||
+            typeof obj[key] !== "number" ||
+            isNaN(obj[key]) ||
+            obj[key] === null ||
+            obj[key] === -999
+        ) {
+            return false;
+        }
+    }
 
-	return true;
+    return true;
 }
 
 /**
@@ -491,32 +574,33 @@ export function validateValues( keys: string[], obj: object ): boolean {
  * @return The offset of the specified timezone in either minutes or OpenSprinkler encoded format (depending on the
  * value of useMinutes).
  */
-function getTimezone( time: number | string, useMinutes: boolean = false ): number {
+function getTimezone(
+    time: number | string,
+    useMinutes: boolean = false
+): number {
+    let hour, minute;
 
-	let hour, minute;
+    if (typeof time === "number") {
+        hour = Math.floor(time / 60);
+        minute = time % 60;
+    } else {
+        // Match the provided time string against a regex for parsing
+        let splitTime =
+            time.match(filters.time) || time.match(filters.timezone);
 
-	if ( typeof time === "number" ) {
-		hour = Math.floor( time / 60 );
-		minute = time % 60;
-	} else {
+        hour = parseInt(splitTime[7] + splitTime[8]);
+        minute = parseInt(splitTime[9]);
+    }
 
-		// Match the provided time string against a regex for parsing
-		let splitTime = time.match( filters.time ) || time.match( filters.timezone );
+    if (useMinutes) {
+        return hour * 60 + minute;
+    } else {
+        // Convert the timezone into the OpenSprinkler encoded format
+        minute = ((minute / 15) >> 0) / 4;
+        hour = hour + (hour >= 0 ? minute : -minute);
 
-		hour = parseInt( splitTime[ 7 ] + splitTime[ 8 ] );
-		minute = parseInt( splitTime[ 9 ] );
-	}
-
-	if ( useMinutes ) {
-		return ( hour * 60 ) + minute;
-	} else {
-
-		// Convert the timezone into the OpenSprinkler encoded format
-		minute = ( minute / 15 >> 0 ) / 4;
-		hour = hour + ( hour >= 0 ? minute : -minute );
-
-		return ( ( hour + 12 ) * 4 ) >> 0;
-	}
+        return ((hour + 12) * 4) >> 0;
+    }
 }
 
 /**
@@ -524,9 +608,9 @@ function getTimezone( time: number | string, useMinutes: boolean = false ): numb
  * @param ip The string representation of the IP address.
  * @return The integer representation of the IP address.
  */
-function ipToInt( ip: string ): number {
-	const split = ip.split( "." );
-	return ( ( ( ( ( ( +split[ 0 ] ) * 256 ) + ( +split[ 1 ] ) ) * 256 ) + ( +split[ 2 ] ) ) * 256 ) + ( +split[ 3 ] );
+function ipToInt(ip: string): number {
+    const split = ip.split(".");
+    return ((+split[0] * 256 + +split[1]) * 256 + +split[2]) * 256 + +split[3];
 }
 
 /**
@@ -536,25 +620,27 @@ function ipToInt( ip: string ): number {
  * @param parameter An array of parameters or a single parameter value.
  * @return The first element in the array of parameter or the single parameter provided.
  */
-export function getParameter( parameter: string | ParsedQs | (string | ParsedQs)[] | null | undefined ): string {
-	if ( Array.isArray( parameter ) ) {
-		parameter = parameter[0];
-	}
+export function getParameter(
+    parameter: string | ParsedQs | (string | ParsedQs)[] | null | undefined
+): string {
+    if (Array.isArray(parameter)) {
+        parameter = parameter[0];
+    }
 
-	if (typeof parameter == "object") {
-		parameter = "";
-	}
+    if (typeof parameter == "object") {
+        parameter = "";
+    }
 
-	// Return an empty string if the parameter is undefined.
-	return parameter || "";
+    // Return an empty string if the parameter is undefined.
+    return parameter || "";
 }
 
-export function keyToUse( defaultKey: string, pws: PWS ): string {
-	if(pws && pws.apiKey){
-		return pws.apiKey;
-	}else if(defaultKey){
-		return defaultKey;
-	}else{
-		throw new CodedError( ErrorCode.NoAPIKeyProvided );
-	}
+export function keyToUse(defaultKey: string, pws: PWS): string {
+    if (pws && pws.apiKey) {
+        return pws.apiKey;
+    } else if (defaultKey) {
+        return defaultKey;
+    } else {
+        throw new CodedError(ErrorCode.NoAPIKeyProvided);
+    }
 }

@@ -1,11 +1,9 @@
-import * as moment from "moment-timezone";
-import * as geoTZ from "geo-tz";
-
 import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
-import { httpJSONRequest, keyToUse } from "../weather";
+import { httpJSONRequest, keyToUse, localTime } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
+import { addDays, fromUnixTime, getUnixTime, startOfDay, subDays } from "date-fns";
 
 export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
@@ -18,12 +16,12 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 		// The Unix timestamp of 24 hours ago.
-		const yesterdayTimestamp = moment().subtract( 1, "day" ).unix();
+        const yesterday = subDays(startOfDay(localTime(coordinates)), 1);
 
 		const localKey = keyToUse(this.API_KEY, pws);
 
 		// PW's timemachine API is broken currently, so we have to use the forecast API, which only gives the most recent 24 hours
-		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ yesterdayTimestamp }?units=us&exclude=currently,minutely,alerts`;
+		const yesterdayUrl = `https://timemachine.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ getUnixTime(yesterday) }?units=us&exclude=currently,minutely,alerts`;
 
 		let historicData;
 		try {
@@ -50,9 +48,10 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		samples = samples.slice(0,24);
 
 		const cloudCoverInfo: CloudCoverInfo[] = samples.map( ( hour ): CloudCoverInfo => {
+            const startTime = fromUnixTime(hour.time);
 			return {
-				startTime: moment.unix( hour.time ),
-				endTime: moment.unix( hour.time ).add( 1, "hours" ),
+				startTime,
+				endTime: addDays(startTime, 1),
 				cloudCover: hour.cloudCover
 			};
 		} );
