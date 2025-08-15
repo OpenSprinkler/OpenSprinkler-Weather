@@ -42,13 +42,13 @@ const WEATHER_PROVIDERS: { [name: string]: WeatherProvider } = {
     local: new LocalWeatherProvider(),
     OpenMeteo: new OpenMeteoWeatherProvider(),
     OWM: new OWMWeatherProvider(),
-    PirateWeather: new PirateWeatherWeatherProvider(),
-    WUnderground: new WUndergroundWeatherProvider(),
+    PW: new PirateWeatherWeatherProvider(),
+    WU: new WUndergroundWeatherProvider(),
 };
 
 const GEOCODERS: { [name: string]: Geocoder } = {
     GoogleMaps: new GoogleMapsGeocoder(),
-    WUnderground: new WUndergroundGeocoder(),
+    WU: new WUndergroundGeocoder(),
 };
 
 const WEATHER_PROVIDER: WeatherProvider =
@@ -56,9 +56,9 @@ const WEATHER_PROVIDER: WeatherProvider =
     WEATHER_PROVIDERS["Apple"];
 const PWS_WEATHER_PROVIDER: WeatherProvider =
     WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] ||
-    WEATHER_PROVIDERS["WUnderground"];
+    WEATHER_PROVIDERS["WU"];
 const GEOCODER: Geocoder =
-    GEOCODERS[process.env.GEOCODER] || GEOCODERS["WUnderground"];
+    GEOCODERS[process.env.GEOCODER] || GEOCODERS["WU"];
 
 // Define regex filters to match against location
 const filters = {
