@@ -8,6 +8,7 @@ import {
     PWS,
     TimeData,
     WeatherData,
+    WeatherProviderShortId,
 } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import {
@@ -35,7 +36,7 @@ import GoogleMapsGeocoder from "./geocoders/GoogleMaps";
 import WUndergroundGeocoder from "./geocoders/WUnderground";
 import { TZDate } from "@date-fns/tz";
 
-const WEATHER_PROVIDERS: { [name: string]: WeatherProvider } = {
+const WEATHER_PROVIDERS: { [K in Exclude<WeatherProviderShortId, "mock">]: WeatherProvider } = {
     Apple: new AppleWeatherProvider(),
     AW: new AccuWeatherWeatherProvider(),
     DWD: new DWDWeatherProvider(),
