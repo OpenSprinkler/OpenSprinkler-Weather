@@ -37,7 +37,7 @@ import { TZDate } from "@date-fns/tz";
 
 const WEATHER_PROVIDERS: { [name: string]: WeatherProvider } = {
     Apple: new AppleWeatherProvider(),
-    AccuWeather: new AccuWeatherWeatherProvider(),
+    AW: new AccuWeatherWeatherProvider(),
     DWD: new DWDWeatherProvider(),
     local: new LocalWeatherProvider(),
     OpenMeteo: new OpenMeteoWeatherProvider(),
