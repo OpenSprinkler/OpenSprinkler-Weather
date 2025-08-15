@@ -21,9 +21,6 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ startTimestamp }&last_date=${ endTimestamp }&tz=${tz}`
 
-		//console.log("DWD getWateringData request for coordinates: %s", coordinates);
-		//console.log("1: %s", yesterdayUrl);
-
 		let historicData;
 		try {
 			historicData = await httpJSONRequest( historicUrl );
@@ -37,8 +34,6 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		}
 
 		const hours = historicData.weather;
-
-		//console.log("2: %s", samples.len);
 
 		// Fail if not enough data is available.
 		// There will only be 23 samples on the day that daylight saving time begins.
@@ -102,14 +97,14 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				temp: this.C2F(temp / length),
 				humidity: humidity / length,
 				precip: this.mm2inch(precip),
-				periodStartTime: getUnixTime(new Date(daysInHours[ i ].timestamp)),
+				periodStartTime: getUnixTime(new TZDate(daysInHours[i][0].timestamp)),
 				minTemp: this.C2F(minTemp),
 				maxTemp: this.C2F(maxTemp),
 				minHumidity: minHumidity,
 				maxHumidity: maxHumidity,
 				solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
 				// Assume wind speed measurements are taken at 2 meters.
-				windSpeed: this.kmh2mph(wind / daysInHours[ i ].length)
+				windSpeed: this.kmh2mph(wind / length)
 			}
 
 			if ( minTemp === undefined || maxTemp === undefined || minHumidity === undefined || maxHumidity === undefined || result.solarRadiation === undefined || wind === undefined || precip === undefined ) {
@@ -117,21 +112,12 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			}
 
 			data.push(result);
-
-			// console.log("DWD 1: temp:%s humidity:%s precip:%s raining:%s",
-			// 	totals.temp / samples.length,
-			// 	totals.humidity / samples.length,
-			// 	totals.precip,
-			// 	samples[ samples.length - 1 ].precipitation > 0);
 		}
 
 		return data.reverse();
 	}
 
 	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
-
-		//console.log("DWD getWeatherData request for coordinates: %s", coordinates);
-
 		const tz = getTZ(coordinates);
 
 		const currentUrl = `https://api.brightsky.dev/current_weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&tz=${tz}`;
@@ -212,13 +198,6 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				description: condition,
 			} );
 		}
-
-		/*console.log("DWD 2: temp:%s humidity:%s wind:%s desc:%s city:%s",
-			current.weather.temperature,
-			current.weather.relative_humidity,
-			current.weather.wind_speed_30,
-			current.weather.condition,
-			current.sources[0].station_name);*/
 
 		return weather;
 	}
