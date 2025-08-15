@@ -20,23 +20,23 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-  outputs:
-    owner: ${{ steps.lower-owner.outputs.owner }}
-    repository: ${{ steps.lower-repo.outputs.repository }}
-  steps:
-    - id: lower-repo
-      name: Repository to lowercase
-      shell: bash
-      run: |
-        REPO="${{ github.event.repository.name }}"
-        echo "repository=${REPO,,}" >> $GITHUB_OUTPUT
+    outputs:
+      owner: ${{ steps.lower-owner.outputs.owner }}
+      repository: ${{ steps.lower-repo.outputs.repository }}
+    steps:
+      - id: lower-repo
+        name: Repository to lowercase
+        shell: bash
+        run: |
+          REPO="${{ github.event.repository.name }}"
+          echo "repository=${REPO,,}" >> $GITHUB_OUTPUT
 
-    - id: lower-owner
-      name: Owner to lowercase
-      shell: bash
-      run: |
-        OWNER="${{ needs.pre-job.outputs.owner }}"
-        echo "owner=${OWNER,,}" >> $GITHUB_OUTPUT
+      - id: lower-owner
+        name: Owner to lowercase
+        shell: bash
+        run: |
+          OWNER="${{ needs.pre-job.outputs.owner }}"
+          echo "owner=${OWNER,,}" >> $GITHUB_OUTPUT
 
   retag_weather:
     name: Re-Tag Weather
