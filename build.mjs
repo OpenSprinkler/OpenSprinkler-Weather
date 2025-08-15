@@ -33,7 +33,7 @@ function copyFolder(src, dest) {
 copyFolder(source, target);
 
 await esbuild.build({
-    entryPoints: ['server.ts'],
+    entryPoints: ['src/server.ts'],
     bundle: true,
     outfile: 'dist/index.cjs',
     platform: 'node',

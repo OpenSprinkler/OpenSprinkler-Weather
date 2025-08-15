@@ -12,9 +12,9 @@
     "allowSyntheticDefaultImports": true
   },
   "include": [
-    "errors.ts",
-    "server.ts",
-    "types.ts",
-    "routes/**/*"
+    "src/errors.ts",
+    "src/server.ts",
+    "src/types.ts",
+    "src/routes/**/*"
   ]
 }

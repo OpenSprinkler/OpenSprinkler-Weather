@@ -7,7 +7,7 @@ import cors from "cors";
 import { getWateringData, getWeatherData } from "./routes/weather";
 import { captureWUStream } from "./routes/weatherProviders/local";
 import { getBaselineETo } from "./routes/baselineETo";
-import {default as packageJson} from "./package.json";
+import {default as packageJson} from "../package.json";
 import { pinoHttp } from "pino-http";
 import { pino, LevelWithSilent } from "pino";
 
