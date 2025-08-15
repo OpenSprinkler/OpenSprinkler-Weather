@@ -23,7 +23,6 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 
 
 		const historicUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&start_date=${startTimestamp}&end_date=${endTimestamp}&timezone=${tz}&timeformat=unixtime`;
-        console.log(historicUrl)
 
 		let historicData;
 		try {
@@ -137,11 +136,6 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				description: this.getWMOIconCode( current.daily.weathercode[day] ).desc,
 			} );
 		}
-
-		/*console.log("OM 2: temp:%s humidity:%s wind:%s",
-			this.F2C(weather.temp),
-			weather.humidity,
-			this.mph2kmh(weather.wind));*/
 
 		return weather;
 	}

@@ -210,7 +210,6 @@ jobs:
             suffix=${{ matrix.suffix }}
           images: |
             name=${{ env.GHCR_REPO }}
-            name=${{ env.DOCKER_REPO }},enable=${{ github.event_name == 'release' }}
           tags: |
             # Tag with branch name
             type=ref,event=branch
