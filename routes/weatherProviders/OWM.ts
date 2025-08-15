@@ -22,7 +22,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		//Get previous date by using UTC
         const yesterday = subDays(startOfDay(localTime(coordinates)), 1);
 
-		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${format(yesterday, "YYYY-MM-DD")}&tz=${format(yesterday, "xxx")}`;
+		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${format(yesterday, "yyyy-MM-dd")}&tz=${format(yesterday, "xxx")}`;
 
 		// Perform the HTTP request to retrieve the weather data
 		let historicData;
