@@ -69,19 +69,7 @@ It is possible to build a self-contained docker image from this repository.  It 
 without installing any prerequisites or setting up systemd.
 
 ### Building the Docker image
-
-```shell script
-./build-docker.sh  # run with -h for other options
-```
-The above will generate baselineEtoData (if not already done) and then build a complete opensprinkler-weather docker image.
+This will be rewritten since github automatically builds the images
 
 ### Running the Docker image
-
-```shell script
-docker create --name=osweather -p 3000:3000 --restart unless-stopped opensprinkler-weather
-docker start osweather
-
-# Instead of the above, use this for testing/troubleshooting by running it in the foreground:
-docker run --rm -it -p 3000:3000 opensprinkler-weather
-```
-Note: to expose a different port, change `-p 3000:3000` to, eg `-p12345:3000`
+This will be rewritten since github automatically builds the images
