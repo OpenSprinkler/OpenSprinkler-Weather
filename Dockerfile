@@ -1,4 +1,4 @@
-FROM alpine:lts AS build_eto
+FROM alpine:latest AS build_eto
 WORKDIR /eto
 
 RUN apk add --no-cache imagemagick gcc libc-dev build-base
