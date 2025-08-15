@@ -35,8 +35,7 @@ jobs:
         name: Owner to lowercase
         shell: bash
         run: |
-          OWNER="${{ GITHUB_REPOSITORY_OWNER }}"
-          echo "owner=${OWNER}" >> $GITHUB_OUTPUT
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
 
   retag_weather:
     name: Re-Tag Weather
