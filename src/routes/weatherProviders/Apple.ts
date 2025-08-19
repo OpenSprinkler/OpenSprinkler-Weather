@@ -312,7 +312,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
 			const length = daysInHours[i].length;
 			const windSpeed =
-				(days[i].daytimeForecast.windSpeed +
+				(days[i].daytimeForecast?.windSpeed || 0 +
 					days[i].overnightForecast.windSpeed) /
 				2;
 

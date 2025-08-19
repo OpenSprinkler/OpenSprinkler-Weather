@@ -69,7 +69,6 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
 			temp += hour.temperature;
             const currentHumidity = hour.humidity || this.humidityFromDewPoint(hour.temperature, hour.dewPoint);
-            console.log(hour.humidity, this.humidityFromDewPoint(hour.temperature, hour.dewPoint));
 			humidity += currentHumidity;
 			// This field may be missing from the response if it is snowing.
 			precip += hour.precipAccumulation || 0;
