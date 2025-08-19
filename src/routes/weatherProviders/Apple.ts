@@ -8,7 +8,7 @@ import {
 	CloudCoverInfo,
 } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
-import { addHours, getUnixTime, startOfDay, subDays } from "date-fns";
+import { format, addHours, getUnixTime, startOfDay, subDays } from "date-fns";
 import { TZDate } from "@date-fns/tz";
 
 type UnitsSystem = "m";
@@ -241,6 +241,8 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			historicData = await httpJSONRequest(historicUrl, {
 				Authorization: `Bearer ${await this.API_KEY}`,
 			});
+
+            console.log(JSON.stringify(historicData));
 		} catch (err) {
 			console.error("Error retrieving weather information from Apple:", err);
 			throw new CodedError(ErrorCode.WeatherApiError);
@@ -268,6 +270,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
 		// Cut days down to match number of hours
 		days.splice(0, days.length - daysInHours.length);
+		daysInHours.splice(0, daysInHours.length - days.length);
 
 		// Pull data for each day of the given interval
 		const data = [];
