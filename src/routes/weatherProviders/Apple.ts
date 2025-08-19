@@ -241,8 +241,6 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			historicData = await httpJSONRequest(historicUrl, {
 				Authorization: `Bearer ${await this.API_KEY}`,
 			});
-
-            console.log(JSON.stringify(historicData));
 		} catch (err) {
 			console.error("Error retrieving weather information from Apple:", err);
 			throw new CodedError(ErrorCode.WeatherApiError);
