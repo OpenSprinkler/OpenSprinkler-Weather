@@ -21,7 +21,8 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		const localKey = keyToUse(this.API_KEY, pws);
 
 		// PW's timemachine API is broken currently, so we have to use the forecast API, which only gives the most recent 24 hours
-		const yesterdayUrl = `https://timemachine.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ getUnixTime(yesterday) }?units=us&exclude=currently,minutely,alerts`;
+		// const yesterdayUrl = `https://timemachine.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ getUnixTime(yesterday) }?exclude=currently,minutely,alerts`;
+		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ getUnixTime(subDays(new Date(), 1)) }?exclude=currently,minutely,alerts`;
 
 		let historicData;
 		try {
@@ -65,15 +66,18 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
 			 * significantly skewed if data is missing for several consecutive hours).
 			 */
+
 			temp += hour.temperature;
-			humidity += hour.humidity;
+            const currentHumidity = hour.humidity || this.humidityFromDewPoint(hour.temperature, hour.dewPoint);
+            console.log(hour.humidity, this.humidityFromDewPoint(hour.temperature, hour.dewPoint));
+			humidity += currentHumidity;
 			// This field may be missing from the response if it is snowing.
 			precip += hour.precipAccumulation || 0;
 
 			// Skip hours where humidity measurement does not exist to prevent ETo result from being NaN.
-			if ( hour.humidity !== undefined ) {
-				minHumidity = minHumidity < hour.humidity ? minHumidity : hour.humidity;
-				maxHumidity = maxHumidity > hour.humidity ? maxHumidity : hour.humidity;
+			if ( currentHumidity !== undefined ) {
+				minHumidity = minHumidity < currentHumidity ? minHumidity : currentHumidity;
+				maxHumidity = maxHumidity > currentHumidity ? maxHumidity : currentHumidity;
 			}
 		}
 
@@ -81,15 +85,15 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			weatherProvider: "PW",
 			temp: temp / samples.length,
 			humidity: humidity / samples.length * 100,
-			precip: precip,
+			precip: this.mmToInchesPerHour(precip),
 			periodStartTime: historicData.hourly.data[ 0 ].time,
-			minTemp: historicData.daily.data[ 0 ].temperatureMin,
-			maxTemp: historicData.daily.data[ 0 ].temperatureMax,
+			minTemp: this.celsiusToFahrenheit(historicData.daily.data[ 0 ].temperatureMin),
+			maxTemp: this.celsiusToFahrenheit(historicData.daily.data[ 0 ].temperatureMax),
 			minHumidity: minHumidity * 100,
 			maxHumidity: maxHumidity * 100,
 			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
 			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: historicData.daily.data[ 0 ].windSpeed
+			windSpeed: this.kphToMph(historicData.daily.data[ 0 ].windSpeed)
 		}];
 	}
 
@@ -169,4 +173,43 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 				return "01d";
 		}
 	}
+
+    private celsiusToFahrenheit(celsius: number): number {
+		return (celsius * 9) / 5 + 32;
+	}
+
+	private mmToInchesPerHour(mmPerHour: number): number {
+		return mmPerHour * 0.03937007874;
+	}
+
+	private kphToMph(kph: number): number {
+		return kph * 0.621371;
+	}
+
+    //https://www.npl.co.uk/resources/q-a/dew-point-and-relative-humidity
+    private eLn(temperature: number, a: number, b: number): number {
+        return Math.log(611.2) + ((a * temperature) / (b + temperature));
+    }
+
+    private eWaterLn(temperature: number): number {
+        return this.eLn(temperature, 17.62, 243.12);
+    }
+    private eIceLn(temperature: number): number {
+        return this.eLn(temperature, 22.46, 272.62);
+    }
+
+    private humidityFromDewPoint(temperature: number, dewPoint: number): number {
+        if (isNaN(temperature)) return temperature;
+        if (isNaN(dewPoint)) return dewPoint;
+
+        let eFn: (temp: number) => number;
+
+        if (temperature > 0) {
+            eFn = (temp: number) => this.eWaterLn(temp);
+        } else {
+            eFn = (temp: number) => this.eIceLn(temp);
+        }
+
+        return 100 * Math.exp(eFn(dewPoint) - eFn(temperature));
+    }
 }
