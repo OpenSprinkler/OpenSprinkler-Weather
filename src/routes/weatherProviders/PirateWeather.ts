@@ -22,7 +22,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
 		// PW's timemachine API is broken currently, so we have to use the forecast API, which only gives the most recent 24 hours
 		// const yesterdayUrl = `https://timemachine.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ getUnixTime(yesterday) }?exclude=currently,minutely,alerts`;
-		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ getUnixTime(subDays(new Date(), 1)) }?exclude=currently,minutely,alerts`;
+		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ getUnixTime(subDays(new Date(), 1)) }?exclude=currently,minutely,alerts&units=ca`;
 
 		let historicData;
 		try {
@@ -82,7 +82,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
 		return [{
 			weatherProvider: "PW",
-			temp: temp / samples.length,
+			temp: this.celsiusToFahrenheit(temp / samples.length),
 			humidity: humidity / samples.length * 100,
 			precip: this.mmToInchesPerHour(precip),
 			periodStartTime: historicData.hourly.data[ 0 ].time,
