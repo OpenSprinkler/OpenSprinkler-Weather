@@ -49,6 +49,8 @@ export interface AdjustmentMethodResponse {
 	scales?: number[];
 	/** How long the data is cached for. */
 	ttl: number;
+	/** Whether watering restriction is active */
+	restricted?: number;
 }
 
 export interface AdjustmentOptions {

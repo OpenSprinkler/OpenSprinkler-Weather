@@ -14,3 +14,4 @@ observations.json
 geocoderCache.json
 dist
 pnpm-lock.yaml
+package-lock.json

@@ -400,6 +400,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	const data = {
 		scale:		undefined,
 		rd:			undefined,
+		restricted: undefined,
 		tz:			getTimezone( timeData.timezone, undefined ),
 		sunrise:	timeData.sunrise,
 		sunset:		timeData.sunset,
@@ -426,6 +427,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	data.rawData = adjustmentMethodResponse.rawData;
 	data.scales = adjustmentMethodResponse.scales;
 	data.ttl = adjustmentMethodResponse.ttl;
+	data.restricted = adjustmentMethodResponse.restricted;
 
 	if ( checkRestrictions ) {
 		let wateringData: readonly WateringData[] = adjustmentMethodResponse.wateringData;
@@ -453,7 +455,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
 		if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) > 0 ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
-			data.scale = 0;
+			data.restricted = 1;
 		}
 	}
 
