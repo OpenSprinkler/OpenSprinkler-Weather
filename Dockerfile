@@ -18,7 +18,6 @@ WORKDIR /weather
 
 COPY /tsconfig.json ./
 COPY /package.json ./
-COPY /package-lock.json ./
 RUN npm install
 COPY /build.mjs ./
 
