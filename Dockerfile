@@ -31,6 +31,7 @@ EXPOSE 8080
 
 WORKDIR /weather
 COPY /package.json ./
+RUN npm install --production
 RUN mkdir baselineEToData
 COPY --from=build_eto /eto/Baseline_ETo_Data.bin ./baselineEToData
 COPY --from=build_node /weather/dist ./dist
