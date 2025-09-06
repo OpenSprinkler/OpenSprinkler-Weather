@@ -20,7 +20,7 @@ export const captureWUStream = async function( req: express.Request, res: expres
 	let rainCount = getMeasurement(req, "dailyrainin");
 
 	const obs: Observation = {
-		timestamp: req.query.dateutc === "now" ? moment().unix() : moment( req.query.dateutc + "Z" ).unix(),
+		timestamp: req.query.dateutc === "now" ? Math.floor(Date.now()/1000) : Math.floor(new Date(String(req.query.dateutc) + "Z").getTime()/1000),
 		temp: getMeasurement(req, "tempf"),
 		humidity: getMeasurement(req, "humidity"),
 		windSpeed: getMeasurement(req, "windspeedmph"),
@@ -39,7 +39,7 @@ export const captureWUStream = async function( req: express.Request, res: expres
 export default class LocalWeatherProvider extends WeatherProvider {
 
 	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
-		queue = queue.filter( obs => moment().unix() - obs.timestamp < 24*60*60 );
+		queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
 
 		if ( queue.length == 0 ) {
 			console.error( "There is insufficient data to support Weather response from local PWS." );
@@ -71,7 +71,7 @@ export default class LocalWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 
-		queue = queue.filter( obs => moment().unix() - obs.timestamp < 24*60*60 );
+		queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
 
 		if ( queue.length == 0 || queue[ 0 ].timestamp - queue[ queue.length - 1 ].timestamp < 23*60*60 ) {
 			console.error( "There is insufficient data to support watering calculation from local PWS." );
@@ -106,7 +106,7 @@ export default class LocalWeatherProvider extends WeatherProvider {
 }
 
 function saveQueue() {
-	queue = queue.filter( obs => moment().unix() - obs.timestamp < 24*60*60 );
+	queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
 	try {
 		fs.writeFileSync( "observations.json" , JSON.stringify( queue ), "utf8" );
 	} catch ( err ) {
@@ -118,7 +118,7 @@ if ( process.env.WEATHER_PROVIDER === "local" && process.env.LOCAL_PERSISTENCE )
 	if ( fs.existsSync( "observations.json" ) ) {
 		try {
 			queue = JSON.parse( fs.readFileSync( "observations.json", "utf8" ) );
-			queue = queue.filter( obs => moment().unix() - obs.timestamp < 24*60*60 );
+			queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
 		} catch ( err ) {
 			console.error( "Error reading historical observations from local storage.", err );
 			queue = [];
