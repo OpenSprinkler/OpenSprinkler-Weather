@@ -1,4 +1,41 @@
+NOTE: this document is being re-written. The information below regarding how to install, run, and use the weather service on a Rapsberry Pi has been replaced by the new README.md at the root folder. The information about how to use your own Personal Weather Station (PWS) is still relevant and will be updated soon.
+
+## Connecting your own Personal Weather Station (PWS)
+
+If you own a PWS and are running a local instance of the Weather Service then you may be able to send the data directly from your PWS to the Weather Service avoiding any "cloud" based services. The weather data can then be used by the Weather Service to calculate Zimmerman based watering levels.
+
+### Options for PWS Owners
+
+**1 ) PWS supporting RESTfull output**
+
+Some PWS allow the user to specify a `GET request` to send weather observations onto a local service for processing. For example, the MeteoBridge Pro allows for requests to be specified in a custom template that translates the PWS weather values and units into a format that the local Weather Service can accept. If available, the user documentation for the PWS should detail how to configure a custom GET request.
+
+For more information on the RESTfull protocol click [here](docs/pws-protocol.md)
+
+**2 ) Networked PWS that support Weather Underground**
+
+Many PWS already support the Weather Underground format and can be connected to the user's home network to send data directly to the WU cloud service. For these PWS, it is possible to physically intercept the data stream heading to the WU cloud and redirect it to the Weather Service server instead.
+
+To do this intercepting, you place a physical device - such as a Raspberry Pi - in-between the PWS and the home network. It is this "man-in-the-middle" device that will look for information heading from the PWS toward the WU cloud and redirect that information to the local Weather Service.
+
+For more information on configuring a Raspberry Pi Zero W to act as a "Man In The Middle" solution follow these links:
+- If you have a PWS that connects to your home network using an ethernet cable then click [here](docs/man-in-middle.md)
+- If you have a PWS that connects to your home network via wifi then click [here](docs/wifi-hotspot.md)
+
+**3 ) PWS Supported By WeeWX**
+
+The WeeWX project provides a mechanism for OpenSprinkler owners to capture the data from many different manufacturer's PWS and to both store the information locally and to publish the data to a number of destinations. OpenSprinkler owners can use this solution to send their PWS weather observations onto a local Weather Service server.
+
+For more information on the "WeeWX Solution" click [here](docs/weewx.md)
+
+**4 ) Solutions for specific PWS (provided by OpenSprinkler Forum members)**
+
+- Davis Vantage: a solution for this PWS has been kindly provided by @rmloeb [here](docs/davis-vantage.md)
+- Netatmo: instructions for configuring this PWS have been greatfully provided by @franzstein [here](docs/netatmo.md)
+
 ## Installating a Local Weather Service onto a Raspberry Pi
+
+NOTE: the information below is outdated and mostly replaced by the current README.md at the root folder.
 
 **Step 1:** Download and install Node.js onto the Raspberry Pi so that you can run the OpenSprinkler weather server locally. The version of Node.js to install is dependent on your model of Raspberry Pi. Note that you can run the command ```uname -m``` on your Raspberry Pi to help identify the chipset that is being used.
 
