@@ -14,7 +14,7 @@ This script works with the OpenSprinkler Unified Firmware to automatically adjus
 
 **server.js** is the primary file launching the API daemon.
 
-**js/routes/** contains all the endpoints for the API service, including weather data providers, adjustment methods, geocoders. The list of currently supported weather data providers, their capabilities, and details on various adjustment methods can be found at our [support website]: https://openthings.freshdesk.com/support/solutions/articles/5000823370-use-weather-adjustments
+**src/routes/** contains all the endpoints for the API service, including weather data providers, adjustment methods, geocoders. The list of currently supported weather data providers, their capabilities, and details on various adjustment methods can be found at our [support website]: https://openthings.freshdesk.com/support/solutions/articles/5000823370-use-weather-adjustments
 
 ---
 
