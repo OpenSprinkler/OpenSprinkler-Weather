@@ -47,7 +47,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 
 		const cloudCoverInfo: CloudCoverInfo[] = historicData.map( ( hour ): CloudCoverInfo => {
 			//return empty interval if measurement does not exist
-            const time = fromUnixTime( hour.EpochTime, {in: tz(getTZ(coordinates))} );
+			const time = fromUnixTime( hour.EpochTime, {in: tz(getTZ(coordinates))} );
 			if(hour.CloudCover === undefined ){
 				return {
 					startTime: time,

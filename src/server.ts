@@ -12,24 +12,24 @@ import { pinoHttp } from "pino-http";
 import { pino, LevelWithSilent } from "pino";
 
 function getLogLevel(): LevelWithSilent {
-    switch (process.env.LOG_LEVEL) {
-        case "trace":
-            return "trace";
-        case "debug":
-            return "debug";
-        case "info":
-            return "info";
-        case "warn":
-            return "warn";
-        case "error":
-            return "error";
-        case "fatal":
-            return "fatal";
-        case "silent":
-            return "silent";
-        default:
-            return "info";
-    }
+switch (process.env.LOG_LEVEL) {
+	case "trace":
+		return "trace";
+	case "debug":
+		return "debug";
+	case "info":
+		return "info";
+	case "warn":
+		return "warn";
+	case "error":
+		return "error";
+	case "fatal":
+		return "fatal";
+	case "silent":
+		return "silent";
+	default:
+		return "info";
+}
 }
 
 const logger = pino({ level: getLogLevel() });
