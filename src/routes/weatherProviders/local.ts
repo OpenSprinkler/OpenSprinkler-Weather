@@ -10,6 +10,8 @@ var queue: Array<Observation> = [],
 	lastRainEpoch = 0,
 	lastRainCount: number;
 
+const MULTI_DAY_RETENTION_HOURS = 3 * 24; // 3 days
+
 function getMeasurement(req: express.Request, key: string): number {
 	let value: number;
 
@@ -70,43 +72,110 @@ export default class LocalWeatherProvider extends WeatherProvider {
 	}
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
+		queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < MULTI_DAY_RETENTION_HOURS*60*60 );
 
-		queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
-
-		if ( queue.length == 0 || queue[ 0 ].timestamp - queue[ queue.length - 1 ].timestamp < 23*60*60 ) {
+		if ( queue.length == 0 ) {
 			console.error( "There is insufficient data to support watering calculation from local PWS." );
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
-		let cTemp = 0, cHumidity = 0, cPrecip = 0, cSolar = 0, cWind = 0;
-		const result: WateringData = {
-			weatherProvider: "local",
-			temp: queue.reduce( ( sum, obs ) => !isNaN( obs.temp ) && ++cTemp ? sum + obs.temp : sum, 0) / cTemp,
-			humidity: queue.reduce( ( sum, obs ) => !isNaN( obs.humidity ) && ++cHumidity ? sum + obs.humidity : sum, 0) / cHumidity,
-			precip: queue.reduce( ( sum, obs ) => !isNaN( obs.precip ) && ++cPrecip ? sum + obs.precip : sum, 0),
-			periodStartTime: Math.floor( queue[ queue.length - 1 ].timestamp ),
-			minTemp: queue.reduce( (min, obs) => ( min > obs.temp ) ? obs.temp : min, Infinity ),
-			maxTemp: queue.reduce( (max, obs) => ( max < obs.temp ) ? obs.temp : max, -Infinity ),
-			minHumidity: queue.reduce( (min, obs) => ( min > obs.humidity ) ? obs.humidity : min, Infinity ),
-			maxHumidity: queue.reduce( (max, obs) => ( max < obs.humidity ) ? obs.humidity : max, -Infinity ),
-			solarRadiation: queue.reduce( (sum, obs) => !isNaN( obs.solarRadiation ) && ++cSolar ? sum + obs.solarRadiation : sum, 0) / cSolar,
-			windSpeed: queue.reduce( (sum, obs) => !isNaN( obs.windSpeed ) && ++cWind ? sum + obs.windSpeed : sum, 0) / cWind
-		};
+		const dailyData = this.groupObservationsByDay(queue);
 
-		if ( !( cTemp && cHumidity && cPrecip ) ||
-			[ result.minTemp, result.minHumidity, -result.maxTemp, -result.maxHumidity ].includes( Infinity ) ||
-			!( cSolar && cWind && cPrecip )) {
+		if ( dailyData.length === 0 ) {
 			console.error( "There is insufficient data to support watering calculation from local PWS." );
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
-		return [result];
+		// Convert each day's observations to WateringData
+		const results: WateringData[] = [];
+
+		for ( const dayObservations of dailyData ) {
+			if ( dayObservations.length === 0 ) continue;
+
+			let cTemp = 0, cHumidity = 0, cPrecip = 0, cSolar = 0, cWind = 0;
+
+			const result: WateringData = {
+				weatherProvider: "local",
+				temp: dayObservations.reduce( ( sum, obs ) => !isNaN( obs.temp ) && ++cTemp ? sum + obs.temp : sum, 0) / cTemp,
+				humidity: dayObservations.reduce( ( sum, obs ) => !isNaN( obs.humidity ) && ++cHumidity ? sum + obs.humidity : sum, 0) / cHumidity,
+				precip: dayObservations.reduce( ( sum, obs ) => !isNaN( obs.precip ) && ++cPrecip ? sum + obs.precip : sum, 0),
+				periodStartTime: Math.floor( dayObservations[ dayObservations.length - 1 ].timestamp ),
+				minTemp: dayObservations.reduce( (min, obs) => ( min > obs.temp ) ? obs.temp : min, Infinity ),
+				maxTemp: dayObservations.reduce( (max, obs) => ( max < obs.temp ) ? obs.temp : max, -Infinity ),
+				minHumidity: dayObservations.reduce( (min, obs) => ( min > obs.humidity ) ? obs.humidity : min, Infinity ),
+				maxHumidity: dayObservations.reduce( (max, obs) => ( max < obs.humidity ) ? obs.humidity : max, -Infinity ),
+				solarRadiation: dayObservations.reduce( (sum, obs) => !isNaN( obs.solarRadiation ) && ++cSolar ? sum + obs.solarRadiation : sum, 0) / cSolar,
+				windSpeed: dayObservations.reduce( (sum, obs) => !isNaN( obs.windSpeed ) && ++cWind ? sum + obs.windSpeed : sum, 0) / cWind
+			};
+
+			// Validate data quality for this day
+			if ( !( cTemp && cHumidity && cPrecip ) ||
+				[ result.minTemp, result.minHumidity, -result.maxTemp, -result.maxHumidity ].includes( Infinity ) ||
+				!( cSolar && cWind && cPrecip )) {
+				console.warn( `Skipping day with insufficient data quality: ${new Date(result.periodStartTime * 1000).toISOString()}` );
+				continue;
+			}
+
+			results.push(result);
+		}
+
+		if ( results.length === 0 ) {
+			console.error( "There is insufficient data to support watering calculation from local PWS." );
+			throw new CodedError( ErrorCode.InsufficientWeatherData );
+		}
+
+		// Return results in reverse chronological order (most recent first)
+		return results.reverse();
 	};
+
+	/**
+	 * Groups observations into 24-hour periods (days)
+	 * @param observations Array of observations to group
+	 * @returns Array of arrays, where each inner array contains observations for one day
+	 */
+	private groupObservationsByDay(observations: Observation[]): Observation[][] {
+		if (observations.length === 0) return [];
+
+		// Sort observations by timestamp (oldest first)
+		const sortedObs = [...observations].sort((a, b) => a.timestamp - b.timestamp);
+
+		const dailyGroups: Observation[][] = [];
+		let currentDay: Observation[] = [];
+		let currentDayStart = 0;
+
+		for (const obs of sortedObs) {
+			const obsDayStart = Math.floor(obs.timestamp / (24 * 60 * 60)) * (24 * 60 * 60);
+
+			if (currentDay.length === 0) {
+				// First observation
+				currentDayStart = obsDayStart;
+				currentDay.push(obs);
+			} else if (obsDayStart === currentDayStart) {
+				// Same day as current group
+				currentDay.push(obs);
+			} else {
+				// New day - save current group and start new one
+				if (currentDay.length > 0) {
+					dailyGroups.push(currentDay);
+				}
+				currentDay = [obs];
+				currentDayStart = obsDayStart;
+			}
+		}
+
+		// Don't forget the last day
+		if (currentDay.length > 0) {
+			dailyGroups.push(currentDay);
+		}
+
+		return dailyGroups;
+	}
 
 }
 
 function saveQueue() {
-	queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
+	// Keep 3 days of data for multi-day ETo calculations
+	queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < MULTI_DAY_RETENTION_HOURS*60*60 );
 	try {
 		fs.writeFileSync( "observations.json" , JSON.stringify( queue ), "utf8" );
 	} catch ( err ) {
@@ -118,7 +187,8 @@ if ( process.env.WEATHER_PROVIDER === "local" && process.env.LOCAL_PERSISTENCE )
 	if ( fs.existsSync( "observations.json" ) ) {
 		try {
 			queue = JSON.parse( fs.readFileSync( "observations.json", "utf8" ) );
-			queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
+			// Keep 3 days of data when loading from storage
+			queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < MULTI_DAY_RETENTION_HOURS*60*60 );
 		} catch ( err ) {
 			console.error( "Error reading historical observations from local storage.", err );
 			queue = [];
