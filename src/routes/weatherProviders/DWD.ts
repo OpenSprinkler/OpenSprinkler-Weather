@@ -13,11 +13,11 @@ export default class DWDWeatherProvider extends WeatherProvider {
 	}
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
-        const tz = getTZ(coordinates);
+		const tz = getTZ(coordinates);
 		const currentDay = startOfDay(localTime(coordinates));
 
-        const startTimestamp = subDays(currentDay, 7).toISOString();
-        const endTimestamp = currentDay.toISOString();
+		const startTimestamp = subDays(currentDay, 7).toISOString();
+		const endTimestamp = currentDay.toISOString();
 
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ startTimestamp }&last_date=${ endTimestamp }&tz=${tz}`
 
@@ -52,7 +52,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 
 		for(let i = 0; i < daysInHours.length; i++){
 			const cloudCoverInfo: CloudCoverInfo[] = daysInHours[i].map( ( hour ): CloudCoverInfo => {
-                const startTime = new TZDate(hour.timestamp, tz);
+				const startTime = new TZDate(hour.timestamp, tz);
 				const result : CloudCoverInfo = {
 					startTime,
 					endTime: addHours(startTime, 1),
@@ -151,7 +151,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			forecast: [],
 		};
 
-        const local = localTime(coordinates);
+		const local = localTime(coordinates);
 
 		for ( let day = 0; day < 7; day++ ) {
 
