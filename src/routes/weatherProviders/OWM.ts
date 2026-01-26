@@ -20,7 +20,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		const localKey = keyToUse(this.API_KEY, pws);
 
 		//Get previous date by using UTC
-        const yesterday = subDays(startOfDay(localTime(coordinates)), 1);
+		const yesterday = subDays(startOfDay(localTime(coordinates)), 1);
 
 		const yesterdayUrl = `https://api.openweathermap.org/data/3.0/onecall/day_summary?units=imperial&appid=${ localKey }&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${format(yesterday, "yyyy-MM-dd")}&tz=${format(yesterday, "xxx")}`;
 
@@ -41,7 +41,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		let clouds = (new Array(24)).fill(historicData.cloud_cover.afternoon);
 
 		const cloudCoverInfo: CloudCoverInfo[] = clouds.map( ( sample, i ): CloudCoverInfo => {
-            const start = addHours(yesterday, i);
+			const start = addHours(yesterday, i);
 			if( sample === undefined ) {
 				return {
 					startTime: start,

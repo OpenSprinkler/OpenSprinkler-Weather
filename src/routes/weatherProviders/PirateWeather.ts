@@ -16,7 +16,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 		// The Unix timestamp of 24 hours ago.
-        const yesterday = subDays(startOfDay(localTime(coordinates)), 1);
+		const yesterday = subDays(startOfDay(localTime(coordinates)), 1);
 
 		const localKey = keyToUse(this.API_KEY, pws);
 
@@ -49,7 +49,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		samples = samples.slice(0,24);
 
 		const cloudCoverInfo: CloudCoverInfo[] = samples.map( ( hour ): CloudCoverInfo => {
-            const startTime = fromUnixTime(hour.time);
+			const startTime = fromUnixTime(hour.time);
 			return {
 				startTime,
 				endTime: addDays(startTime, 1),
@@ -68,7 +68,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			 */
 
 			temp += hour.temperature;
-            const currentHumidity = hour.humidity || this.humidityFromDewPoint(hour.temperature, hour.dewPoint);
+			const currentHumidity = hour.humidity || this.humidityFromDewPoint(hour.temperature, hour.dewPoint);
 			humidity += currentHumidity;
 			// This field may be missing from the response if it is snowing.
 			precip += hour.precipAccumulation || 0;
@@ -173,7 +173,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		}
 	}
 
-    private celsiusToFahrenheit(celsius: number): number {
+	private celsiusToFahrenheit(celsius: number): number {
 		return (celsius * 9) / 5 + 32;
 	}
 
@@ -185,30 +185,30 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		return kph * 0.621371;
 	}
 
-    //https://www.npl.co.uk/resources/q-a/dew-point-and-relative-humidity
-    private eLn(temperature: number, a: number, b: number): number {
-        return Math.log(611.2) + ((a * temperature) / (b + temperature));
-    }
+	//https://www.npl.co.uk/resources/q-a/dew-point-and-relative-humidity
+	private eLn(temperature: number, a: number, b: number): number {
+		return Math.log(611.2) + ((a * temperature) / (b + temperature));
+	}
 
-    private eWaterLn(temperature: number): number {
-        return this.eLn(temperature, 17.62, 243.12);
-    }
-    private eIceLn(temperature: number): number {
-        return this.eLn(temperature, 22.46, 272.62);
-    }
+	private eWaterLn(temperature: number): number {
+		return this.eLn(temperature, 17.62, 243.12);
+	}
+	private eIceLn(temperature: number): number {
+		return this.eLn(temperature, 22.46, 272.62);
+	}
 
-    private humidityFromDewPoint(temperature: number, dewPoint: number): number {
-        if (isNaN(temperature)) return temperature;
-        if (isNaN(dewPoint)) return dewPoint;
+	private humidityFromDewPoint(temperature: number, dewPoint: number): number {
+		if (isNaN(temperature)) return temperature;
+		if (isNaN(dewPoint)) return dewPoint;
 
-        let eFn: (temp: number) => number;
+		let eFn: (temp: number) => number;
 
-        if (temperature > 0) {
-            eFn = (temp: number) => this.eWaterLn(temp);
-        } else {
-            eFn = (temp: number) => this.eIceLn(temp);
-        }
+		if (temperature > 0) {
+			eFn = (temp: number) => this.eWaterLn(temp);
+		} else {
+			eFn = (temp: number) => this.eIceLn(temp);
+		}
 
-        return 100 * Math.exp(eFn(dewPoint) - eFn(temperature));
-    }
+		return 100 * Math.exp(eFn(dewPoint) - eFn(temperature));
+	}
 }

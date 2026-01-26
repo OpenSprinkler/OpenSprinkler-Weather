@@ -5,31 +5,31 @@ import express from "express";
 import cors from "cors";
 
 import { getWateringData, getWeatherData } from "./routes/weather";
-import { captureWUStream } from "./routes/weatherProviders/local";
+import { captureWUStream, getQueue } from "./routes/weatherProviders/local";
 import { getBaselineETo } from "./routes/baselineETo";
 import {default as packageJson} from "../package.json";
 import { pinoHttp } from "pino-http";
 import { pino, LevelWithSilent } from "pino";
 
 function getLogLevel(): LevelWithSilent {
-    switch (process.env.LOG_LEVEL) {
-        case "trace":
-            return "trace";
-        case "debug":
-            return "debug";
-        case "info":
-            return "info";
-        case "warn":
-            return "warn";
-        case "error":
-            return "error";
-        case "fatal":
-            return "fatal";
-        case "silent":
-            return "silent";
-        default:
-            return "info";
-    }
+switch (process.env.LOG_LEVEL) {
+	case "trace":
+		return "trace";
+	case "debug":
+		return "debug";
+	case "info":
+		return "info";
+	case "warn":
+		return "warn";
+	case "error":
+		return "error";
+	case "fatal":
+		return "fatal";
+	case "silent":
+		return "silent";
+	default:
+		return "info";
+}
 }
 
 const logger = pino({ level: getLogLevel() });
@@ -65,6 +65,19 @@ app.get( "/", function( req, res ) {
 // Handle requests matching /baselineETo
 app.options( /baselineETo/, cors() );
 app.get( /baselineETo/, cors(), getBaselineETo );
+
+// Debug endpoint to inspect observation queue (useful for development)
+app.get( "/debug/queue", function( req, res ) {
+	const queue = getQueue();
+	const count = parseInt(req.query.count as string) || 10;
+	const recentObs = queue.slice(-count); // Get last N observations
+
+	res.json({
+		totalCount: queue.length,
+		showing: recentObs.length,
+		observations: recentObs
+	});
+});
 
 // Handle 404 error
 app.use( function( req, res ) {

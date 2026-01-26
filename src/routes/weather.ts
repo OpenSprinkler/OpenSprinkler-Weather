@@ -32,6 +32,7 @@ import DWDWeatherProvider from "./weatherProviders/DWD";
 import LocalWeatherProvider from "./weatherProviders/local";
 import OpenMeteoWeatherProvider from "./weatherProviders/OpenMeteo";
 import PirateWeatherWeatherProvider from "./weatherProviders/PirateWeather";
+import HybridWeatherProvider from "./weatherProviders/hybrid";
 import GoogleMapsGeocoder from "./geocoders/GoogleMaps";
 import WUndergroundGeocoder from "./geocoders/WUnderground";
 import { TZDate } from "@date-fns/tz";
@@ -46,6 +47,13 @@ const WEATHER_PROVIDERS: { [K in Exclude<WeatherProviderShortId, "mock">]: Weath
     PW: new PirateWeatherWeatherProvider(),
     WU: new WUndergroundWeatherProvider(),
 };
+
+// Initialize Hybrid provider with access to all forecast providers (excluding 'local')
+const HYBRID_PROVIDER = new HybridWeatherProvider(
+    new Map(
+        Object.entries(WEATHER_PROVIDERS).filter(([key]) => key !== 'local')
+    )
+);
 
 const GEOCODERS: { [name: string]: Geocoder } = {
     GoogleMaps: new GoogleMapsGeocoder(),
@@ -176,20 +184,52 @@ function getTimeData(coordinates: GeoCoordinates): TimeData {
     };
 }
 
+
+/**
+ * Helper function to detect if wateringData contains future forecast data.
+ * This is used to determine if we're in Hybrid Mode with combined local+forecast data.
+ *
+ * @param wateringData Array of watering data to check
+ * @returns true if array contains data for future days (tomorrow onwards)
+ */
+function hasFutureDaysInWateringData(wateringData?: readonly WateringData[]): boolean {
+	if (!wateringData || wateringData.length === 0) {
+		return false;
+	}
+
+	// Calculate start of tomorrow (midnight UTC)
+	const nowUtc = new Date();
+	const tomorrowMidnightUtc = new Date(Date.UTC(
+		nowUtc.getUTCFullYear(),
+		nowUtc.getUTCMonth(),
+		nowUtc.getUTCDate() + 1,
+		0, 0, 0
+	));
+	const tomorrowEpoch = Math.floor(tomorrowMidnightUtc.getTime() / 1000);
+
+	// Check if array contains any future days
+	return wateringData.some(data => data.periodStartTime >= tomorrowEpoch);
+}
+
 /**
  * Checks if the weather data meets any of the restrictions set by OpenSprinkler. Restrictions prevent any watering
  * from occurring and are similar to 0% watering level. Known restrictions are:
  *
- * - California watering restriction prevents watering if precipitation over two days is greater than 0.1" over the past
- * 48 hours.
+ * - Rain amount restriction: Prevents watering if forecasted precipitation over N days exceeds threshold.
+ *   In Hybrid Mode, uses combined local+forecast data from wateringData array.
+ *   In Standard Mode, uses weather.forecast array.
+ * - California restriction: Prevents watering if precipitation over two days is greater than 0.1" over the past 48 hours.
+ * - Temperature restriction: Prevents watering if current temperature is below minimum threshold.
+ *
  * @param cali A boolean to enable the California restriction based on the old method.
  * @param wateringData Watering data to use to determine if any restrictions apply.
  * @param adjustmentOptions The adjustment options used, which gives restriction information.
- * @param weather Weather data to use to determine if any restrictions apply.
+ * @param weather Weather data to use to determine if any restrictions apply (used in Standard Mode).
  * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
  */
 function checkWeatherRestriction( cali: boolean, wateringData?: readonly WateringData[], adjustmentOptions?: AdjustmentOptions, weather?: WeatherData ): boolean {
 
+	// California restriction: Check past 48 hours
 	if ( ( cali || (adjustmentOptions && adjustmentOptions.cali ) ) && wateringData && wateringData.length ) {
 		// The most recent two days are at the beginning of the data array
 		const len = wateringData.length;
@@ -203,26 +243,78 @@ function checkWeatherRestriction( cali: boolean, wateringData?: readonly Waterin
 		}
 	}
 
+	// Rain amount restriction: Check forecasted rain
+	// AUTO-DETECT MODE: Use wateringData if it contains future days (Hybrid Mode),
+	//                   otherwise use weather.forecast (Standard Mode)
 	if ( adjustmentOptions.rainAmt && adjustmentOptions.rainAmt > 0 && adjustmentOptions.rainDays ) {
-		const days = weather.forecast.length > adjustmentOptions.rainDays ? adjustmentOptions.rainDays : weather.forecast.length;
-		let precip = 0;
-		for ( let i = 0; i < days; i++ ) {
-			precip += weather.forecast[i].precip;
-		}
 
-		if ( precip > adjustmentOptions.rainAmt ){
-			return true;
+		// Check if we have future forecast data in wateringData (Hybrid Mode)
+		const isHybridMode = hasFutureDaysInWateringData(wateringData);
+
+		if (isHybridMode) {
+			// HYBRID MODE: Use wateringData which contains local historical + cloud forecast
+			console.log('[Weather Restriction] Hybrid Mode detected - using combined wateringData for forecast check');
+
+			// Calculate start of tomorrow (midnight UTC)
+			const nowUtc = new Date();
+			const tomorrowMidnightUtc = new Date(Date.UTC(
+				nowUtc.getUTCFullYear(),
+				nowUtc.getUTCMonth(),
+				nowUtc.getUTCDate() + 1,
+				0, 0, 0
+			));
+			const tomorrowEpoch = Math.floor(tomorrowMidnightUtc.getTime() / 1000);
+
+			// Filter to only future days (tomorrow onwards)
+			const futureDays = wateringData.filter(data => data.periodStartTime >= tomorrowEpoch);
+
+			// Take only the requested number of days
+			const daysToCheck = Math.min(futureDays.length, adjustmentOptions.rainDays);
+
+			console.log(`[Weather Restriction] Checking ${daysToCheck} future days for rain (threshold: ${adjustmentOptions.rainAmt}")`);
+
+			let precip = 0;
+			for ( let i = 0; i < daysToCheck; i++ ) {
+				precip += futureDays[i].precip;
+				console.log(`[Weather Restriction] Day ${i+1}: +${futureDays[i].precip}" (total: ${precip}")`);
+			}
+
+			if ( precip > adjustmentOptions.rainAmt ) {
+				console.log(`[Weather Restriction] TRIGGERED: ${precip}" > ${adjustmentOptions.rainAmt}"`);
+				return true;
+			}
+
+		} else {
+			// STANDARD MODE: Use weather.forecast (backwards-compatible behavior)
+			if (!weather || !weather.forecast || weather.forecast.length === 0) {
+				console.warn('[Weather Restriction] No forecast data available for rain amount check');
+				return false;
+			}
+
+			console.log('[Weather Restriction] Standard Mode - using weather.forecast');
+
+			const days = weather.forecast.length > adjustmentOptions.rainDays ? adjustmentOptions.rainDays : weather.forecast.length;
+			let precip = 0;
+			for ( let i = 0; i < days; i++ ) {
+				precip += weather.forecast[i].precip;
+			}
+
+			if ( precip > adjustmentOptions.rainAmt ){
+				return true;
+			}
 		}
 	}
 
+	// Temperature restriction: Check current temperature
 	if ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp != -40 ) {
-		if ( weather.temp < adjustmentOptions.minTemp ) {
+		if ( weather && weather.temp < adjustmentOptions.minTemp ) {
 			return true;
 		}
 	}
 
 	return false;
 }
+
 
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
@@ -382,13 +474,25 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let weatherProvider: WeatherProvider;
 	let provider: string = adjustmentOptions.provider;
 
-	if ( !provider && process.env.WEATHER_PROVIDER ) {
+	// Check if hybrid mode is enabled via environment variable
+	const isHybridMode = process.env.WEATHER_PROVIDER === 'hybrid';
+
+	// In hybrid mode, don't fall back to env.WEATHER_PROVIDER for forecast provider
+	if ( !provider && process.env.WEATHER_PROVIDER && !isHybridMode ) {
 		provider = process.env.WEATHER_PROVIDER;
 	}
 
-	if( pws && pws.id ){
+	if (isHybridMode) {
+		// HYBRID MODE: Use local for historical, App UI selection for forecast
+		weatherProvider = HYBRID_PROVIDER;
+		// Use provider from App, or default to Apple (never use 'hybrid' as provider name)
+		const forecastProvider = provider && provider !== 'hybrid' ? provider : 'Apple';
+		console.log(`[Weather] Hybrid mode active. Forecast provider: ${forecastProvider}`);
+	} else if (pws && pws.id) {
+		// Standard PWS mode
 		weatherProvider = PWS_WEATHER_PROVIDER;
-	}else{
+	} else {
+		// Standard single-provider mode
 		if (typeof WEATHER_PROVIDERS[provider] === 'object') {
 			weatherProvider = WEATHER_PROVIDERS[provider];
 		} else {
@@ -414,6 +518,22 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// Calculate the watering scale if it wasn't found in the cache.
 	let adjustmentMethodResponse: AdjustmentMethodResponse;
 	try {
+		if (isHybridMode && weatherProvider instanceof HybridWeatherProvider) {
+			// HYBRID MODE: Get forecast provider from App UI selection
+			// Never use 'hybrid' as provider name - default to Apple
+			const forecastProvider = provider && provider !== 'hybrid' ? provider : 'Apple';
+
+			console.log(`[Weather] Fetching hybrid data: local (historical) + ${forecastProvider} (forecast)`);
+
+			// Fetch combined watering data before calling adjustment method
+			await weatherProvider.getWateringDataWithForecastProvider(
+				coordinates,
+				pws,
+				forecastProvider
+			);
+		}
+
+		// Call adjustment method (works for both hybrid and standard modes)
 		adjustmentMethodResponse = await adjustmentMethod.calculateWateringScale(
 			adjustmentOptions, coordinates, weatherProvider, pws
 		);
@@ -431,6 +551,15 @@ export const getWateringData = async function( req: express.Request, res: expres
 
 	if ( checkRestrictions ) {
 		let wateringData: readonly WateringData[] = adjustmentMethodResponse.wateringData;
+
+		// DEBUG: Log wateringData content
+		console.log(`[Debug] wateringData from adjustmentMethod: ${wateringData ? wateringData.length + ' entries' : 'undefined'}`);
+		if (wateringData && wateringData.length > 0) {
+			const sortedByTime = [...wateringData].sort((a, b) => a.periodStartTime - b.periodStartTime);
+			console.log(`[Debug] Oldest entry: epoch=${sortedByTime[0].periodStartTime}, precip=${sortedByTime[0].precip}`);
+			console.log(`[Debug] Newest entry: epoch=${sortedByTime[sortedByTime.length-1].periodStartTime}, precip=${sortedByTime[sortedByTime.length-1].precip}`);
+		}
+
 		let dataArr: CachedResult<readonly WateringData[]>;
 		// Fetch the watering data if the AdjustmentMethod didn't fetch it and the california restriction is being checked.
 		if ( ( ( ( wateringParam >> 7 ) & 1 ) > 0 || ( typeof adjustmentOptions.cali !== "undefined" && adjustmentOptions.cali ) ) && !adjustmentMethodResponse.wateringData ) {

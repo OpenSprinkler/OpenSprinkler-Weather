@@ -6,11 +6,19 @@ import { CodedError, ErrorCode } from "../../errors";
 
 export abstract class Geocoder {
 
-	private static cacheFile = process.env.GEOCODER_CACHE_FILE || path.join(__dirname, "..", "geocoderCache.json");
+	// Use same data directory as other persistent data
+	// Using PERSISTENCE_LOCATION as per PR #144, but with path.join() for cross-platform compatibility (Copilot suggestion)
+	private static dataDir = process.env.PERSISTENCE_LOCATION || path.join(__dirname, '..', '..', 'data');
+	private static cacheFile = path.join(Geocoder.dataDir, 'geocoderCache.json');
 
 	private cache: Map<string, GeoCoordinates>;
 
 	public constructor() {
+		// Ensure data directory exists
+		if (!fs.existsSync(Geocoder.dataDir)) {
+			fs.mkdirSync(Geocoder.dataDir, { recursive: true });
+		}
+
 		// Load the cache from disk.
 		if ( fs.existsSync( Geocoder.cacheFile ) ) {
 			this.cache = new Map( JSON.parse( fs.readFileSync( Geocoder.cacheFile, "utf-8" ) ) );
@@ -25,7 +33,15 @@ export abstract class Geocoder {
 	}
 
 	private saveCache(): void {
-		fs.writeFileSync( Geocoder.cacheFile, JSON.stringify( Array.from( this.cache.entries() ) ) );
+		try {
+			// Ensure data directory exists before writing
+			if (!fs.existsSync(Geocoder.dataDir)) {
+				fs.mkdirSync(Geocoder.dataDir, { recursive: true });
+			}
+			fs.writeFileSync( Geocoder.cacheFile, JSON.stringify( Array.from( this.cache.entries() ) ) );
+		} catch (err) {
+			console.error("Error saving geocoder cache:", err);
+		}
 	}
 
 	/**

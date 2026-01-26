@@ -4,7 +4,7 @@ name: Docker
 on:
   workflow_dispatch:
   push:
-    branches: [master]
+    branches: [hybrid]
   pull_request:
   release:
     types: [published]
@@ -58,7 +58,7 @@ jobs:
         env:
           REGISTRY_NAME: 'ghcr.io'
           REPOSITORY: ${{ needs.pre-job.outputs.owner }}/weather-server
-          TAG_OLD: master${{ matrix.suffix }}
+          TAG_OLD: hybrid${{ matrix.suffix }}
           TAG_PR: ${{ github.event.number == 0 && github.ref_name || format('pr-{0}', github.event.number) }}${{ matrix.suffix }}
           TAG_COMMIT: commit-${{ github.event_name != 'pull_request' && github.sha || github.event.pull_request.head.sha }}${{ matrix.suffix }}
         run: |

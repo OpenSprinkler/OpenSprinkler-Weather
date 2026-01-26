@@ -36,38 +36,38 @@ interface Metadata {
 }
 
 interface CurrentWeather {
-    name: string,
-    metadata: Metadata,
-    asOf: string; // Required; ISO 8601 date-time
-    cloudCover?: number; // Optional; 0 to 1
-    conditionCode: string; // Required; enumeration of weather condition
-    daylight?: boolean; // Optional; indicates daylight
-    humidity: number; // Required; 0 to 1
-    precipitationIntensity: number; // Required; in mm/h
-    pressure: number; // Required; in millibars
-    pressureTrend: PressureTrend; // Required; direction of pressure change
-    temperature: number; // Required; in °C
-    temperatureApparent: number; // Required; feels-like temperature in °C
-    temperatureDewPoint: number; // Required; in °C
-    uvIndex: number; // Required; UV radiation level
-    visibility: number; // Required; in meters
-    windDirection?: number; // Optional; in degrees
-    windGust?: number; // Optional; max wind gust speed in km/h
-    windSpeed: number; // Required; in km/h
+	name: string,
+	metadata: Metadata,
+	asOf: string; // Required; ISO 8601 date-time
+	cloudCover?: number; // Optional; 0 to 1
+	conditionCode: string; // Required; enumeration of weather condition
+	daylight?: boolean; // Optional; indicates daylight
+	humidity: number; // Required; 0 to 1
+	precipitationIntensity: number; // Required; in mm/h
+	pressure: number; // Required; in millibars
+	pressureTrend: PressureTrend; // Required; direction of pressure change
+	temperature: number; // Required; in °C
+	temperatureApparent: number; // Required; feels-like temperature in °C
+	temperatureDewPoint: number; // Required; in °C
+	uvIndex: number; // Required; UV radiation level
+	visibility: number; // Required; in meters
+	windDirection?: number; // Optional; in degrees
+	windGust?: number; // Optional; max wind gust speed in km/h
+	windSpeed: number; // Required; in km/h
 }
 
 interface DayPartForecast {
-    cloudCover: number; // Required; 0 to 1
-    conditionCode: string; // Required; enumeration of weather condition
-    forecastEnd: string; // Required; ISO 8601 date-time
-    forecastStart: string; // Required; ISO 8601 date-time
-    humidity: number; // Required; 0 to 1
-    precipitationAmount: number; // Required; in millimeters
-    precipitationChance: number; // Required; as a percentage
-    precipitationType: PrecipitationType; // Required
-    snowfallAmount: number; // Required; in millimeters
-    windDirection?: number; // Optional; in degrees
-    windSpeed: number; // Required; in km/h
+	cloudCover: number; // Required; 0 to 1
+	conditionCode: string; // Required; enumeration of weather condition
+	forecastEnd: string; // Required; ISO 8601 date-time
+	forecastStart: string; // Required; ISO 8601 date-time
+	humidity: number; // Required; 0 to 1
+	precipitationAmount: number; // Required; in millimeters
+	precipitationChance: number; // Required; as a percentage
+	precipitationType: PrecipitationType; // Required
+	snowfallAmount: number; // Required; in millimeters
+	windDirection?: number; // Optional; in degrees
+	windSpeed: number; // Required; in km/h
 }
 
 interface DailyForecastData {
@@ -99,9 +99,9 @@ interface DailyForecastData {
 }
 
 interface DailyForecast {
-    name: string,
-    metadata: Metadata,
-    days: DailyForecastData[];
+	name: string,
+	metadata: Metadata,
+	days: DailyForecastData[];
 }
 
 interface HourWeatherConditions {
@@ -127,9 +127,9 @@ interface HourWeatherConditions {
 }
 
 interface HourlyForecast {
-    name: string,
-    metadata: Metadata,
-    hours: HourWeatherConditions[];
+	name: string,
+	metadata: Metadata,
+	hours: HourWeatherConditions[];
 }
 
 interface ForecastMinute {
@@ -147,16 +147,16 @@ interface ForecastPeriodSummary {
 }
 
 interface NextHourForecast {
-    name: string,
-    metadata: Metadata,
-    forecastEnd?: string; // ISO 8601 date-time
-    forecastStart?: string; // ISO 8601 date-time
-    minutes: ForecastMinute[]; // Required; array of forecast minutes
-    summary: ForecastPeriodSummary[]; // Required; array of forecast summaries
+	name: string,
+	metadata: Metadata,
+	forecastEnd?: string; // ISO 8601 date-time
+	forecastStart?: string; // ISO 8601 date-time
+	minutes: ForecastMinute[]; // Required; array of forecast minutes
+	summary: ForecastPeriodSummary[]; // Required; array of forecast summaries
 }
 
 interface WeatherAlertSummary {
-    areaId?: string; // Official designation of the affected area
+	areaId?: string; // Official designation of the affected area
   areaName?: string; // Human-readable name of the affected area
   certainty: Certainty; // Required; likelihood of the event
   countryCode: string; // Required; ISO country code
@@ -175,9 +175,9 @@ interface WeatherAlertSummary {
 }
 
 interface WeatherAlertCollection {
-    name: string,
-    metadata: Metadata,
-    alerts: WeatherAlertSummary[];
+	name: string,
+	metadata: Metadata,
+	alerts: WeatherAlertSummary[];
 }
 
 interface AppleWeather {
@@ -225,7 +225,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 	): Promise<WateringData[]> {
 		const currentDay = startOfDay(localTime(coordinates));
 
-        const tz = getTZ(coordinates);
+		const tz = getTZ(coordinates);
 
 		const startTimestamp = new Date(+subDays(currentDay, 10)).toISOString();
 		const endTimestamp = new Date(+currentDay).toISOString();
@@ -280,7 +280,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
 			const cloudCoverInfo: CloudCoverInfo[] = daysInHours[i].map(
 				(hour): CloudCoverInfo => {
-                    const startTime = new TZDate(hour.forecastStart, tz);
+					const startTime = new TZDate(hour.forecastStart, tz);
 
 					return {
 						startTime,
@@ -347,7 +347,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		coordinates: GeoCoordinates,
 		pws: PWS | undefined
 	): Promise<WeatherData> {
-        const tz = getTZ(coordinates);
+		const tz = getTZ(coordinates);
 
 		const forecastUrl = `https://weatherkit.apple.com/api/v1/weather/en/${coordinates[0]}/${coordinates[1]}?dataSets=currentWeather,forecastDaily&timezone=${tz}`;
 
