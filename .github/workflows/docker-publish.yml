@@ -35,9 +35,49 @@ jobs:
       - name: Run tests
         run: npm test
 
+  validate-source:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require master or an immutable release tag on master
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SOURCE_NAME: ${{ github.ref_name }}
+          SOURCE_REF: ${{ github.ref }}
+          SOURCE_TYPE: ${{ github.ref_type }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$SOURCE_TYPE" == "branch" ]]; then
+            if [[ "$SOURCE_REF" != "refs/heads/master" ]]; then
+              echo "Weather image publication is restricted to master." >&2
+              exit 1
+            fi
+          elif [[ "$SOURCE_TYPE" == "tag" ]]; then
+            if ! [[ "$SOURCE_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
+              echo "Release tag is not a valid version: $SOURCE_NAME" >&2
+              exit 1
+            fi
+            git fetch --no-tags origin master:refs/remotes/origin/master
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+              echo "Release tag $SOURCE_NAME is not on master." >&2
+              exit 1
+            fi
+          else
+            echo "Unsupported publication source: $SOURCE_REF" >&2
+            exit 1
+          fi
+
   docker:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [ test, validate-source ]
+    environment:
+      name: weather-image-publish
 
     steps:
       - name: Checkout repository
@@ -45,6 +85,63 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Build and smoke-test the runtime image
+        shell: bash
+        run: |
+          docker build --tag opensprinkler-weather:ci .
+          weather_container="opensprinkler-weather-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cleanup_weather_container() {
+            docker rm --force "$weather_container" >/dev/null 2>&1 || true
+          }
+          trap cleanup_weather_container EXIT
+          docker run --detach --name "$weather_container" \
+            --env HOST=0.0.0.0 \
+            --publish 127.0.0.1:13000:3000 \
+            opensprinkler-weather:ci
+          ready=false
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:13000/ >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != "true" ]]; then
+            docker logs "$weather_container"
+            exit 1
+          fi
+          dashboard_html="$(curl --fail --silent --show-error http://127.0.0.1:13000/dashboard/)"
+          if [[ "$dashboard_html" != *"OpenSprinkler Weather"* ]]; then
+            echo "The built image did not serve the documented dashboard asset." >&2
+            exit 1
+          fi
+
+      - name: Refuse to reuse an immutable release tag
+        if: ${{ github.ref_type == 'tag' }}
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ! [[ "$DOCKERHUB_USERNAME" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            echo "DOCKERHUB_USERNAME is not a valid Docker Hub namespace." >&2
+            exit 1
+          fi
+          status="$(curl --silent --show-error --location --head --proto '=https' --proto-redir '=https' \
+            --output /dev/null --write-out '%{http_code}' \
+            "https://hub.docker.com/v2/namespaces/${DOCKERHUB_USERNAME}/repositories/opensprinkler-weather/tags/${RELEASE_TAG}")"
+          case "$status" in
+            404) ;;
+            200)
+              echo "Docker Hub release tag $RELEASE_TAG already exists; refusing to overwrite it." >&2
+              exit 1
+              ;;
+            *)
+              echo "Could not prove that Docker Hub release tag $RELEASE_TAG is unused (HTTP $status)." >&2
+              exit 1
+              ;;
+          esac
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4

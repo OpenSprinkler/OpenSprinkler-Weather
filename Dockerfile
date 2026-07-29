@@ -21,6 +21,9 @@ RUN npm ci --omit=dev \
 
 COPY --from=build /weather/js ./js
 COPY --from=build /weather/baselineEToData ./baselineEToData
+COPY --from=build /weather/public/dashboard/*.html ./public/dashboard/
+COPY --from=build /weather/public/dashboard/*.css ./public/dashboard/
+COPY --from=build /weather/public/dashboard/*.js ./public/dashboard/
 COPY --from=build /weather/docs ./docs
 COPY --from=build /weather/README.md ./README.md
 
