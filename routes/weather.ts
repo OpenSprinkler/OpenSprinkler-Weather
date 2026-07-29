@@ -112,6 +112,11 @@ export const ADJUSTMENT_METHOD: { [ key: number ] : AdjustmentMethod } = {
 	4: WaterBudgetAdjustmentMethod
 };
 
+/** Resolve the frozen legacy request ID after removing the bit-7 restriction flag. */
+export function resolveLegacyAdjustmentMethod( adjustmentParam: number ): AdjustmentMethod | undefined {
+	return ADJUSTMENT_METHOD[ adjustmentParam & ~( 1 << 7 ) ];
+}
+
 const cache = new WateringScaleCache();
 const LEGACY_FIRMWARE_SUPPORT = process.env.LEGACY_FIRMWARE_SUPPORT !== 'false';
 const SIMPLIFIED_RESPONSE_FORMAT = process.env.SIMPLIFIED_RESPONSE_FORMAT !== 'false';
@@ -373,7 +378,7 @@ export interface WateringDecision {
 export async function computeWateringDecision( input: WateringDecisionInput ): Promise< WateringDecision > {
 	const { coordinates, adjustmentParam, adjustmentOptions, pws } = input;
 	const methodId = adjustmentParam & ~( 1 << 7 );
-	const adjustmentMethod: AdjustmentMethod = ADJUSTMENT_METHOD[ methodId ];
+	const adjustmentMethod: AdjustmentMethod = resolveLegacyAdjustmentMethod( adjustmentParam );
 	if ( !adjustmentMethod ) throw new CodedError( ErrorCode.InvalidAdjustmentMethod );
 	const checkRestrictions: boolean = ( ( adjustmentParam >> 7 ) & 1 ) > 0;
 
@@ -499,7 +504,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		return;
 	}
 
-	let adjustmentMethod: AdjustmentMethod	= ADJUSTMENT_METHOD[ adjustmentParam & ~( 1 << 7 ) ];
+	let adjustmentMethod: AdjustmentMethod = resolveLegacyAdjustmentMethod( adjustmentParam );
 	let checkRestrictions: boolean = ( ( adjustmentParam >> 7 ) & 1 ) > 0;
 	let adjustmentOptionsString: string = getParameter(req.query.wto);
 	let location: string = getParameter(req.query.loc);
@@ -597,17 +602,25 @@ function sendWateringData( res: express.Response, data: object, useJson: boolean
 		debugLog(`DEBUG sendWateringData: Sending JSON response: ${JSON.stringify(data)}`);
 		res.json( data );
 	} else {
-		let formatted = "";
-		for ( const key in data ) {
-			if ( !data.hasOwnProperty( key ) ) continue;
-			let value = (data as any)[ key ];
-			value = encodeLegacyWateringValue( value );
-			if ( typeof value === "undefined" ) continue;
-			formatted += `&${ key }=${ value }`;
-		}
+		const formatted = formatLegacyWateringData( data );
 		debugLog(`DEBUG sendWateringData: Sending QueryString response: "${formatted}"`);
 		res.send( formatted );
 	}
+}
+
+/** Maximum encoded rawData value size accepted by firmware findKeyVal. */
+export const LEGACY_RAWDATA_LIMIT = 319;
+
+/** Format the exact flat response consumed by the legacy firmware weather callback. */
+export function formatLegacyWateringData( data: object ): string {
+	let formatted = "";
+	for ( const key in data ) {
+		if ( !Object.prototype.hasOwnProperty.call( data, key ) ) continue;
+		const value = encodeLegacyWateringValue( ( data as any )[ key ] );
+		if ( typeof value === "undefined" ) continue;
+		formatted += `&${ key }=${ value }`;
+	}
+	return formatted;
 }
 
 /**
