@@ -5,7 +5,12 @@ import MockDate from "mockdate";
 
 process.env.WEATHER_PROVIDER = "OWM";
 
-import { getWateringData } from "./weather";
+import {
+	buildWeatherSensorResponse,
+	fetchWeatherSensorData,
+	getWateringData,
+} from "./weather";
+import { CachedResult } from "../cache";
 import { GeoCoordinates, WeatherData, WateringData, PWS } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
@@ -57,6 +62,85 @@ describe("Watering Data", () => {
 		expect(result.scale).to.equal(33);
 		expect(result.scales).to.eql([33]);
 		expect(result.rawData).to.eql({ wp: "mock", h: 50, p: 0, t: 58.3 });
+	});
+});
+
+describe("Weather Sensor Data", () => {
+	const weatherData: WeatherData = {
+		weatherProvider: "mock",
+		temp: 0,
+		humidity: 0,
+		wind: undefined,
+		raining: false,
+		description: "Clear",
+		icon: "clear",
+		region: "Test",
+		city: "Test",
+		minTemp: 32,
+		maxTemp: 50,
+		precip: 0,
+		forecast: [{
+			temp_min: 31,
+			temp_max: 51,
+			precip: 0.1,
+			date: 1557705600,
+			icon: "clear",
+			description: "Clear",
+		}],
+	};
+	const wateringData: WateringData = {
+		weatherProvider: "mock",
+		precip: 0,
+		temp: 45,
+		humidity: 60,
+		periodStartTime: 1557622800,
+		minTemp: 35,
+		maxTemp: 55,
+		minHumidity: 40,
+		maxHumidity: 80,
+		solarRadiation: 4.5,
+		windSpeed: 3,
+	};
+
+	it("preserves zero values and omits unavailable fields", () => {
+		const weatherResult: CachedResult<WeatherData> = {
+			value: weatherData,
+			ttl: 1000,
+			cachedAt: 1557748800000,
+		};
+		const wateringResult: CachedResult<readonly WateringData[]> = {
+			value: [wateringData],
+			ttl: 1000,
+			cachedAt: 1557748800000,
+		};
+
+		const result = buildWeatherSensorResponse(
+			[42, -75],
+			{ current: true, forecast: true, historical: true },
+			weatherResult,
+			wateringResult
+		);
+
+		expect(result.c).to.eql({ at: 1557748800, t: 0, h: 0, r: 0 });
+		expect(result.f).to.eql({ at: 1557705600, lo: 32, hi: 50, p: 0 });
+		expect(result.h.p).to.equal(0);
+		expect(result.h.eto).to.be.a("number");
+	});
+
+	it("fetches only the provider data required by scope", async () => {
+		const provider = new CountingMockWeatherProvider({
+			weatherData,
+			wateringData: [wateringData],
+		});
+
+		await fetchWeatherSensorData(
+			provider,
+			[42, -75],
+			{ current: true, forecast: false, historical: false }
+		);
+
+		expect(provider.weatherCalls).to.equal(1);
+		expect(provider.wateringCalls).to.equal(0);
 	});
 });
 
@@ -120,4 +204,25 @@ export class MockWeatherProvider extends WeatherProvider {
 interface MockWeatherData {
 	wateringData?: WateringData[];
 	weatherData?: WeatherData;
+}
+
+class CountingMockWeatherProvider extends MockWeatherProvider {
+	public weatherCalls = 0;
+	public wateringCalls = 0;
+
+	protected async getWeatherDataInternal(
+		coordinates: GeoCoordinates,
+		pws: PWS | undefined
+	): Promise<WeatherData> {
+		this.weatherCalls++;
+		return super.getWeatherDataInternal(coordinates, pws);
+	}
+
+	protected async getWateringDataInternal(
+		coordinates: GeoCoordinates,
+		pws: PWS | undefined
+	): Promise<WateringData[]> {
+		this.wateringCalls++;
+		return super.getWateringDataInternal(coordinates, pws);
+	}
 }

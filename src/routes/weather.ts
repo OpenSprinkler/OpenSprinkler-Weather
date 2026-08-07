@@ -19,7 +19,7 @@ import {
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
-import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
+import EToAdjustmentMethod, { calculateETo } from "./adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
 import { ParsedQs } from "qs";
@@ -77,6 +77,158 @@ const ADJUSTMENT_METHOD: { [key: number]: AdjustmentMethod } = {
     2: RainDelayAdjustmentMethod,
     3: EToAdjustmentMethod,
 };
+
+function parseAdjustmentOptions(value: string): AdjustmentOptions {
+    const decoded = decodeURIComponent(value.replace(/\\x/g, "%"));
+    return JSON.parse("{" + decoded + "}");
+}
+
+function parsePwsOptions(adjustmentOptions: AdjustmentOptions): PWS | undefined {
+    if (adjustmentOptions.provider === "WU" && adjustmentOptions.pws && adjustmentOptions.key) {
+        const idMatch = adjustmentOptions.pws.match(/^[a-zA-Z\d]+$/);
+        const keyMatch = adjustmentOptions.key.match(/^[a-f\d]{32}$/);
+        if (!idMatch) throw new CodedError(ErrorCode.InvalidPwsId);
+        if (!keyMatch) throw new CodedError(ErrorCode.InvalidPwsApiKey);
+        return { id: idMatch[0], apiKey: keyMatch[0] };
+    }
+
+    return adjustmentOptions.key ? { apiKey: adjustmentOptions.key } : undefined;
+}
+
+function selectWeatherProvider(adjustmentOptions: AdjustmentOptions, pws?: PWS): WeatherProvider {
+    if (pws?.id) return PWS_WEATHER_PROVIDER;
+
+    const provider = adjustmentOptions.provider || process.env.WEATHER_PROVIDER;
+    return WEATHER_PROVIDERS[provider] || WEATHER_PROVIDERS.Apple;
+}
+
+export type WeatherSensorScope = {
+    current: boolean;
+    forecast: boolean;
+    historical: boolean;
+};
+
+export type WeatherSensorResponse = {
+    v: 1;
+    u: "us";
+    wp?: string;
+    c?: { at: number; t?: number; h?: number; w?: number; r?: number };
+    f?: { at: number; lo?: number; hi?: number; p?: number };
+    h?: { at: number; t?: number; h?: number; p?: number; w?: number; sr?: number; eto?: number };
+    e?: { c?: number; f?: number; h?: number };
+};
+
+function parseWeatherSensorScope(value: string): WeatherSensorScope {
+    const scope = value || "cfh";
+    if (!/^[cfh]+$/.test(scope)) {
+        throw new CodedError(ErrorCode.MalformedAdjustmentOptions);
+    }
+
+    return {
+        current: scope.includes("c"),
+        forecast: scope.includes("f"),
+        historical: scope.includes("h"),
+    };
+}
+
+function roundFinite(value: number | undefined, digits: number): number | undefined {
+    if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+    const factor = Math.pow(10, digits);
+    return Math.round(value * factor) / factor;
+}
+
+function omitUndefined<T extends object>(value: T): T {
+    for (const key of Object.keys(value)) {
+        if (value[key] === undefined) delete value[key];
+    }
+    return value;
+}
+
+/** Builds the compact, controller-oriented weather sensor response. */
+export function buildWeatherSensorResponse(
+    coordinates: GeoCoordinates,
+    scope: WeatherSensorScope,
+    weatherResult?: CachedResult<WeatherData>,
+    wateringResult?: CachedResult<readonly WateringData[]>,
+    elevation: number = 600
+): WeatherSensorResponse {
+    const result: WeatherSensorResponse = { v: 1, u: "us" };
+
+    if (weatherResult) {
+        const weather = weatherResult.value;
+        result.wp = weather.weatherProvider;
+
+        if (scope.current) {
+            result.c = omitUndefined({
+                at: Math.floor(weatherResult.cachedAt / 1000),
+                t: roundFinite(weather.temp, 1),
+                h: roundFinite(weather.humidity, 1),
+                w: roundFinite(weather.wind, 1),
+                r: typeof weather.raining === "boolean" ? (weather.raining ? 1 : 0) : undefined,
+            });
+        }
+
+        if (scope.forecast && weather.forecast.length) {
+            const forecast = weather.forecast[0];
+            result.f = omitUndefined({
+                at: forecast.date,
+                lo: roundFinite(weather.minTemp ?? forecast.temp_min, 1),
+                hi: roundFinite(weather.maxTemp ?? forecast.temp_max, 1),
+                p: roundFinite(weather.precip ?? forecast.precip, 3),
+            });
+        }
+    }
+
+    if (scope.historical && wateringResult?.value.length) {
+        const history = wateringResult.value[0];
+        result.wp ||= history.weatherProvider;
+        result.h = omitUndefined({
+            at: history.periodStartTime,
+            t: roundFinite(history.temp, 1),
+            h: roundFinite(history.humidity, 1),
+            p: roundFinite(history.precip, 3),
+            w: roundFinite(history.windSpeed, 1),
+            sr: roundFinite(history.solarRadiation, 2),
+            eto: roundFinite(calculateETo(history, elevation, coordinates), 3),
+        });
+    }
+
+    return result;
+}
+
+type WeatherSensorFetchResult = {
+    weatherResult?: CachedResult<WeatherData>;
+    wateringResult?: CachedResult<readonly WateringData[]>;
+    weatherError?: CodedError;
+    wateringError?: CodedError;
+};
+
+/** Fetches only the provider data required by the requested scope. */
+export async function fetchWeatherSensorData(
+    weatherProvider: WeatherProvider,
+    coordinates: GeoCoordinates,
+    scope: WeatherSensorScope,
+    pws?: PWS
+): Promise<WeatherSensorFetchResult> {
+    const result: WeatherSensorFetchResult = {};
+
+    if (scope.current || scope.forecast) {
+        try {
+            result.weatherResult = await weatherProvider.getWeatherData(coordinates, pws);
+        } catch (err) {
+            result.weatherError = makeCodedError(err);
+        }
+    }
+    if (scope.historical) {
+        try {
+            result.wateringResult = await weatherProvider.getWateringData(coordinates, pws);
+        } catch (err) {
+            result.wateringError = makeCodedError(err);
+        }
+    }
+
+    return result;
+}
 
 /**
  * Resolves a location description to geographic coordinates.
@@ -231,11 +383,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 
 	// Parse weather adjustment options
 	try {
-		// Parse data that may be encoded
-		adjustmentOptionsString = decodeURIComponent( adjustmentOptionsString.replace( /\\x/g, "%" ) );
-
-		// Reconstruct JSON string from deformed controller output
-		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
+		adjustmentOptions = parseAdjustmentOptions(adjustmentOptionsString);
 	} catch ( err ) {
 		// If the JSON is not valid then abort the calculation
 		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ));
@@ -250,39 +398,14 @@ export const getWeatherData = async function( req: express.Request, res: express
 		return;
 	}
 
-	let pws: PWS | undefined = undefined;
-	if ( adjustmentOptions.provider === "WU" && adjustmentOptions.pws && adjustmentOptions.key ) {
-		const idMatch = adjustmentOptions.pws.match( /^[a-zA-Z\d]+$/ );
-		const pwsId = idMatch ? idMatch[ 0 ] : undefined;
-		const keyMatch = adjustmentOptions.key.match( /^[a-f\d]{32}$/ );
-		const apiKey = keyMatch ? keyMatch[ 0 ] : undefined;
-
-		// Make sure that the PWS ID and API key look valid.
-		if ( !pwsId ) {
-			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsId ) );
-			return;
-		}
-		if ( !apiKey ) {
-			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsApiKey ) );
-			return;
-		}
-
-		pws = { id: pwsId, apiKey: apiKey };
-	}else if ( adjustmentOptions.key ){
-		pws = {apiKey: adjustmentOptions.key};
-	}
-
-	let WEATHER_PROVIDER: WeatherProvider;
-	let provider: string = adjustmentOptions.provider;
-
-	if ( !provider && process.env.WEATHER_PROVIDER ) {
-		provider = process.env.WEATHER_PROVIDER;
-	}
-
-	if (typeof WEATHER_PROVIDERS[provider] === 'object') {
-		WEATHER_PROVIDER = WEATHER_PROVIDERS[provider];
-	} else {
-		WEATHER_PROVIDER = WEATHER_PROVIDERS['Apple'];
+	let pws: PWS | undefined;
+	let weatherProvider: WeatherProvider;
+	try {
+		pws = parsePwsOptions(adjustmentOptions);
+		weatherProvider = selectWeatherProvider(adjustmentOptions, pws);
+	} catch (err) {
+		sendWateringError(res, makeCodedError(err));
+		return;
 	}
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
@@ -290,7 +413,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 
 	if (weatherData == undefined) {
 	try {
-		weatherData = await WEATHER_PROVIDER.getWeatherData( coordinates, pws );
+		weatherData = await weatherProvider.getWeatherData( coordinates, pws );
 	} catch ( err ) {
 		res.send( "Error: " + err );
 		return;
@@ -302,6 +425,61 @@ export const getWeatherData = async function( req: express.Request, res: express
 		ttl: weatherData.ttl,
 		location: coordinates,
 	} );
+};
+
+/** Returns compact current, forecast, and historical values for WeatherSensor instances. */
+export const getWeatherSensorData = async function(req: express.Request, res: express.Response) {
+    let adjustmentOptions: AdjustmentOptions;
+    let scope: WeatherSensorScope;
+
+    try {
+        adjustmentOptions = parseAdjustmentOptions(getParameter(req.query.wto));
+        scope = parseWeatherSensorScope(getParameter(req.query.scope));
+    } catch (err) {
+        const error = makeCodedError(err);
+        res.status(400).json({ errCode: error.errCode });
+        return;
+    }
+
+    let coordinates: GeoCoordinates;
+    let pws: PWS | undefined;
+    let weatherProvider: WeatherProvider;
+    try {
+        coordinates = await resolveCoordinates(getParameter(req.query.loc));
+        pws = parsePwsOptions(adjustmentOptions);
+        weatherProvider = selectWeatherProvider(adjustmentOptions, pws);
+    } catch (err) {
+        const error = makeCodedError(err);
+        res.status(400).json({ errCode: error.errCode });
+        return;
+    }
+
+    const { weatherResult, wateringResult, weatherError, wateringError } =
+        await fetchWeatherSensorData(weatherProvider, coordinates, scope, pws);
+
+    if (!weatherResult && !wateringResult) {
+        const error = weatherError || wateringError || new CodedError(ErrorCode.BadWeatherData);
+        res.status(502).json({ errCode: error.errCode });
+        return;
+    }
+
+    const elevation = Number(adjustmentOptions["elevation"]);
+    const response = buildWeatherSensorResponse(
+        coordinates,
+        scope,
+        weatherResult,
+        wateringResult,
+        Number.isFinite(elevation) ? elevation : 600
+    );
+    const errors: { c?: number; f?: number; h?: number } = {};
+    if (weatherError) {
+        if (scope.current) errors.c = weatherError.errCode;
+        if (scope.forecast) errors.f = weatherError.errCode;
+    }
+    if (wateringError) errors.h = wateringError.errCode;
+    if (Object.keys(errors).length) response.e = errors;
+
+    res.json(response);
 };
 
 // API Handler when using the weatherX.py where X represents the
@@ -331,11 +509,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	// Parse weather adjustment options
 	try {
 
-		// Parse data that may be encoded
-		adjustmentOptionsString = decodeURIComponent( adjustmentOptionsString.replace( /\\x/g, "%" ) );
-
-		// Reconstruct JSON string from deformed controller output
-		adjustmentOptions = JSON.parse( "{" + adjustmentOptionsString + "}" );
+		adjustmentOptions = parseAdjustmentOptions(adjustmentOptionsString);
 	} catch ( err ) {
 		// If the JSON is not valid then abort the calculation
 		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ), adjustmentMethod != ManualAdjustmentMethod );
@@ -356,44 +530,14 @@ export const getWateringData = async function( req: express.Request, res: expres
 	let timeData: TimeData = getTimeData( coordinates );
 
 	// Parse the PWS information.
-	let pws: PWS | undefined = undefined;
-	if ( adjustmentOptions.provider === "WU" && adjustmentOptions.pws && adjustmentOptions.key ) {
-
-		const idMatch = adjustmentOptions.pws.match( /^[a-zA-Z\d]+$/ );
-		const pwsId = idMatch ? idMatch[ 0 ] : undefined;
-		const keyMatch = adjustmentOptions.key.match( /^[a-f\d]{32}$/ );
-		const apiKey = keyMatch ? keyMatch[ 0 ] : undefined;
-
-		// Make sure that the PWS ID and API key look valid.
-		if ( !pwsId ) {
-			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsId ), adjustmentMethod != ManualAdjustmentMethod );
-			return;
-		}
-		if ( !apiKey ) {
-			sendWateringError( res, new CodedError( ErrorCode.InvalidPwsApiKey ), adjustmentMethod != ManualAdjustmentMethod );
-			return;
-		}
-
-		pws = { id: pwsId, apiKey: apiKey };
-	}else if ( adjustmentOptions.key ){
-		pws = {apiKey: adjustmentOptions.key};
-	}
-
+	let pws: PWS | undefined;
 	let weatherProvider: WeatherProvider;
-	let provider: string = adjustmentOptions.provider;
-
-	if ( !provider && process.env.WEATHER_PROVIDER ) {
-		provider = process.env.WEATHER_PROVIDER;
-	}
-
-	if( pws && pws.id ){
-		weatherProvider = PWS_WEATHER_PROVIDER;
-	}else{
-		if (typeof WEATHER_PROVIDERS[provider] === 'object') {
-			weatherProvider = WEATHER_PROVIDERS[provider];
-		} else {
-			weatherProvider = WEATHER_PROVIDERS['Apple'];
-		}
+	try {
+		pws = parsePwsOptions(adjustmentOptions);
+		weatherProvider = selectWeatherProvider(adjustmentOptions, pws);
+	} catch (err) {
+		sendWateringError(res, makeCodedError(err), adjustmentMethod != ManualAdjustmentMethod);
+		return;
 	}
 
 

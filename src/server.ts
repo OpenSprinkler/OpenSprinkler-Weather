@@ -4,7 +4,7 @@ import './bootstrap';
 import express from "express";
 import cors from "cors";
 
-import { getWateringData, getWeatherData } from "./routes/weather";
+import { getWateringData, getWeatherData, getWeatherSensorData } from "./routes/weather";
 import { captureWUStream } from "./routes/weatherProviders/local";
 import { getBaselineETo } from "./routes/baselineETo";
 import {default as packageJson} from "../package.json";
@@ -52,6 +52,10 @@ app.get( /(\d+)/, getWateringData );
 // Handle requests matching /weatherData
 app.options( /weatherData/, cors() );
 app.get( /weatherData/, cors(), getWeatherData );
+
+// Compact current, forecast, and historical data for controller WeatherSensor instances.
+app.options( /weatherSensorData/, cors() );
+app.get( /weatherSensorData/, cors(), getWeatherSensorData );
 
 // Endpoint to stream Weather Underground data from local PWS
 if ( pws === "WU" ) {

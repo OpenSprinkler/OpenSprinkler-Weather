@@ -4,12 +4,14 @@ import { Mutex } from 'async-mutex';
 export type CachedResult<T> = {
 	value: T,
 	ttl: number,
+	cachedAt: number,
 }
 
 export class Cached<T> {
 	private mutex: Mutex;
 	private value: Promise<T> | null = null;
 	private expiresAt: Date | null = null;
+	private cachedAt: number | null = null;
 
 	constructor() {
 		this.mutex = new Mutex();
@@ -24,9 +26,11 @@ export class Cached<T> {
 		if (!this.value) {
 				this.value = getter().then((value) => {
 					this.expiresAt = expiresAt;
+					this.cachedAt = Date.now();
 					return value;
 				}).catch((err) => {
 					this.expiresAt = new Date(0);
+					this.cachedAt = null;
 					throw err;
 				});
 		}
@@ -35,11 +39,13 @@ export class Cached<T> {
 		return {
 			value: await this.value,
 			ttl: differenceInMilliseconds(this.expiresAt, new Date()),
+			cachedAt: this.cachedAt,
 		};
 	}
 
 	async invalidate(): Promise<void> {
 		this.value = null;
 		this.expiresAt = null;
+		this.cachedAt = null;
 	}
 }
