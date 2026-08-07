@@ -52,9 +52,6 @@ const GEOCODERS: { [name: string]: Geocoder } = {
     WU: new WUndergroundGeocoder(),
 };
 
-const WEATHER_PROVIDER: WeatherProvider =
-    WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] ||
-    WEATHER_PROVIDERS["Apple"];
 const PWS_WEATHER_PROVIDER: WeatherProvider =
     WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] ||
     WEATHER_PROVIDERS["WU"];
