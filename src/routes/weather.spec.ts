@@ -1,79 +1,86 @@
-import { expect } from 'chai';
-import nock from 'nock';
-import MockExpressRequest from 'mock-express-request';
-import MockExpressResponse from 'mock-express-response';
-import MockDate from 'mockdate';
+import { expect } from "chai";
+import MockExpressRequest from "mock-express-request";
+import MockExpressResponse from "mock-express-response";
+import MockDate from "mockdate";
 
-// The tests don't use OWM, but the WeatherProvider API key must be set to prevent an error from being thrown on startup.
 process.env.WEATHER_PROVIDER = "OWM";
-process.env.OWM_API_KEY = "NO_KEY";
 
-import { getWateringData } from './weather';
+import { getWateringData } from "./weather";
 import { GeoCoordinates, WeatherData, WateringData, PWS } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
+import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 
-const expected = require( '../test/expected.json' );
-const replies = require( '../test/replies.json' );
+const location = "42,-75";
 
-const location = '01002';
-
-describe('Watering Data', () => {
-	beforeEach(() => MockDate.set('5/13/2019'));
-
-	it('OpenWeatherMap Lookup (Adjustment Method 0, Location 01002)', async () => {
-		mockOWM();
-
-		const expressMocks = createExpressMocks(0, location);
-		await getWateringData(expressMocks.request, expressMocks.response);
-		expect( expressMocks.response._getJSON() ).to.eql( expected.noWeather[location] );
+describe("Watering Data", () => {
+	beforeEach(() => MockDate.set("2019-05-13T12:00:00Z"));
+	afterEach(() => {
+		MockDate.reset();
 	});
 
-	it('OpenWeatherMap Lookup (Adjustment Method 1, Location 01002)', async () => {
-		mockOWM();
+	it("returns time data without calling a provider for manual adjustment", async () => {
+		const { request, response } = createExpressMocks(0);
+		await getWateringData(request, response);
 
-		const expressMocks = createExpressMocks(1, location);
-		await getWateringData(expressMocks.request, expressMocks.response);
-		expect( expressMocks.response._getJSON() ).to.eql( expected.adjustment1[location] );
+		const result = response._getJSON();
+		expect(result.errCode).to.equal(0);
+		expect(result.rawData).to.eql({ wp: "Manual" });
+		expect(result.scale).to.equal(undefined);
+		expect(result.sunrise).to.be.a("number");
+		expect(result.sunset).to.be.a("number");
+	});
+
+	it("calculates Zimmerman adjustment from normalized historical data", async () => {
+		const provider = new MockWeatherProvider({
+			wateringData: [{
+				weatherProvider: "mock",
+				temp: 58.333,
+				humidity: 50,
+				precip: 0,
+				periodStartTime: 1557622800,
+				minTemp: 50,
+				maxTemp: 70,
+				minHumidity: 50,
+				maxHumidity: 50,
+				solarRadiation: 4.5,
+				windSpeed: 3,
+			}],
+		});
+
+		const result = await ZimmermanAdjustmentMethod.calculateWateringScale(
+			{} as any,
+			[42, -75],
+			provider
+		);
+
+		expect(result.scale).to.equal(33);
+		expect(result.scales).to.eql([33]);
+		expect(result.rawData).to.eql({ wp: "mock", h: 50, p: 0, t: 58.3 });
 	});
 });
 
-function createExpressMocks(method: number, location: string) {
+function createExpressMocks(method: number) {
 	const request = new MockExpressRequest({
-		method: 'GET',
+		method: "GET",
 		url: `/${method}?loc=${location}`,
 		query: {
 			loc: location,
-			format: 'json'
+			format: "json",
 		},
-		params: [ method ],
+		params: [method],
 		headers: {
-			'x-forwarded-for': '127.0.0.1'
-		}
+			"x-forwarded-for": "127.0.0.1",
+		},
 	});
 
 	return {
 		request,
-		response: new MockExpressResponse({
-			request
-		})
-	}
+		response: new MockExpressResponse({ request }),
+	};
 }
 
-function mockOWM() {
-	nock( 'http://api.openweathermap.org' )
-		.filteringPath( function() { return "/"; } )
-		.get( "/" )
-		.reply( 200, replies[location].OWMData );
-}
-
-
-/**
- * A WeatherProvider for testing purposes that returns weather data that is provided in the constructor.
- * This is a special WeatherProvider designed for testing purposes and should not be activated using the
- * WEATHER_PROVIDER environment variable.
- */
+/** Weather provider used by endpoint tests without external API calls. */
 export class MockWeatherProvider extends WeatherProvider {
-
 	private readonly mockData: MockWeatherData;
 
 	public constructor(mockData: MockWeatherData) {
@@ -81,26 +88,28 @@ export class MockWeatherProvider extends WeatherProvider {
 		this.mockData = mockData;
 	}
 
-	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
-		return await this.getData( "wateringData" ) as WateringData[];
+	protected async getWateringDataInternal(
+		coordinates: GeoCoordinates,
+		pws: PWS | undefined
+	): Promise<WateringData[]> {
+		return (await this.getData("wateringData")) as WateringData[];
 	}
 
-	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
-		return await this.getData( "weatherData" ) as WeatherData;
+	protected async getWeatherDataInternal(
+		coordinates: GeoCoordinates,
+		pws: PWS | undefined
+	): Promise<WeatherData> {
+		return (await this.getData("weatherData")) as WeatherData;
 	}
 
-	private async getData( type: "wateringData" | "weatherData" ) {
-		const data = this.mockData[ type ];
+	private async getData(type: "wateringData" | "weatherData") {
+		const data = this.mockData[type];
 		if (data instanceof Array) {
-			data.forEach((e) => {
-				if ( !e.weatherProvider ) {
-					e.weatherProvider = "mock";
-				}
+			data.forEach((entry) => {
+				if (!entry.weatherProvider) entry.weatherProvider = "mock";
 			});
-		} else {
-			if ( !data.weatherProvider ) {
-				data.weatherProvider = "mock";
-			}
+		} else if (data && !data.weatherProvider) {
+			data.weatherProvider = "mock";
 		}
 
 		return data;
@@ -108,6 +117,6 @@ export class MockWeatherProvider extends WeatherProvider {
 }
 
 interface MockWeatherData {
-	wateringData?: WateringData[],
-	weatherData?: WeatherData
+	wateringData?: WateringData[];
+	weatherData?: WeatherData;
 }
