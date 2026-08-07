@@ -22,8 +22,13 @@ describe("Weather provider normalization", () => {
 		globalThis.fetch = (async (url: string | URL) => {
 			requestedUrl = String(url);
 			return jsonResponse({
-				current_weather: { temperature: 32, windspeed: 0, weathercode: 0 },
-				current: { relative_humidity_2m: 0, precipitation: 0 },
+				current: {
+					temperature_2m: 32,
+					relative_humidity_2m: 0,
+					precipitation: 0,
+					wind_speed_10m: 0,
+					weather_code: 0,
+				},
 				daily: {
 					weathercode: [61],
 					temperature_2m_min: [30],
@@ -39,7 +44,8 @@ describe("Weather provider normalization", () => {
 		expect(weather.wind).to.equal(0);
 		expect(weather.raining).to.equal(false);
 		expect(weather.precip).to.equal(1);
-		expect(requestedUrl).to.contain("current=relative_humidity_2m,precipitation");
+		expect(requestedUrl).to.contain("current=temperature_2m,relative_humidity_2m,precipitation");
+		expect(requestedUrl).not.to.contain("current_weather=true");
 	});
 
 	it("uses AccuWeather forecast rain amount rather than intensity", async () => {

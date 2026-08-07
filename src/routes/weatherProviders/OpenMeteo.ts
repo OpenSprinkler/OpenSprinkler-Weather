@@ -95,7 +95,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
 		const timezone = getTZ(coordinates);
 
-		const currentUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&current=relative_humidity_2m,precipitation&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime`;
+		const currentUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timeformat=unixtime`;
 
 		let current;
 		try {
@@ -105,18 +105,18 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			throw "An error occurred while retrieving weather information from OpenMeteo."
 		}
 
-		if ( !current || !current.daily || !current.current_weather ) {
+		if ( !current || !current.daily || !current.current ) {
 			throw "Necessary field(s) were missing from weather information returned by OpenMeteo.";
 		}
 
 		const weather: WeatherData = {
 			weatherProvider: "OpenMeteo",
-			temp: current.current_weather.temperature,
+			temp: current.current.temperature_2m,
 			humidity: current.current?.relative_humidity_2m,
-			wind: current.current_weather.windspeed,
+			wind: current.current.wind_speed_10m,
 			raining: typeof current.current?.precipitation === "number" ? current.current.precipitation > 0 : undefined,
-			description: this.getWMOIconCode(current.current_weather.weathercode).desc,
-			icon: this.getWMOIconCode(current.current_weather.weathercode).icon,
+			description: this.getWMOIconCode(current.current.weather_code).desc,
+			icon: this.getWMOIconCode(current.current.weather_code).icon,
 
 			region: "",
 			city: "",
