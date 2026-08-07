@@ -10,6 +10,12 @@ var queue: Array<Observation> = [],
 	lastRainEpoch = 0,
 	lastRainCount: number;
 
+function roundedMeasurement(value: number, precision: number = 0): number | undefined {
+	if (!Number.isFinite(value)) return undefined;
+	const scale = Math.pow(10, precision);
+	return Math.round(value * scale) / scale;
+}
+
 function getMeasurement(req: express.Request, key: string): number {
 	let value: number;
 
@@ -48,23 +54,21 @@ export default class LocalWeatherProvider extends WeatherProvider {
 
 		const weather: WeatherData = {
 			weatherProvider: "local",
-			temp: Math.floor( queue[ 0 ].temp ) || undefined,
+			temp: roundedMeasurement(queue[0].temp),
 			minTemp: undefined,
 			maxTemp: undefined,
-			humidity: Math.floor( queue[ 0 ].humidity ) || undefined ,
-			wind: Math.floor( queue[ 0 ].windSpeed * 10 ) / 10 || undefined,
-			raining: false,
-			precip: Math.floor( queue.reduce( ( sum, obs ) => sum + ( obs.precip || 0 ), 0) * 100 ) / 100,
+			humidity: roundedMeasurement(queue[0].humidity),
+			wind: roundedMeasurement(queue[0].windSpeed, 1),
+			raining: lastRainEpoch > 0 && Math.floor(Date.now() / 1000) - lastRainEpoch <= 60 * 60,
+			// A local observation stream has no forecast data. Historical
+			// precipitation remains available through getWateringData().
+			precip: undefined,
 			description: "",
 			icon: "01d",
 			region: undefined,
 			city: undefined,
 			forecast: []
 		};
-
-		if (weather.precip > 0){
-			weather.raining = true;
-		}
 
 		return weather;
 	}

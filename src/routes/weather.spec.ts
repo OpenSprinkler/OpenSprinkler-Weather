@@ -11,6 +11,7 @@ import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 
 const location = "42,-75";
+const MockRequestConstructor = MockExpressRequest as unknown as new (options: object) => any;
 
 describe("Watering Data", () => {
 	beforeEach(() => MockDate.set("2019-05-13T12:00:00Z"));
@@ -60,7 +61,7 @@ describe("Watering Data", () => {
 });
 
 function createExpressMocks(method: number) {
-	const request = new MockExpressRequest({
+	const request = new MockRequestConstructor({
 		method: "GET",
 		url: `/${method}?loc=${location}`,
 		query: {

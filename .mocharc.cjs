@@ -1,4 +1,5 @@
 process.env.GOOGLE_MAPS_API_KEY ||= "TEST_KEY";
+process.env.ACCUWEATHER_API_KEY ||= "TEST_KEY";
 process.env.OWM_API_KEY ||= "TEST_KEY";
 process.env.WU_API_KEY ||= "TEST_KEY";
 

@@ -95,7 +95,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
 		const timezone = getTZ(coordinates);
 
-		const currentUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime`;
+		const currentUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&current=relative_humidity_2m,precipitation&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime`;
 
 		let current;
 		try {
@@ -112,9 +112,9 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 		const weather: WeatherData = {
 			weatherProvider: "OpenMeteo",
 			temp: current.current_weather.temperature,
-			humidity: 0,
+			humidity: current.current?.relative_humidity_2m,
 			wind: current.current_weather.windspeed,
-			raining: current.daily.precipitation_sum[0] > 0,
+			raining: typeof current.current?.precipitation === "number" ? current.current.precipitation > 0 : undefined,
 			description: this.getWMOIconCode(current.current_weather.weathercode).desc,
 			icon: this.getWMOIconCode(current.current_weather.weathercode).icon,
 

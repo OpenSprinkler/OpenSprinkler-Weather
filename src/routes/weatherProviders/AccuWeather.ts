@@ -144,7 +144,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			city: locationData.EnglishName,
 			minTemp: Math.floor( daily[ 0 ].Temperature.Minimum.Value ),
 			maxTemp: Math.floor( daily[ 0 ].Temperature.Maximum.Value ),
-			precip: daily[ 0 ].Day.PrecipitationIntensity,
+			precip: daily[ 0 ].Day.Rain.Value + daily[ 0 ].Night.Rain.Value,
 			forecast: []
 		};
 
