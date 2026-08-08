@@ -20,6 +20,9 @@ This script works with the OpenSprinkler Unified Firmware to automatically adjus
 
 ## Running the Weather Script Locally
 
+For deterministic, live-provider, and deployed-server testing instructions, see
+[Weather Service Testing](docs/weather-testing.md).
+
 To run the weather script on your own computer, start by downloading the source code (either via `git clone` or a ZIP download). Then install dependencies and compile the TypeScript sources:
 
 ```

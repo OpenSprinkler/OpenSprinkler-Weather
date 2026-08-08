@@ -160,6 +160,23 @@ describe("Weather Sensor Data", () => {
 		expect(provider.weatherCalls).to.equal(1);
 		expect(provider.wateringCalls).to.equal(0);
 	});
+
+	it("shares provider caches across weather sensor scopes and direct consumers", async () => {
+		const provider = new CountingMockWeatherProvider({
+			weatherData,
+			wateringData: [wateringData],
+		});
+		const coordinates: GeoCoordinates = [42, -75];
+
+		await fetchWeatherSensorData(provider, coordinates, { current: true, forecast: false, historical: false });
+		await fetchWeatherSensorData(provider, coordinates, { current: false, forecast: true, historical: false });
+		await fetchWeatherSensorData(provider, coordinates, { current: true, forecast: true, historical: true });
+		await provider.getWeatherData(coordinates);
+		await provider.getWateringData(coordinates);
+
+		expect(provider.weatherCalls).to.equal(1);
+		expect(provider.wateringCalls).to.equal(1);
+	});
 });
 
 function createExpressMocks(method: number) {
