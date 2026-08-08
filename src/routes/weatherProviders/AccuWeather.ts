@@ -5,6 +5,7 @@ import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/
 import { CodedError, ErrorCode } from "../../errors";
 import { addHours, fromUnixTime } from "date-fns";
 import { tz } from "@date-fns/tz";
+import { averageFinite, maxFinite, minFinite } from "./providerUtils";
 
 export default class AccuWeatherWeatherProvider extends WeatherProvider {
 
@@ -25,9 +26,14 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			locationData = await httpJSONRequest( locationUrl );
 		} catch ( err ) {
 			console.error( "Error retrieving location information from AccuWeather:", err );
+			throw new CodedError(ErrorCode.WeatherApiError);
 		}
 
-		const historicUrl = `http://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
+		if (!locationData?.Key) {
+			throw new CodedError(ErrorCode.MissingWeatherField);
+		}
+
+		const historicUrl = `https://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }/historical/24?apikey=${ localKey }&details=true`;
 
 		let historicData;
 		try {
@@ -39,7 +45,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 
 		let dataLen = historicData.length;
 		if ( typeof dataLen !== "number" ) {
-			throw "Necessary field(s) were missing from weather information returned by AccuWeather.";
+			throw new CodedError(ErrorCode.MissingWeatherField);
 		}
 		if ( dataLen < 23 ) {
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
@@ -62,33 +68,20 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			};
 		} );
 
-		let temp: number = 0, humidity: number = 0,
-			minHumidity: number = undefined, maxHumidity: number = undefined, avgWindSpeed: number = 0;
-		for ( const hour of historicData ) {
-			/*
-			 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
-			 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
-			 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
-			 * significantly skewed if data is missing for several consecutive hours).
-			 */
-			temp += hour.Temperature.Imperial.Value;
-			humidity += hour.RelativeHumidity;
-
-			// Skip hours where humidity measurement does not exist to prevent ETo result from being NaN.
-			if ( hour.RelativeHumidity !== undefined ) {
-				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-				minHumidity = minHumidity < hour.RelativeHumidity ? minHumidity : hour.RelativeHumidity;
-				maxHumidity = maxHumidity > hour.RelativeHumidity ? maxHumidity : hour.RelativeHumidity;
-			}
-
-			avgWindSpeed += hour.Wind.Speed.Imperial.Value || 0;
+		const temp = averageFinite(historicData.map(hour => hour.Temperature?.Imperial?.Value));
+		const humidity = averageFinite(historicData.map(hour => hour.RelativeHumidity));
+		const minHumidity = minFinite(historicData.map(hour => hour.RelativeHumidity));
+		const maxHumidity = maxFinite(historicData.map(hour => hour.RelativeHumidity));
+		const avgWindSpeed = averageFinite(historicData.map(hour => hour.Wind?.Speed?.Imperial?.Value));
+		if ([temp, humidity, minHumidity, maxHumidity, avgWindSpeed].some(value => !Number.isFinite(value))) {
+			throw new CodedError(ErrorCode.InsufficientWeatherData);
 		}
 
 		// Accuweather returns data in reverse chronological order by hour
 		return [{
 			weatherProvider: "AW",
-			temp: temp / dataLen,
-			humidity: humidity / dataLen,
+			temp,
+			humidity,
 			precip: historicData[0].PrecipitationSummary.Past24Hours.Imperial.Value,
 			periodStartTime: historicData[dataLen - 1].EpochTime,
 			minTemp: historicData[0].TemperatureSummary.Past24HourRange.Minimum.Imperial.Value,
@@ -96,8 +89,8 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			minHumidity: minHumidity,
 			maxHumidity: maxHumidity,
 			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
-			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: avgWindSpeed / historicData.length
+			// AccuWeather does not document the measurement height for this field.
+			windSpeed: avgWindSpeed
 		}];
 	}
 
@@ -111,6 +104,10 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			locationData = await httpJSONRequest( locationUrl );
 		} catch ( err ) {
 			console.error( "Error retrieving location information from AccuWeather:", err );
+			throw new CodedError(ErrorCode.WeatherApiError);
+		}
+		if (!locationData?.Key) {
+			throw new CodedError(ErrorCode.MissingWeatherField);
 		}
 
 		const currentUrl = `https://dataservice.accuweather.com/currentconditions/v1/${ locationData.Key }?apikey=${ localKey }&details=true`;
@@ -122,13 +119,13 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			forecast = await httpJSONRequest( forecastUrl );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from AccuWeawther:", err );
-			throw "An error occurred while retrieving weather information from AccuWeather."
+			throw new CodedError(ErrorCode.WeatherApiError);
 		}
 
 		let current = currentData[0];
 		let daily = forecast.DailyForecasts;
 		if ( !current || !daily || daily.length < 5) {
-			throw "Necessary field(s) were missing from weather information returned by AccuWeather.";
+			throw new CodedError(ErrorCode.MissingWeatherField);
 		}
 
 		const weather: WeatherData = {
@@ -144,7 +141,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			city: locationData.EnglishName,
 			minTemp: Math.floor( daily[ 0 ].Temperature.Minimum.Value ),
 			maxTemp: Math.floor( daily[ 0 ].Temperature.Maximum.Value ),
-			precip: daily[ 0 ].Day.Rain.Value + daily[ 0 ].Night.Rain.Value,
+			precip: this.getDailyLiquid(daily[0]),
 			forecast: []
 		};
 
@@ -152,7 +149,7 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			weather.forecast.push( {
 				temp_min: Math.floor( daily[ index ].Temperature.Minimum.Value ),
 				temp_max: Math.floor( daily[ index ].Temperature.Maximum.Value ),
-				precip: daily[ index ].Day.Rain.Value + daily[ index ].Night.Rain.Value,
+				precip: this.getDailyLiquid(daily[index]),
 				date: daily[ index ].EpochDate,
 				icon: this.getOWMIconCode( daily[ index ].Day.Icon ),
 				description: daily[ index ].Day.ShortPhrase
@@ -164,6 +161,12 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 
 	public shouldCacheWateringScale(): boolean {
 		return true;
+	}
+
+	private getDailyLiquid(day: any): number {
+		const daytime = day.Day?.TotalLiquid?.Value ?? day.Day?.Rain?.Value;
+		const nighttime = day.Night?.TotalLiquid?.Value ?? day.Night?.Rain?.Value;
+		return (Number.isFinite(daytime) ? daytime : 0) + (Number.isFinite(nighttime) ? nighttime : 0);
 	}
 
 // See https://developer.accuweather.com/weather-icons

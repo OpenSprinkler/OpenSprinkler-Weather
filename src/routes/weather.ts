@@ -265,6 +265,9 @@ export async function httpJSONRequest(url: string, headers?: HeadersInit, body?:
 			headers,
 			body,
 		});
+		if (!res.ok) {
+			throw new CodedError(ErrorCode.WeatherApiError, `Weather provider returned HTTP ${res.status}.`);
+		}
 
 		return await res.json();
 	} catch (err) {

@@ -4,6 +4,7 @@ import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 import { addHours, fromUnixTime, getUnixTime, startOfDay, subDays } from "date-fns";
+import { averageFinite, finiteValues, maxFinite, minFinite, sumFinite } from "./providerUtils";
 
 export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
@@ -20,9 +21,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
 		const localKey = keyToUse(this.API_KEY, pws);
 
-		// PW's timemachine API is broken currently, so we have to use the forecast API, which only gives the most recent 24 hours
-		// const yesterdayUrl = `https://timemachine.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ getUnixTime(yesterday) }?exclude=currently,minutely,alerts`;
-		const yesterdayUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ getUnixTime(subDays(new Date(), 1)) }?exclude=currently,minutely,alerts&units=ca`;
+		const yesterdayUrl = `https://timemachine.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] },${ getUnixTime(yesterday) }?exclude=currently,minutely,alerts&units=ca&version=2`;
 
 		let historicData;
 		try {
@@ -57,42 +56,31 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			};
 		} );
 
-		let temp: number = 0, humidity: number = 0, precip: number = 0,
-			minHumidity: number = undefined, maxHumidity: number = undefined;
-		for ( const hour of samples ) {
-			/*
-			 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
-			 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
-			 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
-			 * significantly skewed if data is missing for several consecutive hours).
-			 */
+		const temperatures = finiteValues(samples.map(hour => hour.temperature));
+		const humidities = finiteValues(samples.map(hour => Number.isFinite(hour.humidity)
+			? hour.humidity
+			: this.humidityFromDewPoint(hour.temperature, hour.dewPoint)));
+		const windSpeeds = finiteValues(samples.map(hour => hour.windSpeed));
+		const liquidAccumulation = sumFinite(samples.map(hour => hour.liquidAccumulation ?? 0));
 
-			temp += hour.temperature;
-            const currentHumidity = hour.humidity || this.humidityFromDewPoint(hour.temperature, hour.dewPoint);
-			humidity += currentHumidity;
-			// This field may be missing from the response if it is snowing.
-			precip += hour.precipAccumulation || 0;
-
-			// Skip hours where humidity measurement does not exist to prevent ETo result from being NaN.
-			if ( currentHumidity !== undefined ) {
-				minHumidity = minHumidity < currentHumidity ? minHumidity : currentHumidity;
-				maxHumidity = maxHumidity > currentHumidity ? maxHumidity : currentHumidity;
-			}
+		if (temperatures.length !== samples.length || humidities.length !== samples.length ||
+			windSpeeds.length === 0 || liquidAccumulation === undefined) {
+			throw new CodedError(ErrorCode.InsufficientWeatherData);
 		}
 
 		return [{
 			weatherProvider: "PW",
-			temp: this.celsiusToFahrenheit(temp / samples.length),
-			humidity: humidity / samples.length * 100,
-			precip: this.mmToInchesPerHour(precip),
+			temp: this.celsiusToFahrenheit(averageFinite(temperatures)),
+			humidity: averageFinite(humidities) * 100,
+			precip: this.cmToInches(liquidAccumulation),
 			periodStartTime: historicData.hourly.data[ 0 ].time,
-			minTemp: this.celsiusToFahrenheit(historicData.daily.data[ 0 ].temperatureMin),
-			maxTemp: this.celsiusToFahrenheit(historicData.daily.data[ 0 ].temperatureMax),
-			minHumidity: minHumidity * 100,
-			maxHumidity: maxHumidity * 100,
+			minTemp: this.celsiusToFahrenheit(minFinite(temperatures)),
+			maxTemp: this.celsiusToFahrenheit(maxFinite(temperatures)),
+			minHumidity: minFinite(humidities) * 100,
+			maxHumidity: maxFinite(humidities) * 100,
 			solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
-			// Assume wind speed measurements are taken at 2 meters.
-			windSpeed: this.kphToMph(historicData.daily.data[ 0 ].windSpeed)
+			// Pirate Weather does not document the measurement height for this field.
+			windSpeed: this.kphToMph(averageFinite(windSpeeds))
 		}];
 	}
 
@@ -100,18 +88,18 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
 		const localKey = keyToUse( this.API_KEY, pws);
 
-		const forecastUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] }?units=us&exclude=minutely,hourly,alerts`;
+		const forecastUrl = `https://api.pirateweather.net/forecast/${ localKey }/${ coordinates[ 0 ] },${ coordinates[ 1 ] }?units=us&exclude=minutely,hourly,alerts&version=2`;
 
 		let forecast;
 		try {
 			forecast = await httpJSONRequest( forecastUrl );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from PirateWeather:", err );
-			throw "An error occurred while retrieving weather information from PirateWeather."
+			throw new CodedError(ErrorCode.WeatherApiError);
 		}
 
 		if ( !forecast.currently || !forecast.daily || !forecast.daily.data ) {
-			throw "Necessary field(s) were missing from weather information returned by PirateWeather.";
+			throw new CodedError(ErrorCode.MissingWeatherField);
 		}
 
 		const weather: WeatherData = {
@@ -127,7 +115,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			city: "",
 			minTemp: Math.floor( forecast.daily.data[ 0 ].temperatureMin ),
 			maxTemp: Math.floor( forecast.daily.data[ 0 ].temperatureMax ),
-			precip: forecast.daily.data[ 0 ].precipIntensity * 24,
+			precip: forecast.daily.data[ 0 ].liquidAccumulation ?? forecast.daily.data[ 0 ].precipIntensity * 24,
 			forecast: []
 		};
 
@@ -135,7 +123,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			weather.forecast.push( {
 				temp_min: Math.floor( forecast.daily.data[ index ].temperatureMin ),
 				temp_max: Math.floor( forecast.daily.data[ index ].temperatureMax ),
-				precip: forecast.daily.data[ index ].precipIntensity * 24,
+				precip: forecast.daily.data[ index ].liquidAccumulation ?? forecast.daily.data[ index ].precipIntensity * 24,
 				date: forecast.daily.data[ index ].time,
 				icon: this.getOWMIconCode( forecast.daily.data[ index ].icon ),
 				description: forecast.daily.data[ index ].summary
@@ -177,8 +165,8 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 		return (celsius * 9) / 5 + 32;
 	}
 
-	private mmToInchesPerHour(mmPerHour: number): number {
-		return mmPerHour * 0.03937007874;
+	private cmToInches(cm: number): number {
+		return cm / 2.54;
 	}
 
 	private kphToMph(kph: number): number {
@@ -209,6 +197,6 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
             eFn = (temp: number) => this.eIceLn(temp);
         }
 
-        return 100 * Math.exp(eFn(dewPoint) - eFn(temperature));
+		return Math.exp(eFn(dewPoint) - eFn(temperature));
     }
 }

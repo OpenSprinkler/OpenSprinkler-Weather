@@ -1,10 +1,24 @@
 import { GeoCoordinates, WeatherData, WateringData, PWS } from "../../types";
 import { getTZ, httpJSONRequest, localTime } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
-import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
+import {
+	approximateSolarRadiation,
+	CloudCoverInfo,
+	standardizeWindSpeed,
+} from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
-import { addDays, addHours, getUnixTime, startOfDay, subDays } from "date-fns";
+import { addDays, addHours, format, getUnixTime, startOfDay, subDays } from "date-fns";
 import { TZDate } from "@date-fns/tz";
+import {
+	averageFinite,
+	completeHistoricalHourlyDays,
+	groupByLocalDay,
+	maxFinite,
+	minFinite,
+	sumFinite,
+} from "./providerUtils";
+
+const WIND_MEASUREMENT_HEIGHT_FEET = 10 * 3.281;
 
 export default class DWDWeatherProvider extends WeatherProvider {
 
@@ -16,8 +30,8 @@ export default class DWDWeatherProvider extends WeatherProvider {
         const tz = getTZ(coordinates);
 		const currentDay = startOfDay(localTime(coordinates));
 
-        const startTimestamp = subDays(currentDay, 7).toISOString();
-        const endTimestamp = currentDay.toISOString();
+		const startTimestamp = format(subDays(currentDay, 7), "yyyy-MM-dd");
+		const endTimestamp = format(currentDay, "yyyy-MM-dd");
 
 		const historicUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ startTimestamp }&last_date=${ endTimestamp }&tz=${tz}`
 
@@ -33,7 +47,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
-		const hours = historicData.weather;
+		const hours: any[] = historicData.weather;
 
 		// Fail if not enough data is available.
 		// There will only be 23 samples on the day that daylight saving time begins.
@@ -41,11 +55,15 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
-		// Cut down to 24 hour sections
-		hours.length -= hours.length % 24;
-		const daysInHours = [];
-		for ( let i = 0; i < hours.length; i+=24 ){
-			daysInHours.push(hours.slice(i, i+24));
+		const daysInHours = completeHistoricalHourlyDays(
+			hours,
+			hour => hour.timestamp,
+			tz,
+			currentDay,
+			7
+		).map(group => group.records);
+		if (!daysInHours.length) {
+			throw new CodedError(ErrorCode.InsufficientWeatherData);
 		}
 
 		const data = [];
@@ -62,53 +80,37 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				return result;
 			} );
 
-			let temp: number = 0, humidity: number = 0, precip: number = 0,
-			minHumidity: number = undefined, maxHumidity: number = undefined,
-			minTemp: number = undefined, maxTemp: number = undefined, wind: number = 0;
-			for ( const hour of daysInHours[i] ) {
-				/*
-				* If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
-				* calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
-				* calculated when data is missing from some samples (since they follow diurnal cycles and will be
-				* significantly skewed if data is missing for several consecutive hours).
-				*/
-
-				temp += hour.temperature;
-				humidity += hour.relative_humidity;
-				// This field may be missing from the response if it is snowing.
-				precip += hour.precipitation || 0;
-
-				minTemp = minTemp < hour.temperature ? minTemp : hour.temperature;
-				maxTemp = maxTemp > hour.temperature ? maxTemp : hour.temperature;
-				wind += hour.wind_speed;
-
-				// Skip hours where humidity does not exist to prevent ETo from being NaN.
-				if ( hour.relative_humidity === undefined || hour.relative_humidity === null)
-					continue;
-				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-				minHumidity = minHumidity < hour.relative_humidity ? minHumidity : hour.relative_humidity;
-				maxHumidity = maxHumidity > hour.relative_humidity ? maxHumidity : hour.relative_humidity;
-			}
-
-			const length = daysInHours[i].length;
+			const day = daysInHours[i];
+			const temp = averageFinite(day.map(hour => hour.temperature));
+			const humidity = averageFinite(day.map(hour => hour.relative_humidity));
+			const precip = sumFinite(day.map(hour => hour.precipitation));
+			const minHumidity = minFinite(day.map(hour => hour.relative_humidity));
+			const maxHumidity = maxFinite(day.map(hour => hour.relative_humidity));
+			const minTemp = minFinite(day.map(hour => hour.temperature));
+			const maxTemp = maxFinite(day.map(hour => hour.temperature));
+			const wind = averageFinite(day.map(hour => hour.wind_speed));
+			const directSolar = day.every(hour => Number.isFinite(hour.solar))
+				? sumFinite(day.map(hour => hour.solar))
+				: undefined;
+			const solarRadiation = directSolar ?? approximateSolarRadiation(cloudCoverInfo, coordinates);
 
 			const result : WateringData = {
 				weatherProvider: "DWD",
-				temp: this.C2F(temp / length),
-				humidity: humidity / length,
+				temp: this.C2F(temp),
+				humidity: humidity,
 				precip: this.mm2inch(precip),
 				periodStartTime: getUnixTime(new TZDate(daysInHours[i][0].timestamp)),
 				minTemp: this.C2F(minTemp),
 				maxTemp: this.C2F(maxTemp),
 				minHumidity: minHumidity,
 				maxHumidity: maxHumidity,
-				solarRadiation: approximateSolarRadiation( cloudCoverInfo, coordinates ),
-				// Assume wind speed measurements are taken at 2 meters.
-				windSpeed: this.kmh2mph(wind / length)
+				solarRadiation,
+				windSpeed: standardizeWindSpeed(this.kmh2mph(wind), WIND_MEASUREMENT_HEIGHT_FEET)
 			}
 
-			if ( minTemp === undefined || maxTemp === undefined || minHumidity === undefined || maxHumidity === undefined || result.solarRadiation === undefined || wind === undefined || precip === undefined ) {
-				throw "Information missing from BrightSky.";
+			if ([temp, humidity, minTemp, maxTemp, minHumidity, maxHumidity, result.solarRadiation, wind, precip]
+				.some(value => !Number.isFinite(value))) {
+				throw new CodedError(ErrorCode.InsufficientWeatherData);
 			}
 
 			data.push(result);
@@ -127,11 +129,11 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			current = await httpJSONRequest( currentUrl );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from Bright Sky:", err );
-			throw "An error occurred while retrieving weather information from Bright Sky."
+			throw new CodedError(ErrorCode.WeatherApiError);
 		}
 
 		if ( !current || !current.weather ) {
-			throw "Necessary field(s) were missing from weather information returned by Bright Sky.";
+			throw new CodedError(ErrorCode.MissingWeatherField);
 		}
 
 		const weather: WeatherData = {
@@ -144,40 +146,48 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			icon: this.getOWMIconCode( current.weather.icon ),
 
 			region: "",
-			city: current.sources[0].station_name,
+			city: current.sources?.[0]?.station_name || "",
 			minTemp: 0,
 			maxTemp: 0,
 			precip: 0,
 			forecast: [],
 		};
 
-        const local = localTime(coordinates);
+		const local = localTime(coordinates);
+		const startDate = format(local, "yyyy-MM-dd");
+		// last_date is the timestamp of the final record, so request through the next midnight
+		// and keep the first seven complete calendar-day groups.
+		const endDate = format(addDays(local, 7), "yyyy-MM-dd");
+		const forecastUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ startDate }&last_date=${ endDate }&tz=${tz}`;
+		let forecast;
+		try {
+			forecast = await httpJSONRequest(forecastUrl);
+		} catch (err) {
+			console.error("Error retrieving weather information from Bright Sky:", err);
+			throw new CodedError(ErrorCode.WeatherApiError);
+		}
+		if (!forecast || !forecast.weather) {
+			throw new CodedError(ErrorCode.MissingWeatherField);
+		}
+		const forecastHours: any[] = forecast.weather;
+		const forecastDays = groupByLocalDay(forecastHours, hour => hour.timestamp, tz).slice(0, 7);
+		if (!forecastDays.length) {
+			throw new CodedError(ErrorCode.InsufficientWeatherData);
+		}
 
-		for ( let day = 0; day < 7; day++ ) {
+		for (let day = 0; day < forecastDays.length; day++) {
+			const records = forecastDays[day].records;
 
-			const date = addDays(local, day);
-
-			const forecastUrl = `https://api.brightsky.dev/weather?lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&date=${ date.toISOString() }`;
-
-			let forecast;
-			try {
-				forecast = await httpJSONRequest( forecastUrl );
-			} catch ( err ) {
-				console.error( "Error retrieving weather information from Bright Sky:", err );
-				throw "An error occurred while retrieving weather information from Bright Sky."
+			const minTemp = minFinite(records.map(hour => hour.temperature));
+			const maxTemp = maxFinite(records.map(hour => hour.temperature));
+			const precip = sumFinite(records.map(hour => hour.precipitation));
+			if (![minTemp, maxTemp, precip].every(Number.isFinite)) {
+				throw new CodedError(ErrorCode.InsufficientWeatherData);
 			}
-			if ( !forecast || !forecast.weather ) {
-				throw "Necessary field(s) were missing from weather information returned by Bright Sky.";
-			}
-
-			let minTemp: number = undefined, maxTemp: number = undefined, precip: number = 0;
 			let condition: string = "dry", icon: string = "", condIdx = 0;
-			const allowed = "dry.fog.rain.sleet.snow.hail.thunderstorm";
-			for ( const hour of forecast.weather ) {
-				minTemp = minTemp < hour.temperature ? minTemp : hour.temperature;
-				maxTemp = maxTemp > hour.temperature ? maxTemp : hour.temperature;
-				precip += hour.precipitation;
-				let idx: number = allowed.indexOf(hour.condition);
+			const allowed = ["dry", "fog", "rain", "sleet", "snow", "hail", "thunderstorm"];
+			for (const hour of records) {
+				const idx = allowed.indexOf(hour.condition);
 				if ( idx > condIdx ) {
 					condIdx = idx;
 					condition = hour.condition;
@@ -193,7 +203,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 				temp_min: this.C2F(minTemp),
 				temp_max: this.C2F(maxTemp),
 				precip: this.mm2inch(precip),
-				date: getUnixTime(date),
+				date: getUnixTime(new TZDate(records[0].timestamp, tz)),
 				icon: this.getOWMIconCode( icon ),
 				description: condition,
 			} );

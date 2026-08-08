@@ -39,6 +39,12 @@ export interface WeatherData {
 	/** The forecasted total precipitation for the current day (in inches), if available. */
 	precip?: number;
 	forecast: WeatherDataForecast[]
+	/** Provider attribution that must accompany displayed weather data, when required by the provider. */
+	attribution?: {
+		name?: string;
+		url?: string;
+		logo?: string;
+	};
 }
 
 /** The forecasted weather for a specific day in the future. */

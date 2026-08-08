@@ -8,8 +8,15 @@ import {
 	CloudCoverInfo,
 } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
-import { format, addHours, getUnixTime, startOfDay, subDays } from "date-fns";
+import { addHours, getUnixTime, startOfDay, subDays } from "date-fns";
 import { TZDate } from "@date-fns/tz";
+import {
+	averageFinite,
+	completeHistoricalHourlyDays,
+	localDateKey,
+	maxFinite,
+	minFinite,
+} from "./providerUtils";
 
 type UnitsSystem = "m";
 type MoonPhase = "new" | "waxingCrescent" | "firstQuarter" | "waxingGibbous" | "full" | "waningGibbous" | "thirdQuarter" | "waningCrescent";
@@ -189,7 +196,7 @@ interface AppleWeather {
 }
 
 export default class AppleWeatherProvider extends WeatherProvider {
-	private readonly API_KEY: Promise<string>;
+	private readonly API_KEY?: Promise<string>;
 
 	public constructor() {
 		super();
@@ -213,10 +220,17 @@ export default class AppleWeatherProvider extends WeatherProvider {
 				kid: process.env.APPLE_KEY_ID,
 				id: `${process.env.APPLE_TEAM_ID}.${process.env.APPLE_SERVICE_ID}`, // custom header field
 			})
-			.setJti(`${process.env.APPLE_TEAM_ID}.${process.env.APPLE_SERVICE_ID}`)
 			.setIssuer(process.env.APPLE_TEAM_ID)
+			.setIssuedAt()
 			.setExpirationTime("10y")
 			.sign(privateKey);
+	}
+
+	protected getApiKey(): Promise<string> {
+		if (!this.API_KEY) {
+			throw new CodedError(ErrorCode.NoAPIKeyProvided);
+		}
+		return this.API_KEY;
 	}
 
 	protected async getWateringDataInternal(
@@ -236,10 +250,11 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			coordinates[1]
 		}?dataSets=forecastHourly,forecastDaily&currentAsOf=${endTimestamp}&hourlyStart=${startTimestamp}&hourlyEnd=${endTimestamp}&dailyStart=${startTimestamp}&dailyEnd=${endTimestamp}&timezone=${tz}`;
 
+		const apiKey = await this.getApiKey();
 		let historicData: AppleWeather;
 		try {
 			historicData = await httpJSONRequest(historicUrl, {
-				Authorization: `Bearer ${await this.API_KEY}`,
+				Authorization: `Bearer ${apiKey}`,
 			});
 		} catch (err) {
 			console.error("Error retrieving weather information from Apple:", err);
@@ -251,7 +266,10 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		}
 
 		const hours = historicData.forecastHourly.hours;
-		const days = historicData.forecastDaily.days;
+		const days = historicData.forecastDaily?.days;
+		if (!days) {
+			throw new CodedError(ErrorCode.MissingWeatherField);
+		}
 
 		// Fail if not enough data is available.
 		// There will only be 23 samples on the day that daylight saving time begins.
@@ -259,26 +277,27 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			throw new CodedError(ErrorCode.InsufficientWeatherData);
 		}
 
-		// Cut hours down into full 24 hour section
-		hours.splice(0, hours.length % 24);
-		const daysInHours: HourWeatherConditions[][] = [];
-		for (let i = 0; i < hours.length; i += 24) {
-			daysInHours.push(hours.slice(i, i + 24));
+		const daysInHours = completeHistoricalHourlyDays(
+			hours,
+			hour => hour.forecastStart,
+			tz,
+			currentDay,
+			10
+		);
+		const dailyByDate = new Map(days.map(day => [localDateKey(day.forecastStart, tz), day]));
+		if (!daysInHours.length) {
+			throw new CodedError(ErrorCode.InsufficientWeatherData);
 		}
-
-		// Cut days down to match number of hours
-		days.splice(0, days.length - daysInHours.length);
-		daysInHours.splice(0, daysInHours.length - days.length);
 
 		// Pull data for each day of the given interval
 		const data = [];
-		for (let i = 0; i < daysInHours.length; i++) {
-			let temp: number = 0,
-				humidity: number = 0,
-				minHumidity: number = undefined,
-				maxHumidity: number = undefined;
-
-			const cloudCoverInfo: CloudCoverInfo[] = daysInHours[i].map(
+		for (const dayGroup of daysInHours) {
+			const day = dailyByDate.get(dayGroup.date);
+			if (!day) {
+				throw new CodedError(ErrorCode.InsufficientWeatherData);
+			}
+			const dayHours = dayGroup.records;
+			const cloudCoverInfo: CloudCoverInfo[] = dayHours.map(
 				(hour): CloudCoverInfo => {
                     const startTime = new TZDate(hour.forecastStart, tz);
 
@@ -289,55 +308,28 @@ export default class AppleWeatherProvider extends WeatherProvider {
 					};
 				}
 			);
-
-			for (const hour of daysInHours[i]) {
-				/*
-				 * If temperature or humidity is missing from a sample, the total will become NaN. This is intended since
-				 * calculateWateringScale will treat NaN as a missing value and temperature/humidity can't be accurately
-				 * calculated when data is missing from some samples (since they follow diurnal cycles and will be
-				 * significantly skewed if data is missing for several consecutive hours).
-				 */
-				temp += this.celsiusToFahrenheit(hour.temperature);
-				humidity += hour.humidity;
-
-				// ETo should skip NaN humidity
-				if (hour.humidity === undefined) {
-					continue;
-				}
-
-				// If minHumidity or maxHumidity is undefined, these comparisons will yield false.
-				minHumidity = minHumidity < hour.humidity ? minHumidity : hour.humidity;
-				maxHumidity = maxHumidity > hour.humidity ? maxHumidity : hour.humidity;
+			const temp = averageFinite(dayHours.map(hour => hour.temperature));
+			const humidity = averageFinite(dayHours.map(hour => hour.humidity));
+			const minHumidity = minFinite(dayHours.map(hour => hour.humidity));
+			const maxHumidity = maxFinite(dayHours.map(hour => hour.humidity));
+			const windSpeed = averageFinite(dayHours.map(hour => hour.windSpeed));
+			if ([temp, humidity, minHumidity, maxHumidity, windSpeed].some(value => !Number.isFinite(value))) {
+				throw new CodedError(ErrorCode.InsufficientWeatherData);
 			}
-
-			const length = daysInHours[i].length;
-			const windSamples = [
-				days[i].daytimeForecast?.windSpeed,
-				days[i].overnightForecast?.windSpeed,
-			].filter(Number.isFinite) as number[];
-			const windSpeed = windSamples.reduce((sum, speed) => sum + speed, 0) / windSamples.length;
 
 			data.push({
 				weatherProvider: "Apple",
-				temp: temp / length,
-				humidity: (humidity / length) * 100,
-				periodStartTime: getUnixTime(new Date(
-					historicData.forecastDaily.days[i].forecastStart
-				)),
-				minTemp: this.celsiusToFahrenheit(
-					historicData.forecastDaily.days[i].temperatureMin
-				),
-				maxTemp: this.celsiusToFahrenheit(
-					historicData.forecastDaily.days[i].temperatureMax
-				),
+				temp: this.celsiusToFahrenheit(temp),
+				humidity: humidity * 100,
+				periodStartTime: getUnixTime(new Date(dayHours[0].forecastStart)),
+				minTemp: this.celsiusToFahrenheit(day.temperatureMin),
+				maxTemp: this.celsiusToFahrenheit(day.temperatureMax),
 				minHumidity: minHumidity * 100,
 				maxHumidity: maxHumidity * 100,
 				solarRadiation: approximateSolarRadiation(cloudCoverInfo, coordinates),
-				// Assume wind speed measurements are taken at 2 meters.
+				// WeatherKit does not document the measurement height for this field.
 				windSpeed: this.kphToMph(windSpeed),
-				precip: this.mmToInchesPerHour(
-					historicData.forecastDaily.days[i].precipitationAmount || 0
-				),
+				precip: this.mmToInchesPerHour(day.precipitationAmount ?? 0),
 			});
 		}
 
@@ -352,14 +344,15 @@ export default class AppleWeatherProvider extends WeatherProvider {
 
 		const forecastUrl = `https://weatherkit.apple.com/api/v1/weather/en/${coordinates[0]}/${coordinates[1]}?dataSets=currentWeather,forecastDaily&timezone=${tz}`;
 
+		const apiKey = await this.getApiKey();
 		let forecast: AppleWeather;
 		try {
 			forecast = await httpJSONRequest(forecastUrl, {
-				Authorization: `Bearer ${await this.API_KEY}`,
+				Authorization: `Bearer ${apiKey}`,
 			});
 		} catch (err) {
 			console.error("Error retrieving weather information from Apple:", err);
-			throw "An error occurred while retrieving weather information from Apple.";
+			throw new CodedError(ErrorCode.WeatherApiError);
 		}
 
 		if (
@@ -367,7 +360,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			!forecast.forecastDaily ||
 			!forecast.forecastDaily.days
 		) {
-			throw "Necessary field(s) were missing from weather information returned by Apple.";
+			throw new CodedError(ErrorCode.MissingWeatherField);
 		}
 
 		const weather: WeatherData = {
@@ -393,6 +386,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 				forecast.forecastDaily.days[0].precipitationAmount
 			),
 			forecast: [],
+			...this.getAttribution(forecast.currentWeather.metadata),
 		};
 
 		for (let index = 0; index < forecast.forecastDaily.days.length; index++) {
@@ -419,6 +413,19 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		}
 
 		return weather;
+	}
+
+	private getAttribution(metadata: Metadata): Pick<WeatherData, "attribution"> | {} {
+		if (!metadata || !(metadata.attributionURL || metadata.providerLogo || metadata.providerName)) {
+			return {};
+		}
+		return {
+			attribution: {
+				name: metadata.providerName,
+				url: metadata.attributionURL,
+				logo: metadata.providerLogo,
+			},
+		};
 	}
 
 	public shouldCacheWateringScale(): boolean {

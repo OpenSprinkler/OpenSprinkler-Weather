@@ -5,10 +5,20 @@ import { GeoCoordinates, WeatherData, WateringData, PWS } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
 import { getParameter } from "../weather";
+import {
+	hasTimeSeriesCoverage,
+	maxFinite,
+	maximumTimeGap,
+	minFinite,
+	sumFinite,
+	timeWeightedAverage,
+} from "./providerUtils";
 
 var queue: Array<Observation> = [],
 	lastRainEpoch = 0,
 	lastRainCount: number;
+
+const MAX_OBSERVATION_GAP_SECONDS = 2 * 60 * 60;
 
 function roundedMeasurement(value: number, precision: number = 0): number | undefined {
 	if (!Number.isFinite(value)) return undefined;
@@ -24,6 +34,9 @@ function getMeasurement(req: express.Request, key: string): number {
 
 export const captureWUStream = async function( req: express.Request, res: express.Response ) {
 	let rainCount = getMeasurement(req, "dailyrainin");
+	const precip = Number.isFinite(rainCount) && Number.isFinite(lastRainCount)
+		? (rainCount < lastRainCount ? rainCount : Math.max(0, rainCount - lastRainCount))
+		: undefined;
 
 	const obs: Observation = {
 		timestamp: req.query.dateutc === "now" ? Math.floor(Date.now()/1000) : Math.floor(new Date(String(req.query.dateutc) + "Z").getTime()/1000),
@@ -31,13 +44,13 @@ export const captureWUStream = async function( req: express.Request, res: expres
 		humidity: getMeasurement(req, "humidity"),
 		windSpeed: getMeasurement(req, "windspeedmph"),
 		solarRadiation: getMeasurement(req, "solarradiation") * 24 / 1000,	// Convert to kWh/m^2 per day
-		precip: rainCount < lastRainCount ? rainCount : rainCount - lastRainCount,
+		precip,
 	};
 
 	lastRainEpoch = getMeasurement(req, "rainin") > 0 ? obs.timestamp : lastRainEpoch;
 	lastRainCount = isNaN(rainCount) ? lastRainCount : rainCount;
 
-	queue.unshift(obs);
+	queue = normalizeQueue([obs, ...queue]);
 
 	res.send( "success\n" );
 };
@@ -45,11 +58,11 @@ export const captureWUStream = async function( req: express.Request, res: expres
 export default class LocalWeatherProvider extends WeatherProvider {
 
 	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
-		queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
+		queue = normalizeQueue(queue);
 
 		if ( queue.length == 0 ) {
 			console.error( "There is insufficient data to support Weather response from local PWS." );
-			throw "There is insufficient data to support Weather response from local PWS.";
+			throw new CodedError(ErrorCode.InsufficientWeatherData);
 		}
 
 		const weather: WeatherData = {
@@ -75,31 +88,47 @@ export default class LocalWeatherProvider extends WeatherProvider {
 
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 
-		queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
+		queue = normalizeQueue(queue);
 
-		if ( queue.length == 0 || queue[ 0 ].timestamp - queue[ queue.length - 1 ].timestamp < 23*60*60 ) {
+		if (queue.length < 2 || queue[0].timestamp - queue[queue.length - 1].timestamp < 23 * 60 * 60 ||
+			maximumTimeGap(queue, obs => obs.timestamp) > MAX_OBSERVATION_GAP_SECONDS) {
 			console.error( "There is insufficient data to support watering calculation from local PWS." );
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
-		let cTemp = 0, cHumidity = 0, cPrecip = 0, cSolar = 0, cWind = 0;
+		const temp = timeWeightedAverage(queue, obs => obs.timestamp, obs => obs.temp);
+		const humidity = timeWeightedAverage(queue, obs => obs.timestamp, obs => obs.humidity);
+		const solarRadiation = timeWeightedAverage(queue, obs => obs.timestamp, obs => obs.solarRadiation);
+		const windSpeed = timeWeightedAverage(queue, obs => obs.timestamp, obs => obs.windSpeed);
+		const precip = sumFinite(queue.map(obs => obs.precip));
+		const hasCoverage = [
+			(obs: Observation) => obs.temp,
+			(obs: Observation) => obs.humidity,
+			(obs: Observation) => obs.solarRadiation,
+			(obs: Observation) => obs.windSpeed,
+		].every(getValue => hasTimeSeriesCoverage(
+			queue,
+			obs => obs.timestamp,
+			getValue,
+			MAX_OBSERVATION_GAP_SECONDS
+		));
 		const result: WateringData = {
 			weatherProvider: "local",
-			temp: queue.reduce( ( sum, obs ) => !isNaN( obs.temp ) && ++cTemp ? sum + obs.temp : sum, 0) / cTemp,
-			humidity: queue.reduce( ( sum, obs ) => !isNaN( obs.humidity ) && ++cHumidity ? sum + obs.humidity : sum, 0) / cHumidity,
-			precip: queue.reduce( ( sum, obs ) => !isNaN( obs.precip ) && ++cPrecip ? sum + obs.precip : sum, 0),
+			temp,
+			humidity,
+			precip,
 			periodStartTime: Math.floor( queue[ queue.length - 1 ].timestamp ),
-			minTemp: queue.reduce( (min, obs) => ( min > obs.temp ) ? obs.temp : min, Infinity ),
-			maxTemp: queue.reduce( (max, obs) => ( max < obs.temp ) ? obs.temp : max, -Infinity ),
-			minHumidity: queue.reduce( (min, obs) => ( min > obs.humidity ) ? obs.humidity : min, Infinity ),
-			maxHumidity: queue.reduce( (max, obs) => ( max < obs.humidity ) ? obs.humidity : max, -Infinity ),
-			solarRadiation: queue.reduce( (sum, obs) => !isNaN( obs.solarRadiation ) && ++cSolar ? sum + obs.solarRadiation : sum, 0) / cSolar,
-			windSpeed: queue.reduce( (sum, obs) => !isNaN( obs.windSpeed ) && ++cWind ? sum + obs.windSpeed : sum, 0) / cWind
+			minTemp: minFinite(queue.map(obs => obs.temp)),
+			maxTemp: maxFinite(queue.map(obs => obs.temp)),
+			minHumidity: minFinite(queue.map(obs => obs.humidity)),
+			maxHumidity: maxFinite(queue.map(obs => obs.humidity)),
+			solarRadiation,
+			windSpeed
 		};
 
-		if ( !( cTemp && cHumidity && cPrecip ) ||
-			[ result.minTemp, result.minHumidity, -result.maxTemp, -result.maxHumidity ].includes( Infinity ) ||
-			!( cSolar && cWind && cPrecip )) {
+		if (!hasCoverage || [result.temp, result.humidity, result.precip, result.minTemp, result.maxTemp,
+			result.minHumidity, result.maxHumidity, result.solarRadiation, result.windSpeed]
+			.some(value => !Number.isFinite(value))) {
 			console.error( "There is insufficient data to support watering calculation from local PWS." );
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
@@ -110,9 +139,10 @@ export default class LocalWeatherProvider extends WeatherProvider {
 }
 
 function saveQueue() {
-	queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
+	queue = normalizeQueue(queue);
 	try {
-		fs.writeFileSync( "observations.json" , JSON.stringify( queue ), "utf8" );
+		const state: PersistedObservationState = { observations: queue, lastRainCount, lastRainEpoch };
+		fs.writeFileSync("observations.json", JSON.stringify(state), "utf8");
 	} catch ( err ) {
 		console.error( "Error saving historical observations to local storage.", err );
 	}
@@ -121,8 +151,14 @@ function saveQueue() {
 if ( process.env.WEATHER_PROVIDER === "local" && process.env.LOCAL_PERSISTENCE ) {
 	if ( fs.existsSync( "observations.json" ) ) {
 		try {
-			queue = JSON.parse( fs.readFileSync( "observations.json", "utf8" ) );
-			queue = queue.filter( obs => Math.floor(Date.now()/1000) - obs.timestamp < 24*60*60 );
+			const stored = JSON.parse(fs.readFileSync("observations.json", "utf8"));
+			if (Array.isArray(stored)) {
+				queue = normalizeQueue(stored);
+			} else {
+				queue = normalizeQueue(stored.observations || []);
+				lastRainCount = Number.isFinite(stored.lastRainCount) ? stored.lastRainCount : undefined;
+				lastRainEpoch = Number.isFinite(stored.lastRainEpoch) ? stored.lastRainEpoch : 0;
+			}
 		} catch ( err ) {
 			console.error( "Error reading historical observations from local storage.", err );
 			queue = [];
@@ -138,4 +174,21 @@ interface Observation {
 	windSpeed: number;
 	solarRadiation: number;
 	precip: number;
+}
+
+interface PersistedObservationState {
+	observations: Observation[];
+	lastRainCount?: number;
+	lastRainEpoch: number;
+}
+
+function normalizeQueue(observations: Observation[]): Observation[] {
+	const cutoff = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+	const unique = new Map<number, Observation>();
+	for (const observation of observations) {
+		if (Number.isFinite(observation?.timestamp) && observation.timestamp >= cutoff && !unique.has(observation.timestamp)) {
+			unique.set(observation.timestamp, observation);
+		}
+	}
+	return Array.from(unique.values()).sort((a, b) => b.timestamp - a.timestamp);
 }
