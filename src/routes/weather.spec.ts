@@ -48,8 +48,6 @@ describe("Watering Data", () => {
 				maxTemp: 70,
 				minHumidity: 50,
 				maxHumidity: 50,
-				solarRadiation: 4.5,
-				windSpeed: 3,
 			}],
 		});
 
@@ -143,6 +141,26 @@ describe("Weather Sensor Data", () => {
 
 		expect(result.h.t).to.equal(45);
 		expect(result.h.eto).to.equal(undefined);
+	});
+
+	it("omits unavailable local ETo fields without discarding core history", () => {
+		const wateringResult: CachedResult<readonly WateringData[]> = {
+			value: [{ ...wateringData, windSpeed: undefined, solarRadiation: undefined }],
+			ttl: 1000,
+			cachedAt: 1557748800000,
+		};
+
+		const result = buildWeatherSensorResponse(
+			[42, -75],
+			{ current: false, forecast: false, historical: true },
+			undefined,
+			wateringResult
+		);
+
+		expect(result.h).to.include({ t: 45, h: 60, p: 0 });
+		expect(result.h).not.to.have.property("w");
+		expect(result.h).not.to.have.property("sr");
+		expect(result.h).not.to.have.property("eto");
 	});
 
 	it("fetches only the provider data required by scope", async () => {

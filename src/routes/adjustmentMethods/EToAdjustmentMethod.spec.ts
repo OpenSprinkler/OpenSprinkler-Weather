@@ -72,6 +72,11 @@ describe( "ETo AdjustmentMethod", () => {
 			makeWateringData({ maxHumidity: 101 }),
 			ErrorCode.BadWeatherData
 		);
+		await expectAdjustmentError(
+			makeAdjustmentOptions(0.15),
+			makeWateringData({ windSpeed: undefined, solarRadiation: undefined }),
+			ErrorCode.BadWeatherData
+		);
 	});
 } );
 

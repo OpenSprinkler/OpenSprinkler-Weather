@@ -87,13 +87,13 @@ export interface WateringData {
 	minHumidity: number;
 	/** The maximum relative humidity over the time period (as a percentage). */
 	maxHumidity: number;
-	/** The solar radiation, accounting for cloud coverage (in kilowatt hours per square meter per day). */
-	solarRadiation: number;
+	/** The solar radiation, accounting for cloud coverage (in kilowatt hours per square meter per day), if available. */
+	solarRadiation?: number;
 	/**
-	 * The average wind speed measured at 2 meters over the time period (in miles per hour). A measurement taken at a
-	 * different height can be standardized to 2m using the `standardizeWindSpeed` function in EToAdjustmentMethod.
+	 * The average wind speed measured at 2 meters over the time period (in miles per hour), if available. A measurement
+	 * taken at a different height can be standardized to 2m using the `standardizeWindSpeed` function in EToAdjustmentMethod.
 	 */
-	windSpeed: number;
+	windSpeed?: number;
 }
 
 export type WeatherProviderId = "OWM" | "PirateWeather" | "local" | "mock" | "WUnderground" | "DWD" | "OpenMeteo" | "AccuWeather" | "Apple";

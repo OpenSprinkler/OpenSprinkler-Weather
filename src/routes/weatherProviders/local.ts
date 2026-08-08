@@ -26,7 +26,7 @@ function roundedMeasurement(value: number, precision: number = 0): number | unde
 	return Math.round(value * scale) / scale;
 }
 
-function getMeasurement(req: express.Request, key: string): number {
+function getMeasurement(req: express.Request, key: string): number | undefined {
 	let value: number;
 
 	return ( key in req.query ) && !isNaN( value = parseFloat( getParameter(req.query[key]) ) ) && ( value !== -9999.0 ) ? value : undefined;
@@ -34,21 +34,25 @@ function getMeasurement(req: express.Request, key: string): number {
 
 export const captureWUStream = async function( req: express.Request, res: express.Response ) {
 	let rainCount = getMeasurement(req, "dailyrainin");
-	const precip = Number.isFinite(rainCount) && Number.isFinite(lastRainCount)
+	const precip = typeof rainCount === "number" && Number.isFinite(rainCount) && Number.isFinite(lastRainCount)
 		? (rainCount < lastRainCount ? rainCount : Math.max(0, rainCount - lastRainCount))
 		: undefined;
+	const solarRadiation = getMeasurement(req, "solarradiation");
+	const rainRate = getMeasurement(req, "rainin");
 
 	const obs: Observation = {
 		timestamp: req.query.dateutc === "now" ? Math.floor(Date.now()/1000) : Math.floor(new Date(String(req.query.dateutc) + "Z").getTime()/1000),
 		temp: getMeasurement(req, "tempf"),
 		humidity: getMeasurement(req, "humidity"),
 		windSpeed: getMeasurement(req, "windspeedmph"),
-		solarRadiation: getMeasurement(req, "solarradiation") * 24 / 1000,	// Convert to kWh/m^2 per day
+		solarRadiation: typeof solarRadiation === "number" && Number.isFinite(solarRadiation)
+			? solarRadiation * 24 / 1000
+			: undefined,	// Convert to kWh/m^2 per day
 		precip,
 	};
 
-	lastRainEpoch = getMeasurement(req, "rainin") > 0 ? obs.timestamp : lastRainEpoch;
-	lastRainCount = isNaN(rainCount) ? lastRainCount : rainCount;
+	lastRainEpoch = typeof rainRate === "number" && rainRate > 0 ? obs.timestamp : lastRainEpoch;
+	lastRainCount = typeof rainCount === "number" && Number.isFinite(rainCount) ? rainCount : lastRainCount;
 
 	queue = normalizeQueue([obs, ...queue]);
 
@@ -89,53 +93,56 @@ export default class LocalWeatherProvider extends WeatherProvider {
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 
 		queue = normalizeQueue(queue);
-
-		if (queue.length < 2 || queue[0].timestamp - queue[queue.length - 1].timestamp < 23 * 60 * 60 ||
-			maximumTimeGap(queue, obs => obs.timestamp) > MAX_OBSERVATION_GAP_SECONDS) {
-			console.error( "There is insufficient data to support watering calculation from local PWS." );
-			throw new CodedError( ErrorCode.InsufficientWeatherData );
-		}
-
-		const temp = timeWeightedAverage(queue, obs => obs.timestamp, obs => obs.temp);
-		const humidity = timeWeightedAverage(queue, obs => obs.timestamp, obs => obs.humidity);
-		const solarRadiation = timeWeightedAverage(queue, obs => obs.timestamp, obs => obs.solarRadiation);
-		const windSpeed = timeWeightedAverage(queue, obs => obs.timestamp, obs => obs.windSpeed);
-		const precip = sumFinite(queue.map(obs => obs.precip));
-		const hasCoverage = [
-			(obs: Observation) => obs.temp,
-			(obs: Observation) => obs.humidity,
-			(obs: Observation) => obs.solarRadiation,
-			(obs: Observation) => obs.windSpeed,
-		].every(getValue => hasTimeSeriesCoverage(
-			queue,
-			obs => obs.timestamp,
-			getValue,
-			MAX_OBSERVATION_GAP_SECONDS
-		));
-		const result: WateringData = {
-			weatherProvider: "local",
-			temp,
-			humidity,
-			precip,
-			periodStartTime: Math.floor( queue[ queue.length - 1 ].timestamp ),
-			minTemp: minFinite(queue.map(obs => obs.temp)),
-			maxTemp: maxFinite(queue.map(obs => obs.temp)),
-			minHumidity: minFinite(queue.map(obs => obs.humidity)),
-			maxHumidity: maxFinite(queue.map(obs => obs.humidity)),
-			solarRadiation,
-			windSpeed
-		};
-
-		if (!hasCoverage || [result.temp, result.humidity, result.precip, result.minTemp, result.maxTemp,
-			result.minHumidity, result.maxHumidity, result.solarRadiation, result.windSpeed]
-			.some(value => !Number.isFinite(value))) {
-			console.error( "There is insufficient data to support watering calculation from local PWS." );
-			throw new CodedError( ErrorCode.InsufficientWeatherData );
-		}
-
-		return [result];
+		return [buildLocalWateringData(queue)];
 	};
 
+}
+
+export function buildLocalWateringData(observations: readonly Observation[]): WateringData {
+	const normalized = normalizeQueue([...observations]);
+
+	if (normalized.length < 2 || normalized[0].timestamp - normalized[normalized.length - 1].timestamp < 23 * 60 * 60 ||
+		maximumTimeGap(normalized, obs => obs.timestamp) > MAX_OBSERVATION_GAP_SECONDS) {
+		console.error( "There is insufficient data to support watering calculation from local PWS." );
+		throw new CodedError( ErrorCode.InsufficientWeatherData );
+	}
+
+	const temp = timeWeightedAverage(normalized, obs => obs.timestamp, obs => obs.temp);
+	const humidity = timeWeightedAverage(normalized, obs => obs.timestamp, obs => obs.humidity);
+	const solarRadiation = timeWeightedAverage(normalized, obs => obs.timestamp, obs => obs.solarRadiation);
+	const windSpeed = timeWeightedAverage(normalized, obs => obs.timestamp, obs => obs.windSpeed);
+	const precip = sumFinite(normalized.map(obs => obs.precip));
+	const hasCoreCoverage = [
+		(obs: Observation) => obs.temp,
+		(obs: Observation) => obs.humidity,
+	].every(getValue => hasTimeSeriesCoverage(
+		normalized,
+		obs => obs.timestamp,
+		getValue,
+		MAX_OBSERVATION_GAP_SECONDS
+	));
+	const result: WateringData = {
+		weatherProvider: "local",
+		temp,
+		humidity,
+		precip,
+		periodStartTime: Math.floor(normalized[normalized.length - 1].timestamp),
+		minTemp: minFinite(normalized.map(obs => obs.temp)),
+		maxTemp: maxFinite(normalized.map(obs => obs.temp)),
+		minHumidity: minFinite(normalized.map(obs => obs.humidity)),
+		maxHumidity: maxFinite(normalized.map(obs => obs.humidity)),
+		solarRadiation,
+		windSpeed
+	};
+
+	if (!hasCoreCoverage || [result.temp, result.humidity, result.precip, result.minTemp, result.maxTemp,
+		result.minHumidity, result.maxHumidity]
+		.some(value => !Number.isFinite(value))) {
+		console.error( "There is insufficient data to support watering calculation from local PWS." );
+		throw new CodedError( ErrorCode.InsufficientWeatherData );
+	}
+
+	return result;
 }
 
 function saveQueue() {
@@ -167,13 +174,13 @@ if ( process.env.WEATHER_PROVIDER === "local" && process.env.LOCAL_PERSISTENCE )
 	setInterval( saveQueue, 1000 * 60 * 30 );
 }
 
-interface Observation {
+export interface Observation {
 	timestamp: number;
-	temp: number;
-	humidity: number;
-	windSpeed: number;
-	solarRadiation: number;
-	precip: number;
+	temp?: number;
+	humidity?: number;
+	windSpeed?: number;
+	solarRadiation?: number;
+	precip?: number;
 }
 
 interface PersistedObservationState {

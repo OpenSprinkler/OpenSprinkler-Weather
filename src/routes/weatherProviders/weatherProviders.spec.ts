@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import AccuWeatherProvider from "./AccuWeather";
 import AppleWeatherProvider from "./Apple";
-import LocalWeatherProvider, { captureWUStream } from "./local";
+import LocalWeatherProvider, { buildLocalWateringData, captureWUStream } from "./local";
 import OpenMeteoProvider from "./OpenMeteo";
 import PirateWeatherProvider from "./PirateWeather";
 import WUndergroundProvider from "./WUnderground";
@@ -404,6 +404,23 @@ describe("Weather provider normalization", () => {
 		expect(weather.wind).to.equal(0);
 		expect(weather.raining).to.equal(false);
 		expect(weather.precip).to.equal(undefined);
+	});
+
+	it("allows local Zimmerman data without wind or solar measurements", () => {
+		const now = Math.floor(Date.now() / 1000);
+		const observations = sequence(24, hour => ({
+			timestamp: now - hour * 60 * 60,
+			temp: 70,
+			humidity: 50,
+			precip: 0,
+		}));
+
+		const data = buildLocalWateringData(observations);
+		expect(data.temp).to.equal(70);
+		expect(data.humidity).to.equal(50);
+		expect(data.precip).to.equal(0);
+		expect(data.windSpeed).to.equal(undefined);
+		expect(data.solarRadiation).to.equal(undefined);
 	});
 
 	it("rejects non-success HTTP responses without exposing the request URL", async () => {
