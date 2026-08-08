@@ -86,7 +86,7 @@ PWS=WU
 WEATHER_PROVIDER=local
 ```
 
-Then upload a synthetic 24-hour observation stream and test it with:
+Then upload a synthetic 48-hour observation stream, ensuring the previous local-calendar day is complete, and test it with:
 
 ```bash
 npm run test:weather-full -- --providers local --include-local-pws

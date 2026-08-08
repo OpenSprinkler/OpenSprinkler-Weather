@@ -113,6 +113,8 @@ PERSISTENCE_LOCATION=/var/lib/opensprinkler-weather # Optional; defaults to the 
 
 Create the configured directory with write permission for the account running the weather service. Persistence remains active when a different `WEATHER_PROVIDER` is selected, allowing the local PWS stream to continue accumulating history.
 
+The local provider retains eight days of observations and supplies up to seven contiguous, complete local-calendar days for multi-day averaging. A complete previous day must be available before local weather adjustment can begin.
+
 * **Step 5d:** If you registered for the Apple WeatherKit API then also add these two lines to the .env file:
 ```
 WEATHER_PROVIDER=Apple

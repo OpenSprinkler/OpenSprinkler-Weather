@@ -122,6 +122,8 @@ When the weather server is running, it starts a web service at `<host>:3000`, wh
     - `rawData`: the raw weather data used for Zimmerman calculation
     - `scales`: multi-day averages based on available historic data. The length of this array depends on the selected weather data provider's capability.
 
+  The local provider retains eight days of observations and returns up to seven contiguous, complete local-calendar days for multi-day averaging. Persistence should be enabled so this history survives a service restart.
+
 - `<host>:3000/2?loc=[long],[lat]&wto="d":28`: Used for **Auto Rain Delay**, where `d` is the number of hours to delay if rain is currently reported.
 
 - `<host>:3000/3?loc=[long],[lat]&wto="baseETo":0.34,"elevation":600`: Used for **ETo** adjustment. `baseETo` is the baseline ETo value in inches/day; `elevation` is the elevation in feet. Returns `scale`, `rawData` and `scales` array similar to Zimmerman.

@@ -1,10 +1,20 @@
 import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
-import { httpJSONRequest, keyToUse, localTime } from "../weather";
+import { getTZ, httpJSONRequest, keyToUse, localTime } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
 import { addHours, fromUnixTime, getUnixTime, startOfDay, subDays } from "date-fns";
-import { averageFinite, finiteValues, maxFinite, minFinite, sumFinite } from "./providerUtils";
+import { averageFinite, completeHistoricalHourlyDays, finiteValues, maxFinite, minFinite, sumFinite } from "./providerUtils";
+
+interface PirateWeatherHour {
+	time: number;
+	temperature?: number;
+	humidity?: number;
+	dewPoint?: number;
+	liquidAccumulation?: number;
+	cloudCover?: number;
+	windSpeed?: number;
+}
 
 export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
@@ -35,17 +45,17 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
-		let samples = [
-			...historicData.hourly.data
-		];
-
-		// Fail if not enough data is available.
-		if ( samples.length < 24 ) {
-			throw new CodedError( ErrorCode.InsufficientWeatherData );
+		const days = completeHistoricalHourlyDays<PirateWeatherHour>(
+			historicData.hourly.data as PirateWeatherHour[],
+			hour => hour.time * 1000,
+			getTZ(coordinates),
+			startOfDay(localTime(coordinates)),
+			1
+		);
+		if (!days.length) {
+			throw new CodedError(ErrorCode.InsufficientWeatherData);
 		}
-
-		//returns 48 hours (first 24 are historical so only loop those)
-		samples = samples.slice(0,24);
+		const samples = days[0].records;
 
 		const cloudCoverInfo: CloudCoverInfo[] = samples.map( ( hour ): CloudCoverInfo => {
             const startTime = fromUnixTime(hour.time);

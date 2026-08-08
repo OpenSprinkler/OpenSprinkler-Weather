@@ -5,15 +5,18 @@ import path from "path";
 import { GeoCoordinates, WeatherData, WateringData, PWS } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
-import { getParameter } from "../weather";
+import { getParameter, getTZ } from "../weather";
 import { localPersistenceEnabled, resolvePersistenceFile } from "../../config";
 import {
-	hasTimeSeriesCoverage,
+	groupByLocalDay,
+	hasWindowCoverage,
+	localDateKey,
+	localDayWindow,
 	maxFinite,
-	maximumTimeGap,
 	minFinite,
+	shiftLocalDate,
 	sumFinite,
-	timeWeightedAverage,
+	timeWeightedAverageInWindow,
 } from "./providerUtils";
 
 var queue: Array<Observation> = [],
@@ -21,6 +24,8 @@ var queue: Array<Observation> = [],
 	lastRainCount: number;
 
 const MAX_OBSERVATION_GAP_SECONDS = 2 * 60 * 60;
+const LOCAL_HISTORY_DAYS = 7;
+const LOCAL_RETENTION_DAYS = LOCAL_HISTORY_DAYS + 1;
 const OBSERVATIONS_FILE = resolvePersistenceFile("observations.json");
 
 function roundedMeasurement(value: number, precision: number = 0): number | undefined {
@@ -96,46 +101,93 @@ export default class LocalWeatherProvider extends WeatherProvider {
 	protected async getWateringDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WateringData[] > {
 
 		queue = normalizeQueue(queue);
-		return [buildLocalWateringData(queue)];
+		return buildLocalWateringDataHistory(queue, coordinates);
 	};
 
 }
 
-export function buildLocalWateringData(observations: readonly Observation[]): WateringData {
-	const normalized = normalizeQueue([...observations]);
+export function buildLocalWateringDataHistory(
+	observations: readonly Observation[],
+	coordinates: GeoCoordinates,
+	now: Date = new Date()
+): WateringData[] {
+	const normalized = normalizeQueue([...observations], Math.floor(now.getTime() / 1000));
+	const timezone = getTZ(coordinates);
+	const groups = new Map(groupByLocalDay(
+		normalized,
+		observation => observation.timestamp * 1000,
+		timezone
+	).map(group => [group.date, group.records]));
+	const result: WateringData[] = [];
+	let date = shiftLocalDate(localDateKey(now, timezone), -1, timezone);
 
-	if (normalized.length < 2 || normalized[0].timestamp - normalized[normalized.length - 1].timestamp < 23 * 60 * 60 ||
-		maximumTimeGap(normalized, obs => obs.timestamp) > MAX_OBSERVATION_GAP_SECONDS) {
-		console.error( "There is insufficient data to support watering calculation from local PWS." );
-		throw new CodedError( ErrorCode.InsufficientWeatherData );
+	for (let count = 0; count < LOCAL_HISTORY_DAYS; count++) {
+		const day = groups.get(date);
+		if (!day) break;
+		const window = localDayWindow(date, timezone);
+		try {
+			result.push(buildLocalWateringData(
+				day,
+				Math.floor(window.start.getTime() / 1000),
+				Math.floor(window.end.getTime() / 1000)
+			));
+		} catch (error) {
+			if (!result.length) throw error;
+			break;
+		}
+		date = shiftLocalDate(date, -1, timezone);
 	}
 
-	const temp = timeWeightedAverage(normalized, obs => obs.timestamp, obs => obs.temp);
-	const humidity = timeWeightedAverage(normalized, obs => obs.timestamp, obs => obs.humidity);
-	const solarRadiation = timeWeightedAverage(normalized, obs => obs.timestamp, obs => obs.solarRadiation);
-	const windSpeed = timeWeightedAverage(normalized, obs => obs.timestamp, obs => obs.windSpeed);
+	if (!result.length) {
+		throw new CodedError(ErrorCode.InsufficientWeatherData);
+	}
+	return result;
+}
+
+export function buildLocalWateringData(
+	observations: readonly Observation[],
+	windowStart: number,
+	windowEnd: number
+): WateringData {
+	const normalized = [...observations].sort((a, b) => a.timestamp - b.timestamp);
+	const temp = timeWeightedAverageInWindow(normalized, obs => obs.timestamp, obs => obs.temp, windowStart, windowEnd);
+	const humidity = timeWeightedAverageInWindow(normalized, obs => obs.timestamp, obs => obs.humidity, windowStart, windowEnd);
 	const precip = sumFinite(normalized.map(obs => obs.precip));
 	const hasCoreCoverage = [
 		(obs: Observation) => obs.temp,
 		(obs: Observation) => obs.humidity,
-	].every(getValue => hasTimeSeriesCoverage(
+	].every(getValue => hasWindowCoverage(
 		normalized,
 		obs => obs.timestamp,
 		getValue,
+		windowStart,
+		windowEnd,
 		MAX_OBSERVATION_GAP_SECONDS
 	));
+	const hasSolarCoverage = hasWindowCoverage(
+		normalized, obs => obs.timestamp, obs => obs.solarRadiation,
+		windowStart, windowEnd, MAX_OBSERVATION_GAP_SECONDS
+	);
+	const hasWindCoverage = hasWindowCoverage(
+		normalized, obs => obs.timestamp, obs => obs.windSpeed,
+		windowStart, windowEnd, MAX_OBSERVATION_GAP_SECONDS
+	);
 	const result: WateringData = {
 		weatherProvider: "local",
 		temp,
 		humidity,
 		precip,
-		periodStartTime: Math.floor(normalized[normalized.length - 1].timestamp),
+		periodStartTime: windowStart,
 		minTemp: minFinite(normalized.map(obs => obs.temp)),
 		maxTemp: maxFinite(normalized.map(obs => obs.temp)),
 		minHumidity: minFinite(normalized.map(obs => obs.humidity)),
 		maxHumidity: maxFinite(normalized.map(obs => obs.humidity)),
-		solarRadiation,
-		windSpeed
+		solarRadiation: hasSolarCoverage
+			? timeWeightedAverageInWindow(normalized, obs => obs.timestamp, obs => obs.solarRadiation, windowStart, windowEnd)
+			: undefined,
+		windSpeed: hasWindCoverage
+			? timeWeightedAverageInWindow(normalized, obs => obs.timestamp, obs => obs.windSpeed, windowStart, windowEnd)
+			: undefined,
 	};
 
 	if (!hasCoreCoverage || [result.temp, result.humidity, result.precip, result.minTemp, result.maxTemp,
@@ -204,8 +256,8 @@ interface PersistedObservationState {
 	lastRainEpoch: number;
 }
 
-function normalizeQueue(observations: Observation[]): Observation[] {
-	const cutoff = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+function normalizeQueue(observations: Observation[], now: number = Math.floor(Date.now() / 1000)): Observation[] {
+	const cutoff = now - LOCAL_RETENTION_DAYS * 24 * 60 * 60;
 	const unique = new Map<number, Observation>();
 	for (const observation of observations) {
 		if (Number.isFinite(observation?.timestamp) && observation.timestamp >= cutoff && !unique.has(observation.timestamp)) {

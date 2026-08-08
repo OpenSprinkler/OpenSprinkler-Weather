@@ -80,6 +80,36 @@ describe("Weather live test runner", () => {
 		expect(validation.errors.join(" ")).to.contain("humidity");
 	});
 
+	it("accepts current-only weather from a provider without forecasts", () => {
+		const provider = { aliases: ["local"], forecast: false };
+		const weatherValidation = validateCase({
+			expectedStatus: 200,
+			provider,
+			endpoint: { kind: "weather" },
+		}, {
+			status: 200,
+			body: { weatherProvider: "local", temp: 70, humidity: 50, wind: 2, forecast: [] },
+		});
+		const sensorValidation = validateCase({
+			expectedStatus: 200,
+			provider,
+			endpoint: { kind: "sensor", scope: "cfh" },
+		}, {
+			status: 200,
+			body: {
+				v: 1,
+				u: "us",
+				wp: "local",
+				e: {},
+				c: { at: 1, t: 70, h: 50, w: 2, r: 0 },
+				h: { at: 1, t: 70, h: 50, p: 0, w: 2, sr: 5, eto: 0.1 },
+			},
+		});
+
+		expect(weatherValidation.errors).to.deep.equal([]);
+		expect(sensorValidation.errors).to.deep.equal([]);
+	});
+
 	it("rejects implausible ETo and solar-radiation scales", () => {
 		const testCase = {
 			expectedStatus: 200,

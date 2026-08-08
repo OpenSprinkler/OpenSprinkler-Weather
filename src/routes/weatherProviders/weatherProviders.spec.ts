@@ -1,7 +1,15 @@
 import { expect } from "chai";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import AccuWeatherProvider from "./AccuWeather";
 import AppleWeatherProvider from "./Apple";
-import LocalWeatherProvider, { buildLocalWateringData, captureWUStream } from "./local";
+import LocalWeatherProvider, {
+	buildLocalWateringData,
+	buildLocalWateringDataHistory,
+	captureWUStream,
+	writeJsonAtomically,
+} from "./local";
 import OpenMeteoProvider from "./OpenMeteo";
 import PirateWeatherProvider from "./PirateWeather";
 import WUndergroundProvider from "./WUnderground";
@@ -17,8 +25,11 @@ import {
 	completeHistoricalHourlyDays,
 	groupByLocalDay,
 	hasTimeSeriesCoverage,
+	hasWindowCoverage,
+	localDayWindow,
 	maximumTimeGap,
 	timeWeightedAverage,
+	timeWeightedAverageInWindow,
 } from "./providerUtils";
 import { httpJSONRequest } from "../weather";
 import { decodeJwt, exportPKCS8, generateKeyPair } from "jose";
@@ -190,6 +201,25 @@ describe("Weather provider normalization", () => {
 		expect(data[0].precip).to.be.closeTo(2.4 / 2.54, 0.0001);
 		expect(data[0].windSpeed).to.be.closeTo(12.5 * 0.621371, 0.0001);
 		expect(data[0].solarRadiation).to.be.greaterThan(0);
+	});
+
+	it("accepts a complete 23-hour Pirate Weather DST day", async () => {
+		MockDate.set("2026-03-09T12:00:00Z");
+		process.env.PIRATEWEATHER_API_KEY = "test-key";
+		const window = localDayWindow("2026-03-08", "America/New_York");
+		const hourly = sequence(23, hour => ({
+			time: window.start.getTime() / 1000 + hour * 60 * 60,
+			temperature: 20,
+			humidity: 0.5,
+			liquidAccumulation: 0,
+			cloudCover: 0,
+			windSpeed: 5,
+		}));
+		globalThis.fetch = (async () => jsonResponse({ hourly: { data: hourly } })) as typeof globalThis.fetch;
+
+		const data = await new TestPirateWeatherProvider().readWatering(coordinates);
+		expect(data).to.have.length(1);
+		expect(data[0].periodStartTime).to.equal(window.start.getTime() / 1000);
 	});
 
 	it("uses Weather Underground daily mean wind and cumulative liquid precipitation", async () => {
@@ -407,20 +437,74 @@ describe("Weather provider normalization", () => {
 	});
 
 	it("allows local Zimmerman data without wind or solar measurements", () => {
-		const now = Math.floor(Date.now() / 1000);
+		const windowStart = Date.parse("2026-01-14T00:00:00Z") / 1000;
+		const windowEnd = Date.parse("2026-01-15T00:00:00Z") / 1000;
 		const observations = sequence(24, hour => ({
-			timestamp: now - hour * 60 * 60,
+			timestamp: windowStart + hour * 60 * 60,
 			temp: 70,
 			humidity: 50,
 			precip: 0,
 		}));
 
-		const data = buildLocalWateringData(observations);
+		const data = buildLocalWateringData(observations, windowStart, windowEnd);
 		expect(data.temp).to.equal(70);
 		expect(data.humidity).to.equal(50);
 		expect(data.precip).to.equal(0);
 		expect(data.windSpeed).to.equal(undefined);
 		expect(data.solarRadiation).to.equal(undefined);
+	});
+
+	it("returns seven contiguous local calendar days newest-first", () => {
+		const timezone = "America/New_York";
+		const observations = Array.from({ length: 8 }, (_, index) => {
+			const day = 8 + index;
+			const window = localDayWindow(`2026-01-${String(day).padStart(2, "0")}`, timezone);
+			return sequence((window.end.getTime() - window.start.getTime()) / (60 * 60 * 1000), hour => ({
+				timestamp: window.start.getTime() / 1000 + hour * 60 * 60,
+				temp: day,
+				humidity: 50,
+				precip: 0,
+			}));
+		}).flat();
+
+		const data = buildLocalWateringDataHistory(observations, coordinates, new Date("2026-01-16T12:00:00Z"));
+		expect(data).to.have.length(7);
+		expect(data.map(day => day.temp)).to.deep.equal([15, 14, 13, 12, 11, 10, 9]);
+	});
+
+	it("stops local multiday history at the first missing calendar day", () => {
+		const timezone = "America/New_York";
+		const observations = [13, 14, 15].flatMap(day => {
+			const window = localDayWindow(`2026-01-${day}`, timezone);
+			return sequence(24, hour => ({
+				timestamp: window.start.getTime() / 1000 + hour * 60 * 60,
+				temp: day,
+				humidity: 50,
+				precip: 0,
+			}));
+		});
+		const withoutMiddleDay = observations.filter(observation => {
+			const middle = localDayWindow("2026-01-14", timezone);
+			return observation.timestamp < middle.start.getTime() / 1000 || observation.timestamp >= middle.end.getTime() / 1000;
+		});
+
+		const data = buildLocalWateringDataHistory(withoutMiddleDay, coordinates, new Date("2026-01-16T12:00:00Z"));
+		expect(data.map(day => day.temp)).to.deep.equal([15]);
+	});
+
+	it("creates persistence directories and replaces state atomically", () => {
+		const directory = fs.mkdtempSync(path.join(os.tmpdir(), "os-weather-"));
+		const fileName = path.join(directory, "state", "observations.json");
+		try {
+			writeJsonAtomically(fileName, { observations: [1] });
+			writeJsonAtomically(fileName, { observations: [2] });
+			expect(JSON.parse(fs.readFileSync(fileName, "utf8"))).to.deep.equal({ observations: [2] });
+			expect(fs.readdirSync(path.dirname(fileName))).to.deep.equal(["observations.json"]);
+		} finally {
+			if (fs.existsSync(fileName)) fs.unlinkSync(fileName);
+			if (fs.existsSync(path.dirname(fileName))) fs.rmdirSync(path.dirname(fileName));
+			if (fs.existsSync(directory)) fs.rmdirSync(directory);
+		}
 	});
 
 	it("rejects non-success HTTP responses without exposing the request URL", async () => {
@@ -447,8 +531,56 @@ describe("Weather provider normalization", () => {
 
 		const groups = groupByLocalDay(records, record => record.time, timezone);
 		expect(groups.map(group => group.records.length)).to.deep.equal([23, 25]);
+		expect(completeHistoricalHourlyDays(records, record => record.time, timezone, new Date("2026-03-09T12:00:00Z")))
+			.to.have.length(1);
 		expect(completeHistoricalHourlyDays(records, record => record.time, timezone, new Date("2026-11-02T12:00:00Z")))
-			.to.have.length(2);
+			.to.have.length(1);
+	});
+
+	it("returns only contiguous complete history ending yesterday", () => {
+		const makeDay = (day: number) => sequence(24, hour => ({
+			time: new Date(Date.UTC(2026, 0, day, hour)),
+		}));
+		const complete = [...makeDay(12), ...makeDay(13), ...makeDay(14)];
+		const before = new Date("2026-01-15T12:00:00Z");
+
+		expect(completeHistoricalHourlyDays(complete, record => record.time, "UTC", before))
+			.to.have.length(3);
+		expect(completeHistoricalHourlyDays(
+			complete.filter(record => record.time.getTime() !== Date.UTC(2026, 0, 13, 12)),
+			record => record.time,
+			"UTC",
+			before
+		)).to.have.length(1);
+		expect(completeHistoricalHourlyDays(
+			complete.filter(record => record.time.getTime() !== Date.UTC(2026, 0, 14, 12)),
+			record => record.time,
+			"UTC",
+			before
+		)).to.have.length(0);
+	});
+
+	it("rejects duplicate hourly slots that conceal a missing hour", () => {
+		const records = sequence(24, hour => ({ time: new Date(Date.UTC(2026, 0, 14, hour)) }));
+		records[12] = { time: records[11].time };
+		expect(completeHistoricalHourlyDays(
+			records,
+			record => record.time,
+			"UTC",
+			new Date("2026-01-15T12:00:00Z")
+		)).to.have.length(0);
+	});
+
+	it("accepts one provider sample anywhere within each hourly slot", () => {
+		const records = sequence(24, hour => ({
+			time: new Date(Date.UTC(2026, 0, 14, hour, 5)),
+		}));
+		expect(completeHistoricalHourlyDays(
+			records,
+			record => record.time,
+			"UTC",
+			new Date("2026-01-15T12:00:00Z")
+		)).to.have.length(1);
 	});
 
 	it("averages finite values without treating missing samples as zero", () => {
@@ -466,6 +598,20 @@ describe("Weather provider normalization", () => {
 		expect(maximumTimeGap(records, record => record.time)).to.equal(180);
 		expect(hasTimeSeriesCoverage(records, record => record.time, record => record.value, 180)).to.equal(true);
 		expect(hasTimeSeriesCoverage(records, record => record.time, record => record.value, 120)).to.equal(false);
+	});
+
+	it("time-weights a bounded window and checks its edges", () => {
+		const records = [
+			{ time: 60, value: 0 },
+			{ time: 120, value: 10 },
+			{ time: 240, value: 10 },
+		];
+		expect(hasWindowCoverage(records, record => record.time, record => record.value, 0, 300, 120))
+			.to.equal(true);
+		expect(hasWindowCoverage(records, record => record.time, record => record.value, 0, 300, 59))
+			.to.equal(false);
+		expect(timeWeightedAverageInWindow(records, record => record.time, record => record.value, 0, 300))
+			.to.equal(7);
 	});
 });
 

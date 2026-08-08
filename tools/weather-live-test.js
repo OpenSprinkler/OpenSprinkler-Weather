@@ -84,6 +84,7 @@ const PROVIDERS = {
 		label: "Local PWS",
 		provider: "local",
 		aliases: ["local"],
+		forecast: false,
 		requiredEnv: [],
 		smokeLocations: [],
 		fullLocations: ["local-station"],
@@ -339,6 +340,7 @@ function validateWeather(body, provider, errors) {
 	checkNumber(errors, body.temp, "temp", -120, 160);
 	checkNumber(errors, body.humidity, "humidity", 0, 100);
 	checkNumber(errors, body.wind, "wind", 0, 250);
+	if (provider.forecast === false) return;
 	checkNumber(errors, body.minTemp, "minTemp", -120, 160);
 	checkNumber(errors, body.maxTemp, "maxTemp", -120, 160);
 	if (finite(body.minTemp) && finite(body.maxTemp) && body.minTemp > body.maxTemp) errors.push("minTemp exceeds maxTemp");
@@ -387,7 +389,9 @@ function validateSensor(body, provider, scope, errors) {
 	validateProvider(errors, body.wp, provider);
 	if (body.e && Object.keys(body.e).length) errors.push(`sensor response contains provider errors: ${JSON.stringify(body.e)}`);
 	for (const block of ["c", "f", "h"]) {
-		if (scope.includes(block)) validateSensorBlock(body, block, errors);
+		if (block === "f" && provider.forecast === false) {
+			if (body[block] !== undefined) errors.push(`unsupported sensor block ${block} was returned`);
+		} else if (scope.includes(block)) validateSensorBlock(body, block, errors);
 		else if (body[block] !== undefined) errors.push(`unrequested sensor block ${block} was returned`);
 	}
 }
@@ -546,17 +550,17 @@ function buildCases(options) {
 
 async function prepareLocalPws(baseUrl, timeoutMs) {
 	const now = Date.now();
-	const start = now - 23.5 * 60 * 60 * 1000;
-	for (let index = 0; index < 25; index++) {
-		const timestamp = new Date(start + index * (23.5 * 60 * 60 * 1000 / 24));
+	const start = now - 48 * 60 * 60 * 1000;
+	for (let index = 0; index <= 48; index++) {
+		const timestamp = new Date(start + index * 60 * 60 * 1000);
 		const url = new URL("/weatherstation/updateweatherstation.php", `${normalizedBase(baseUrl)}/`);
 		url.searchParams.set("dateutc", timestamp.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, ""));
 		url.searchParams.set("tempf", String(55 + 15 * Math.sin(index / 24 * Math.PI)));
 		url.searchParams.set("humidity", String(75 - 25 * Math.sin(index / 24 * Math.PI)));
 		url.searchParams.set("windspeedmph", String(3 + index % 5));
 		url.searchParams.set("solarradiation", String(Math.max(0, 700 * Math.sin(index / 24 * Math.PI))));
-		url.searchParams.set("dailyrainin", index < 12 ? "0" : "0.05");
-		url.searchParams.set("rainin", index === 12 ? "0.05" : "0");
+		url.searchParams.set("dailyrainin", "0");
+		url.searchParams.set("rainin", "0");
 		const response = await request(url, timeoutMs);
 		if (response.status !== 200 || !String(response.body).includes("success")) {
 			throw new Error(`local PWS upload ${index + 1} failed with HTTP ${response.status}`);
@@ -671,7 +675,7 @@ async function main() {
 	for (const item of skipped) console.log(`SKIP ${item.provider}${item.location ? `/${item.location}` : ""}: ${item.reason}`);
 
 	if (options.includeLocalPws) {
-		console.log("Preparing 24 hours of synthetic local PWS observations...");
+		console.log("Preparing 48 hours of synthetic local PWS observations...");
 		try { await prepareLocalPws(options.baseUrl, options.timeoutMs); }
 		catch (error) {
 			console.error(`Local PWS preparation failed: ${error.message}`);

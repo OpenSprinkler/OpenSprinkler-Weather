@@ -61,6 +61,34 @@ describe("Watering Data", () => {
 		expect(result.scales).to.eql([33]);
 		expect(result.rawData).to.eql({ wp: "mock", h: 50, p: 0, t: 58.3 });
 	});
+
+	it("sorts daily history newest-first before calculating rolling averages", async () => {
+		const makeDay = (periodStartTime: number, temp: number): WateringData => ({
+			weatherProvider: "mock",
+			periodStartTime,
+			temp,
+			humidity: 30,
+			precip: 0,
+			minTemp: temp,
+			maxTemp: temp,
+			minHumidity: 30,
+			maxHumidity: 30,
+		});
+		const provider = new MockWeatherProvider({ wateringData: [
+			makeDay(Date.parse("2026-01-13T05:00:00Z") / 1000, 65),
+			makeDay(Date.parse("2026-01-15T05:00:00Z") / 1000, 70),
+			makeDay(Date.parse("2026-01-14T05:00:00Z") / 1000, 75),
+		] });
+
+		const result = await ZimmermanAdjustmentMethod.calculateWateringScale(
+			{} as any,
+			[42, -75],
+			provider
+		);
+
+		expect(result.scales).to.eql([100, 110, 100]);
+		expect(result.rawData).to.include({ t: 70 });
+	});
 });
 
 describe("Weather Sensor Data", () => {
