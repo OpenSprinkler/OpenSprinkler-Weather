@@ -127,6 +127,24 @@ describe("Weather Sensor Data", () => {
 		expect(result.h.eto).to.be.a("number");
 	});
 
+	it("omits invalid ETo without discarding other historical values", () => {
+		const wateringResult: CachedResult<readonly WateringData[]> = {
+			value: [{ ...wateringData, maxHumidity: 101 }],
+			ttl: 1000,
+			cachedAt: 1557748800000,
+		};
+
+		const result = buildWeatherSensorResponse(
+			[42, -75],
+			{ current: false, forecast: false, historical: true },
+			undefined,
+			wateringResult
+		);
+
+		expect(result.h.t).to.equal(45);
+		expect(result.h.eto).to.equal(undefined);
+	});
+
 	it("fetches only the provider data required by scope", async () => {
 		const provider = new CountingMockWeatherProvider({
 			weatherData,

@@ -3,7 +3,9 @@ import { AdjustmentMethod, AdjustmentMethodResponse, AdjustmentOptions } from ".
 import { GeoCoordinates, PWS, WateringData } from "../../types";
 import { WeatherProvider } from "../weatherProviders/WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
-import { fromUnixTime, getDayOfYear, getUnixTime, isAfter, isBefore } from "date-fns";
+import { getDayOfYear, getUnixTime, isAfter, isBefore } from "date-fns";
+import { TZDate } from "@date-fns/tz";
+import * as geoTZ from "geo-tz";
 
 
 /**
@@ -30,15 +32,27 @@ async function calculateEToWateringScale(
 	} else {
 		throw new CodedError( ErrorCode.MissingAdjustmentOption );
 	}
+	if ( !Number.isFinite(baseETo) || baseETo <= 0 ) {
+		throw new CodedError( ErrorCode.MalformedAdjustmentOptions );
+	}
 
 	if ( adjustmentOptions && "elevation" in adjustmentOptions ) {
 		elevation = adjustmentOptions.elevation;
 	}
 
+	if ( wateringData.length === 0 ) {
+		throw new CodedError( ErrorCode.InsufficientWeatherData );
+	}
+
+	const rawEtos = wateringData.map(data => calculateETo(data, elevation, coordinates));
+	if ( rawEtos.some((eto, i) => !Number.isFinite(eto) || !Number.isFinite(wateringData[i].precip) || wateringData[i].precip < 0) ) {
+		throw new CodedError( ErrorCode.BadWeatherData );
+	}
+
 	// Calculate ETo value for first day to return (precipitation is not a part of it)
-	const returnETo = calculateETo( wateringData[0], elevation, coordinates);
-	// Calculate eto scores per day
-	const etos = wateringData.map(data => calculateETo( data, elevation, coordinates) - data.precip);
+	const returnETo = rawEtos[0];
+	// Calculate ETo scores per day.
+	const etos = rawEtos.map((eto, i) => eto - wateringData[i].precip);
 
 	// Compute uncapped scales for each score
 	const uncappedScales = etos.map(score => score / baseETo * 100);
@@ -86,13 +100,17 @@ async function calculateEToWateringScale(
  * @return The reference potential evapotranspiration (in inches per day).
  */
 export function calculateETo( wateringData: WateringData, elevation: number, coordinates: GeoCoordinates ): number {
+	if ( !hasValidEToInputs(wateringData, elevation, coordinates) ) {
+		return NaN;
+	}
+
 	// Convert to Celsius.
 	const minTemp = ( wateringData.minTemp - 32 ) * 5 / 9;
 	const maxTemp = ( wateringData.maxTemp - 32 ) * 5 / 9;
 	// Convert to meters.
 	elevation = elevation / 3.281;
 	// Convert to meters per second.
-	const windSpeed = wateringData.windSpeed / 2.237;
+	const windSpeed = Math.max(wateringData.windSpeed / 2.237, 0.5);
 	// Convert to megajoules.
 	const solarRadiation = wateringData.solarRadiation * 3.6;
 
@@ -118,7 +136,17 @@ export function calculateETo( wateringData: WateringData, elevation: number, coo
 
 	const actualVaporPressure = ( minSaturationVaporPressure * wateringData.maxHumidity / 100 + maxSaturationVaporPressure * wateringData.minHumidity / 100 ) / 2;
 
-	const dayOfYear = getDayOfYear(fromUnixTime(wateringData.periodStartTime));
+	let timezone: string;
+	try {
+		timezone = geoTZ.find(coordinates[0], coordinates[1])[0];
+	} catch {
+		return NaN;
+	}
+	if ( !timezone ) {
+		return NaN;
+	}
+	const localDate = new TZDate(wateringData.periodStartTime * 1000, timezone);
+	const dayOfYear = getDayOfYear(localDate);
 
 	const inverseRelativeEarthSunDistance = 1 + 0.033 * Math.cos( 2 * Math.PI / 365 * dayOfYear );
 
@@ -126,15 +154,20 @@ export function calculateETo( wateringData: WateringData, elevation: number, coo
 
 	const latitudeRads = Math.PI / 180 * coordinates[ 0 ];
 
-	const sunsetHourAngle = Math.acos( -Math.tan( latitudeRads ) * Math.tan( solarDeclination ) );
+	const sunsetAngleArgument = -Math.tan(latitudeRads) * Math.tan(solarDeclination);
+	const sunsetHourAngle = Math.acos(Math.max(-1, Math.min(1, sunsetAngleArgument)));
 
 	const extraterrestrialRadiation = 24 * 60 / Math.PI * 0.082 * inverseRelativeEarthSunDistance * ( sunsetHourAngle * Math.sin( latitudeRads ) * Math.sin( solarDeclination ) + Math.cos( latitudeRads ) * Math.cos( solarDeclination ) * Math.sin( sunsetHourAngle ) );
 
 	const clearSkyRadiation = ( 0.75 + 2e-5 * elevation ) * extraterrestrialRadiation;
+	if ( clearSkyRadiation <= Number.EPSILON ) {
+		return NaN;
+	}
 
 	const netShortWaveRadiation = ( 1 - 0.23 ) * solarRadiation;
 
-	const netOutgoingLongWaveRadiation = 4.903e-9 * ( Math.pow( maxTemp + 273.16, 4 ) + Math.pow( minTemp + 273.16, 4 ) ) / 2 * ( 0.34 - 0.14 * Math.sqrt( actualVaporPressure ) ) * ( 1.35 * solarRadiation / clearSkyRadiation - 0.35);
+	const relativeSolarRadiation = Math.min(solarRadiation / clearSkyRadiation, 1);
+	const netOutgoingLongWaveRadiation = 4.903e-9 * ( Math.pow( maxTemp + 273.16, 4 ) + Math.pow( minTemp + 273.16, 4 ) ) / 2 * ( 0.34 - 0.14 * Math.sqrt( actualVaporPressure ) ) * ( 1.35 * relativeSolarRadiation - 0.35);
 
 	const netRadiation = netShortWaveRadiation - netOutgoingLongWaveRadiation;
 
@@ -142,7 +175,32 @@ export function calculateETo( wateringData: WateringData, elevation: number, coo
 
 	const windTerm = psiTerm * tempTerm * ( avgSaturationVaporPressure - actualVaporPressure );
 
-	return ( windTerm + radiationTerm ) / 25.4;
+	const eto = ( windTerm + radiationTerm ) / 25.4;
+	return Number.isFinite(eto) ? Math.max(0, eto) : NaN;
+}
+
+function hasValidEToInputs(wateringData: WateringData, elevation: number, coordinates: GeoCoordinates): boolean {
+	const values = [
+		wateringData.minTemp,
+		wateringData.maxTemp,
+		wateringData.minHumidity,
+		wateringData.maxHumidity,
+		wateringData.windSpeed,
+		wateringData.solarRadiation,
+		wateringData.periodStartTime,
+		elevation,
+		coordinates[0],
+		coordinates[1],
+	];
+
+	return values.every(Number.isFinite) &&
+		wateringData.minTemp <= wateringData.maxTemp &&
+		wateringData.minHumidity >= 0 && wateringData.minHumidity <= 100 &&
+		wateringData.maxHumidity >= 0 && wateringData.maxHumidity <= 100 &&
+		wateringData.minHumidity <= wateringData.maxHumidity &&
+		wateringData.windSpeed >= 0 && wateringData.solarRadiation >= 0 &&
+		coordinates[0] >= -90 && coordinates[0] <= 90 &&
+		coordinates[1] >= -180 && coordinates[1] <= 180;
 }
 
 /**

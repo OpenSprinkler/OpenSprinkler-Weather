@@ -3,7 +3,7 @@ import { httpJSONRequest, keyToUse, localTime } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { approximateSolarRadiation, CloudCoverInfo } from "../adjustmentMethods/EToAdjustmentMethod";
 import { CodedError, ErrorCode } from "../../errors";
-import { addDays, fromUnixTime, getUnixTime, startOfDay, subDays } from "date-fns";
+import { addHours, fromUnixTime, getUnixTime, startOfDay, subDays } from "date-fns";
 
 export default class PirateWeatherWeatherProvider extends WeatherProvider {
 
@@ -52,7 +52,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
             const startTime = fromUnixTime(hour.time);
 			return {
 				startTime,
-				endTime: addDays(startTime, 1),
+				endTime: addHours(startTime, 1),
 				cloudCover: hour.cloudCover
 			};
 		} );

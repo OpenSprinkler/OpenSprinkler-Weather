@@ -3,6 +3,9 @@ import { getTZ, httpJSONRequest, localTime } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
 import { format, getUnixTime, startOfDay, subDays } from "date-fns";
+import { standardizeWindSpeed } from "../adjustmentMethods/EToAdjustmentMethod";
+
+const WIND_MEASUREMENT_HEIGHT_FEET = 10 * 3.281;
 
 export default class OpenMeteoWeatherProvider extends WeatherProvider {
 
@@ -22,7 +25,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
         const endTimestamp = format(currentDay, "yyyy-MM-dd");
 
 
-		const historicUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&start_date=${startTimestamp}&end_date=${endTimestamp}&timezone=${tz}&timeformat=unixtime`;
+		const historicUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relative_humidity_2m,precipitation,shortwave_radiation,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&start_date=${startTimestamp}&end_date=${endTimestamp}&timezone=${tz}&timeformat=unixtime`;
 
 		let historicData;
 		try {
@@ -57,19 +60,18 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 
 			for (let index = i*24; index < (i+1)*24; index++ ) {
 				temp += historicData.hourly.temperature_2m[index];
-				humidity += historicData.hourly.relativehumidity_2m[index];
+				humidity += historicData.hourly.relative_humidity_2m[index];
 				precip += historicData.hourly.precipitation[index] || 0;
 
 				minTemp = minTemp < historicData.hourly.temperature_2m[index] ? minTemp : historicData.hourly.temperature_2m[index];
 				maxTemp = maxTemp > historicData.hourly.temperature_2m[index] ? maxTemp : historicData.hourly.temperature_2m[index];
 
-				if (historicData.hourly.windspeed_10m[index] > wind)
-					wind = historicData.hourly.windspeed_10m[index];
+				wind += historicData.hourly.wind_speed_10m[index];
 
-				minHumidity = minHumidity < historicData.hourly.relativehumidity_2m[index] ? minHumidity : historicData.hourly.relativehumidity_2m[index];
-				maxHumidity = maxHumidity > historicData.hourly.relativehumidity_2m[index] ? maxHumidity : historicData.hourly.relativehumidity_2m[index];
+				minHumidity = minHumidity < historicData.hourly.relative_humidity_2m[index] ? minHumidity : historicData.hourly.relative_humidity_2m[index];
+				maxHumidity = maxHumidity > historicData.hourly.relative_humidity_2m[index] ? maxHumidity : historicData.hourly.relative_humidity_2m[index];
 
-				solar += historicData.hourly.direct_radiation[index];
+				solar += historicData.hourly.shortwave_radiation[index];
 			}
 
 			const result: WateringData = {
@@ -83,7 +85,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				minHumidity: minHumidity,
 				maxHumidity: maxHumidity,
 				solarRadiation: solar / 1000, // API gives in Watts
-				windSpeed: wind
+				windSpeed: standardizeWindSpeed(wind / 24, WIND_MEASUREMENT_HEIGHT_FEET)
 			}
 
 			data.push(result);

@@ -311,10 +311,11 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			}
 
 			const length = daysInHours[i].length;
-			const windSpeed =
-				(days[i].daytimeForecast?.windSpeed || 0 +
-					days[i].overnightForecast.windSpeed) /
-				2;
+			const windSamples = [
+				days[i].daytimeForecast?.windSpeed,
+				days[i].overnightForecast?.windSpeed,
+			].filter(Number.isFinite) as number[];
+			const windSpeed = windSamples.reduce((sum, speed) => sum + speed, 0) / windSamples.length;
 
 			data.push({
 				weatherProvider: "Apple",
