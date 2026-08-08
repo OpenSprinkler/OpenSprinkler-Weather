@@ -40,6 +40,8 @@ GEOCODER=GoogleMaps
 GOOGLE_MAPS_API_KEY=your_api_key
 ```
 
+`PORT` is the canonical server-port setting. `HTTP_PORT` is also accepted as a compatibility alias.
+
 Note: The `GOOGLE_MAPS_API_KEY` does not need to be valid if you query the service directly with GPS coordinates. The Maps API is only used for geocoding (converting a city name or ZIP code into latitude/longitude).
 
 To set a default weather provider (e.g. `OpenMeteo`), include:

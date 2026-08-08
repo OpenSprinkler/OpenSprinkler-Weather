@@ -20,7 +20,7 @@ The live runner tests through HTTP, so build and start the service in another te
 
 ```bash
 npm run build
-HOST=127.0.0.1 HTTP_PORT=3000 npm start
+HOST=127.0.0.1 PORT=3000 npm start
 ```
 
 The service reads its normal `.env`. `baselineEToData/Baseline_ETo_Data.bin` must exist for `/baselineETo` and ETo adjustment tests.

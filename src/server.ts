@@ -10,6 +10,7 @@ import { getBaselineETo } from "./routes/baselineETo";
 import {default as packageJson} from "../package.json";
 import { pinoHttp } from "pino-http";
 import { pino, LevelWithSilent } from "pino";
+import { resolveServerPort } from "./config";
 
 function getLogLevel(): LevelWithSilent {
     switch (process.env.LOG_LEVEL) {
@@ -35,7 +36,7 @@ function getLogLevel(): LevelWithSilent {
 const logger = pino({ level: getLogLevel() });
 
 const host = process.env.HOST || "127.0.0.1";
-const port = parseInt(process.env.HTTP_PORT) || 3000;
+const port = resolveServerPort();
 
 export let pws = process.env.PWS || "none";
 export const app = express();
