@@ -88,6 +88,16 @@ You can also run the precompiled weather service in Docker. The GitHub repositor
 
 To launch it as a background service (daemon), run the container and point it to your `.env` file for configuration. The .env setup is the same as described above, but note that the Docker image already includes the `Baseline_ETo_Data.bin`, so you don’t need to generate it yourself.
 
+When using a local PWS, enable persistence and mount the image's `/data` directory so observations and the geocoder cache survive container replacement:
+
+```bash
+docker run -d --env-file .env -e LOCAL_PERSISTENCE=true \
+  -v opensprinkler-weather-data:/data -p 3000:3000 \
+  ghcr.io/opensprinkler/weather-server:release
+```
+
+For non-container installations, `PERSISTENCE_LOCATION` optionally selects the directory containing `observations.json`. Persistence is controlled solely by `LOCAL_PERSISTENCE`, independently of `WEATHER_PROVIDER`, so a configured PWS stream can be retained while another provider supplies controller weather data.
+
 If you prefer to build the Docker image locally, be aware that the process is resource-intensive. You will need at least 30 GB of free disk space and sufficient memory to complete the build, since generating the baseline ETo dataset is computationally heavy.
 
 ---

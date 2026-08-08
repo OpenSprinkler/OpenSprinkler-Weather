@@ -107,8 +107,11 @@ DARKSKY_API_KEY=<YOUR DARK SKY KEY>
 ```
 WEATHER_PROVIDER=local
 PWS=WU
-LOCAL_PERSISTENCE=true #It's advisable to use this option which logs data to observations.json every 30 minutes and maintains data accross reboots
+LOCAL_PERSISTENCE=true # Saves observations every 30 minutes and restores them after a restart
+PERSISTENCE_LOCATION=/var/lib/opensprinkler-weather # Optional; defaults to the working directory
 ```
+
+Create the configured directory with write permission for the account running the weather service. Persistence remains active when a different `WEATHER_PROVIDER` is selected, allowing the local PWS stream to continue accumulating history.
 
 * **Step 5d:** If you registered for the Apple WeatherKit API then also add these two lines to the .env file:
 ```
@@ -168,4 +171,3 @@ This will return a response similar to below with the `scale` value equating to 
 **Step 8:** You will now need to configure your OpenSprinkler device to use the local version of the Weather Service rather than the Cloud version. On a web browser, go to `http://<your OS IP>:80/su` if you have an OS device or `http://<your OSPi IP>:8080/su` for OSPi/OSBo devices to set the Weather Service IP and PORT number.
 
 OpenSprinkler should now be connected to your local Weather Service for calculating rain delay and watering levels.
-

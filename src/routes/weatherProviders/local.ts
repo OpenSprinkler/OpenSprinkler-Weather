@@ -1,10 +1,12 @@
 import express	from "express";
 import fs from "fs";
+import path from "path";
 
 import { GeoCoordinates, WeatherData, WateringData, PWS } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
 import { getParameter } from "../weather";
+import { localPersistenceEnabled, resolvePersistenceFile } from "../../config";
 import {
 	hasTimeSeriesCoverage,
 	maxFinite,
@@ -19,6 +21,7 @@ var queue: Array<Observation> = [],
 	lastRainCount: number;
 
 const MAX_OBSERVATION_GAP_SECONDS = 2 * 60 * 60;
+const OBSERVATIONS_FILE = resolvePersistenceFile("observations.json");
 
 function roundedMeasurement(value: number, precision: number = 0): number | undefined {
 	if (!Number.isFinite(value)) return undefined;
@@ -149,16 +152,16 @@ function saveQueue() {
 	queue = normalizeQueue(queue);
 	try {
 		const state: PersistedObservationState = { observations: queue, lastRainCount, lastRainEpoch };
-		fs.writeFileSync("observations.json", JSON.stringify(state), "utf8");
+		writeJsonAtomically(OBSERVATIONS_FILE, state);
 	} catch ( err ) {
 		console.error( "Error saving historical observations to local storage.", err );
 	}
 }
 
-if ( process.env.WEATHER_PROVIDER === "local" && process.env.LOCAL_PERSISTENCE ) {
-	if ( fs.existsSync( "observations.json" ) ) {
+if ( localPersistenceEnabled() ) {
+	if ( fs.existsSync( OBSERVATIONS_FILE ) ) {
 		try {
-			const stored = JSON.parse(fs.readFileSync("observations.json", "utf8"));
+			const stored = JSON.parse(fs.readFileSync(OBSERVATIONS_FILE, "utf8"));
 			if (Array.isArray(stored)) {
 				queue = normalizeQueue(stored);
 			} else {
@@ -172,6 +175,18 @@ if ( process.env.WEATHER_PROVIDER === "local" && process.env.LOCAL_PERSISTENCE )
 		}
 	}
 	setInterval( saveQueue, 1000 * 60 * 30 );
+}
+
+export function writeJsonAtomically(fileName: string, value: unknown): void {
+	const directory = path.dirname(fileName);
+	const temporary = `${fileName}.${process.pid}.tmp`;
+	fs.mkdirSync(directory, { recursive: true });
+	try {
+		fs.writeFileSync(temporary, JSON.stringify(value), "utf8");
+		fs.renameSync(temporary, fileName);
+	} finally {
+		if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+	}
 }
 
 export interface Observation {
