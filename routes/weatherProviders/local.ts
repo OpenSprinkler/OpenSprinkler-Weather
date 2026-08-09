@@ -81,7 +81,10 @@ const measurementRanges: { [key: string]: { min?: number, max?: number } } = {
 
 function getAuthTokens(req: express.Request): string[] {
 	const tokens: string[] = [];
-	for (const key of ["key", "token"]) {
+	// "PASSWORD" is the credential field of the WU upload protocol itself — hardware stations
+	// (e.g. Ecowitt customized upload) send their configured station key there and cannot be
+	// configured to add a separate key/token parameter.
+	for (const key of ["key", "token", "PASSWORD"]) {
 		const queryValue = req.query[key];
 		const token = Array.isArray(queryValue) ? queryValue[0] : queryValue;
 		if (typeof token === "string") tokens.push(token);
