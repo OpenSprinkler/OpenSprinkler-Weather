@@ -91,4 +91,19 @@ describe( "/weatherData additive contract", () => {
 			message: "An unexpected weather service error occurred."
 		} );
 	} );
+	it( "honors the requested provider for display even in local/hybrid mode", async () => {
+		process.env.WEATHER_PROVIDER = "local";
+		try {
+			nock( "https://api.openweathermap.org" )
+				.get( "/data/3.0/onecall" ).query( true ).reply( 200, owmBody() );
+			const mocks = weatherMocks( COORDINATES, OWM_OPTIONS );
+			await getWeatherData( mocks.request, mocks.response );
+			const body: any = mocks.response._getJSON();
+			expect( mocks.response.statusCode ).to.equal( 200 );
+			expect( body.weatherProvider ).to.equal( "OWM" );
+			expect( body.forecast ).to.have.length( 2 );
+		} finally {
+			delete process.env.WEATHER_PROVIDER;
+		}
+	} );
 } );
