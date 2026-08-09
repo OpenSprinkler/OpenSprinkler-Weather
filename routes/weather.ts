@@ -476,7 +476,13 @@ export const getWeatherData = async function( req: express.Request, res: express
 
 	let activeWeatherProvider: WeatherProvider;
 	try {
-		activeWeatherProvider = resolveWeatherProvider( adjustmentOptions, pws );
+		// Display forecasts honor the explicitly requested provider even when the service runs in
+		// local/hybrid mode (WEATHER_PROVIDER=local): the local PWS stream feeds watering
+		// adjustments but has no forecast, so forcing it here would blank the App's Weather tab.
+		// Watering adjustments (/weatherAdjustment) keep the unmodified resolution.
+		const requested = typeof adjustmentOptions.provider === "string"
+			? weatherProviders()[ adjustmentOptions.provider ] : undefined;
+		activeWeatherProvider = requested ?? resolveWeatherProvider( adjustmentOptions, pws );
 	} catch ( err ) {
 		sendWeatherDataError( res, err );
 		return;
