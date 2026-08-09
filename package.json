@@ -4,7 +4,7 @@
   "version": "3.0.2",
   "repository": "https://github.com/OpenSprinkler/Weather-Weather",
   "scripts": {
-		"test": "mocha",
+    "test": "mocha",
     "test:weather-live": "node tools/weather-live-test.js",
     "test:weather-smoke": "node tools/weather-live-test.js --profile smoke",
     "test:weather-full": "node tools/weather-live-test.js --profile full",
