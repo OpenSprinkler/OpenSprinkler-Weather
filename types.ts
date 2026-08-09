@@ -56,6 +56,19 @@ export interface WeatherDataForecast {
     icon: string;
     /** A human-readable description of the weather. */
     description: string;
+    /**
+     * The forecasted total precipitation for this day (in inches). The OpenSprinkler App requires
+     * this on every entry to render the forecast page; providers should always emit it (0 for dry).
+     */
+    precip?: number;
+    /** The probability of precipitation for this day (percent, 0–100). */
+    pop?: number;
+    /** The forecasted relative humidity for this day (percent). */
+    humidity?: number;
+    /** The forecasted wind speed for this day (in miles per hour). */
+    wind?: number;
+    /** The forecasted maximum UV index for this day. */
+    uv?: number;
 }
 
 export interface BaseWateringData {

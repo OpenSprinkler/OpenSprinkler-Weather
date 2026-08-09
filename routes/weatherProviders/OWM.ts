@@ -98,12 +98,19 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		};
 
 		for (let index = 0; index < weatherData.daily.length; index++) {
+			const daily = weatherData.daily[index];
 			weather.forecast.push({
-				temp_min: weatherData.daily[index].temp.min,
-				temp_max: weatherData.daily[index].temp.max,
-				date: weatherData.daily[index].dt,
-				icon: weatherData.daily[index].weather[0].icon,
-				description: weatherData.daily[index].weather[0].description
+				temp_min: daily.temp.min,
+				temp_max: daily.temp.max,
+				date: daily.dt,
+				icon: daily.weather[0].icon,
+				description: daily.weather[0].description,
+				// OWM reports rain in mm regardless of the units parameter.
+				precip: (daily.rain ? daily.rain : 0) / 25.4,
+				...(typeof daily.pop === "number" ? { pop: Math.round(daily.pop * 100) } : {}),
+				...(typeof daily.humidity === "number" ? { humidity: daily.humidity } : {}),
+				...(typeof daily.wind_speed === "number" ? { wind: daily.wind_speed } : {}),
+				...(typeof daily.uvi === "number" ? { uv: daily.uvi } : {})
 			});
 		}
 
