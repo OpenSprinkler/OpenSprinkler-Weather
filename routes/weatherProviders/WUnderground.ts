@@ -78,11 +78,37 @@ export default class WUnderground extends WeatherProvider {
 			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
+		const hourlyURL = `https://api.weather.com/v3/wx/forecast/hourly/2day?geocode=${ coordinates[ 0 ] },${ coordinates[ 1 ] }&format=json&language=en-US&units=e&apiKey=${ pws.apiKey }`;
+
+		// The hourly forecast is an optional enrichment; a failure here must not break the
+		// daily forecast payload the App depends on.
+		let hourlyForecast: any = {};
+		try {
+			hourlyForecast = await httpJSONRequest( hourlyURL );
+		} catch ( err ) {
+			console.error( "Error retrieving hourly weather information from WUnderground (continuing without hourly):", err );
+		}
+
 		const current = data.observations[0];
 
-		const icon = forecast.daypart[0].iconCode[0];
+		// The v3 daily-forecast daypart arrays hold TWO slots per day (day = 2i, night = 2i + 1),
+		// and today's day slot (plus temperatureMax[0]) turns null after ~3 p.m. local time. The
+		// old [index] addressing read the wrong day past index 0 and Math.floor(null) fabricated
+		// a 0° maximum that made the App reject the whole payload.
+		const finite = ( value: any ): value is number => typeof value === "number" && Number.isFinite( value );
+		const dayparts = ( forecast.daypart && forecast.daypart[0] ) || {};
+		const partValue = ( values: any[] | undefined, index: number ): any => {
+			const day = values ? values[ 2 * index ] : undefined;
+			return ( day === null || day === undefined ) ? ( values ? values[ 2 * index + 1 ] : undefined ) : day;
+		};
+		const dailyQpf = ( index: number ): number =>
+			( finite( forecast.qpf?.[index] ) ? forecast.qpf[index] : 0 ) +
+			( finite( forecast.qpfSnow?.[index] ) ? forecast.qpfSnow[index] : 0 );
 
-		const maxTemp = forecast.temperatureMax[0];
+		const currentIcon = partValue( dayparts.iconCode, 0 );
+		const maxTemp = finite( forecast.temperatureMax[0] ) ? forecast.temperatureMax[0]
+			: finite( forecast.calendarDayTemperatureMax?.[0] ) ? forecast.calendarDayTemperatureMax[0]
+			: current.imperial.temp;
 
 		const weather: WeatherData = {
 			weatherProvider: "WUnderground",
@@ -90,25 +116,65 @@ export default class WUnderground extends WeatherProvider {
 			humidity: Math.floor( current.humidity ),
 			wind: Math.floor( current.imperial.windSpeed ),
 			description: forecast.narrative[0],
-			icon: this.getWUIconCode( (icon === null) ? -1 : icon ), //Null after 3pm
+			icon: this.getWUIconCode( finite( currentIcon ) ? currentIcon : -1 ),
 
 			region: current.country,
 			city: "",
 			minTemp: Math.floor( forecast.temperatureMin[0] ),
-			maxTemp: Math.floor( (maxTemp === null ) ? current.imperial.temp : maxTemp ), //Null after 3pm
-			precip: forecast.qpf[0] + forecast.qpfSnow[0],
-			forecast: []
+			maxTemp: Math.floor( maxTemp ),
+			precip: dailyQpf( 0 ),
+			forecast: [],
+			...( finite( current.epoch ) ? { observedAt: current.epoch } : {} )
 		};
 
 		for ( let index = 0; index < forecast.dayOfWeek.length; index++ ) {
-			weather.forecast.push( {
-				temp_min: Math.floor( forecast.temperatureMin[index] ),
-				temp_max: Math.floor( forecast.temperatureMax[index] ),
+			const min = forecast.temperatureMin[index];
+			const max = finite( forecast.temperatureMax[index] ) ? forecast.temperatureMax[index]
+				: finite( forecast.calendarDayTemperatureMax?.[index] ) ? forecast.calendarDayTemperatureMax[index]
+				: index === 0 ? current.imperial.temp : undefined;
+			// Never emit a fabricated day; the App validates every entry and rejects the payload.
+			if ( !finite( min ) || !finite( max ) ) {
+				continue;
+			}
+			const icon = partValue( dayparts.iconCode, index );
+			const entry: WeatherData["forecast"][number] = {
+				temp_min: Math.floor( min ),
+				temp_max: Math.floor( max ),
 				date: forecast.validTimeUtc[index],
-				icon: this.getWUIconCode( forecast.daypart[0].iconCode[index] ),
-				description: forecast.narrative[index]
-			} );
+				icon: this.getWUIconCode( finite( icon ) ? icon : -1 ),
+				description: forecast.narrative[index],
+				precip: dailyQpf( index )
+			};
+			const pop = partValue( dayparts.precipChance, index );
+			const humidity = partValue( dayparts.relativeHumidity, index );
+			const wind = partValue( dayparts.windSpeed, index );
+			const uv = partValue( dayparts.uvIndex, index );
+			if ( finite( pop ) ) entry.pop = pop;
+			if ( finite( humidity ) ) entry.humidity = humidity;
+			if ( finite( wind ) ) entry.wind = wind;
+			if ( finite( uv ) ) entry.uv = uv;
+			weather.forecast.push( entry );
 		}
+
+		const hourly = [] as NonNullable< WeatherData["hourly"] >;
+		const hourlyTimes = Array.isArray( hourlyForecast.validTimeUtc ) ? hourlyForecast.validTimeUtc : [];
+		for ( let index = 0; index < Math.min( hourlyTimes.length, 24 ); index++ ) {
+			const time = hourlyTimes[index];
+			const temp = hourlyForecast.temperature?.[index];
+			if ( !finite( time ) || !finite( temp ) ) continue;
+			const precip = hourlyForecast.qpf?.[index];
+			const icon = hourlyForecast.iconCode?.[index];
+			const hour: NonNullable< WeatherData["hourly"] >[number] = {
+				time,
+				temp,
+				precip: finite( precip ) ? precip : 0,
+				icon: this.getWUIconCode( finite( icon ) ? icon : -1 )
+			};
+			const pop = hourlyForecast.precipChance?.[index];
+			if ( finite( pop ) ) hour.pop = pop;
+			hourly.push( hour );
+		}
+		if ( hourly.length > 0 ) weather.hourly = hourly;
 
 		return normalizeWeatherData( "WUnderground", weather );
 	}

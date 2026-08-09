@@ -434,7 +434,13 @@ async function calculateEToWateringScale(
  * Enhanced calculation functions with crop coefficient support
  */
 
-function hargreavesEto(maxTempF: number, minTempF: number, coordinates: GeoCoordinates, periodStartTime: number): number {
+/**
+ * Estimate daily reference ETo with the Hargreaves-Samani temperature method. It derives
+ * extraterrestrial radiation from latitude and day-of-year, then converts the result to inches/day.
+ * This is intentionally an approximation for forecasts that lack radiation, humidity, and wind data;
+ * it should not be treated as equivalent to a full FAO-56 Penman-Monteith calculation.
+ */
+export function calculateHargreavesSamaniETo(maxTempF: number, minTempF: number, coordinates: GeoCoordinates, periodStartTime: number): number {
     const maxTempC = (maxTempF - 32) * 5 / 9;
     const minTempC = (minTempF - 32) * 5 / 9;
     const avgTempC = (maxTempC + minTempC) / 2;
@@ -553,7 +559,7 @@ function calculateHybridForecastScaleWithCrop(
         let dailyEto: number;
         if (dayData.estimatedFields.length > 2) {
             // Hargreaves temperature-only fallback used when too many fields are estimated.
-            dailyEto = hargreavesEto(dayData.maxTemp, dayData.minTemp, coordinates, dayData.periodStartTime);
+            dailyEto = calculateHargreavesSamaniETo(dayData.maxTemp, dayData.minTemp, coordinates, dayData.periodStartTime);
         } else {
             dailyEto = calculateETo(dayData, elevation, coordinates);
         }

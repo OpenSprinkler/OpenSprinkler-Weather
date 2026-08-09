@@ -205,7 +205,8 @@ export default class LocalWeatherProvider extends EnhancedWeatherProvider {
 			icon: "01d",
 			region: undefined,
 			city: undefined,
-			forecast: []
+			forecast: [],
+			...( Number.isFinite( latestObs.timestamp ) ? { observedAt: latestObs.timestamp } : {} )
 		};
 		debugLog("DEBUG: LocalWeatherProvider.getWeatherData RETURNING result:", JSON.stringify(weather));
 		return normalizeWeatherData( "local", weather );

@@ -117,7 +117,8 @@ export default class AccuWeatherWeatherProvider extends WeatherProvider {
 			minTemp: Math.floor( daily[ 0 ].Temperature.Minimum.Value ),
 			maxTemp: Math.floor( daily[ 0 ].Temperature.Maximum.Value ),
 			precip: Number.isFinite( dayPrecip ) ? dayPrecip : NaN,
-			forecast: []
+			forecast: [],
+			...( Number.isFinite( current.EpochTime ) ? { observedAt: current.EpochTime } : {} )
 		};
 
 		for ( let index = 0; index < daily.length; index++ ) {

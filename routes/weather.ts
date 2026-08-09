@@ -13,7 +13,7 @@ import WateringScaleCache, { CachedScale } from "../WateringScaleCache";
 import ManualAdjustmentMethod from "./adjustmentMethods/ManualAdjustmentMethod";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 import RainDelayAdjustmentMethod from "./adjustmentMethods/RainDelayAdjustmentMethod";
-import EToAdjustmentMethod from "./adjustmentMethods/EToAdjustmentMethod";
+import EToAdjustmentMethod, { calculateHargreavesSamaniETo } from "./adjustmentMethods/EToAdjustmentMethod";
 import WaterBudgetAdjustmentMethod from "./adjustmentMethods/WaterBudgetAdjustmentMethod";
 import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
@@ -453,7 +453,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 		debugLog(`DEBUG getWeatherData: Parsed adjustmentOptions: ${JSON.stringify(redactLogValue(adjustmentOptions))}`);
 	} catch ( err ) {
 		console.error(`DEBUG getWeatherData: Failed to parse adjustmentOptions:`, redactLogValue(err));
-		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ));
+		sendWeatherDataError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ) );
 		return;
 	}
 
@@ -462,7 +462,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 		coordinates = await resolveCoordinates( location );
 	} catch (err: any) {
 		console.error(`DEBUG getWeatherData: Failed to resolve coordinates:`, redactLogValue(err));
-		res.send(`Error: Unable to resolve location (${redactLogValue(err.message || err)})`);
+		sendWeatherDataError( res, err );
 		return;
 	}
 
@@ -470,11 +470,17 @@ export const getWeatherData = async function( req: express.Request, res: express
 	try {
 		pws = buildPwsFromParams( adjustmentOptions );
 	} catch ( err ) {
-		sendWateringError( res, makeCodedError( err ) );
+		sendWeatherDataError( res, err );
 		return;
 	}
 
-	let activeWeatherProvider: WeatherProvider = resolveWeatherProvider( adjustmentOptions, pws );
+	let activeWeatherProvider: WeatherProvider;
+	try {
+		activeWeatherProvider = resolveWeatherProvider( adjustmentOptions, pws );
+	} catch ( err ) {
+		sendWeatherDataError( res, err );
+		return;
+	}
 	debugLog(`DEBUG getWeatherData: Using provider: ${activeWeatherProvider.constructor.name}`);
 	
 	const timeData: TimeData = getTimeDataForCoordinates( coordinates );
@@ -484,15 +490,74 @@ export const getWeatherData = async function( req: express.Request, res: express
 		debugLog(`DEBUG getWeatherData: ${activeWeatherProvider.constructor.name}.getWeatherData responded with: ${JSON.stringify(weatherData)}`);
 	} catch ( err: any ) {
 		console.error(`DEBUG getWeatherData: ${activeWeatherProvider.constructor.name}.getWeatherData failed:`, redactLogValue(err));
-		res.send( "Error: " + redactLogValue(err.message || err) );
+		sendWeatherDataError( res, err );
 		return;
 	}
+
+	for ( const day of weatherData.forecast || [] ) {
+		if ( Number.isFinite( day.temp_min ) && Number.isFinite( day.temp_max ) && Number.isFinite( day.date ) ) {
+			day.eto = calculateHargreavesSamaniETo( day.temp_max, day.temp_min, coordinates, day.date );
+		}
+	}
+	weatherData.generatedAt = Math.floor( Date.now() / 1000 );
 	
 	const response = { ...timeData, ...weatherData, location: coordinates };
 	debugLog(`DEBUG getWeatherData: Final response for /weather endpoint: ${JSON.stringify(response)}`);
 	res.json( response );
 	debugLog(`DEBUG getWeatherData: END - Response sent.`);
 };
+
+function weatherDataErrorStatus( errCode: ErrorCode ): number {
+	switch ( errCode ) {
+		case ErrorCode.InvalidLocationFormat:
+		case ErrorCode.NoLocationFound:
+		case ErrorCode.InvalidPwsId:
+		case ErrorCode.InvalidPwsApiKey:
+		case ErrorCode.NoPwsProvided:
+		case ErrorCode.NoAPIKeyProvided:
+		case ErrorCode.MalformedAdjustmentOptions:
+		case ErrorCode.MissingAdjustmentOption:
+		case ErrorCode.InvalidAdjustmentMethod:
+			return 400;
+		case ErrorCode.UnsupportedAdjustmentMethod:
+		case ErrorCode.PwsNotSupported:
+			return 422;
+		case ErrorCode.UnexpectedError:
+			return 500;
+		default:
+			return 502;
+	}
+}
+
+const WEATHER_DATA_ERROR_MESSAGES: Partial<Record<ErrorCode, string>> = {
+	[ ErrorCode.BadWeatherData ]: "Weather data was invalid.",
+	[ ErrorCode.InsufficientWeatherData ]: "Insufficient weather data was available.",
+	[ ErrorCode.MissingWeatherField ]: "The weather response was incomplete.",
+	[ ErrorCode.WeatherApiError ]: "The weather provider request failed.",
+	[ ErrorCode.LocationServiceApiError ]: "The location service request failed.",
+	[ ErrorCode.NoLocationFound ]: "No matching location was found.",
+	[ ErrorCode.InvalidLocationFormat ]: "The location format is invalid.",
+	[ ErrorCode.InvalidPwsId ]: "The PWS ID is invalid.",
+	[ ErrorCode.InvalidPwsApiKey ]: "The PWS API key is invalid.",
+	[ ErrorCode.PwsAuthenticationError ]: "The PWS request was not authorized.",
+	[ ErrorCode.PwsNotSupported ]: "The PWS does not support this request.",
+	[ ErrorCode.NoPwsProvided ]: "A PWS is required for this provider.",
+	[ ErrorCode.NoAPIKeyProvided ]: "An API key is required for this provider.",
+	[ ErrorCode.UnsupportedAdjustmentMethod ]: "The requested method is not supported.",
+	[ ErrorCode.InvalidAdjustmentMethod ]: "The requested method is invalid.",
+	[ ErrorCode.MalformedAdjustmentOptions ]: "The weather options are malformed.",
+	[ ErrorCode.MissingAdjustmentOption ]: "A required weather option is missing.",
+	[ ErrorCode.UnexpectedError ]: "An unexpected weather service error occurred."
+};
+
+/** Send the additive JSON error contract used only by /weatherData. */
+export function sendWeatherDataError( res: express.Response, err: any ): void {
+	const coded = makeCodedError( err );
+	const message = coded.message
+		? redactLogString( coded.message )
+		: WEATHER_DATA_ERROR_MESSAGES[ coded.errCode ] || "The weather request failed.";
+	res.status( weatherDataErrorStatus( coded.errCode ) ).json( { error: coded.errCode, message } );
+}
 
 export const getWateringData = async function( req: express.Request, res: express.Response ) {
 	debugLog(`DEBUG getWateringData: START - Path: ${req.path}, Query: ${JSON.stringify(redactLogValue(req.query))}, Params: ${JSON.stringify(redactLogValue(req.params))}`);
