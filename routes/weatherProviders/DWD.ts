@@ -84,6 +84,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 		if ( !current || !current.weather ) {
 			throw "Necessary field(s) were missing from weather information returned by Bright Sky.";
 		}
+		const observedAt = typeof current.weather.timestamp === "string" ? moment( current.weather.timestamp ).unix() : undefined;
 
 		const weather: WeatherData = {
 			weatherProvider: "DWD",
@@ -99,6 +100,7 @@ export default class DWDWeatherProvider extends WeatherProvider {
 			maxTemp: 0,
 			precip: 0,
 			forecast: [],
+			...( Number.isFinite( observedAt ) ? { observedAt } : {} )
 		};
 
 		for ( let day = 0; day < 7; day++ ) {

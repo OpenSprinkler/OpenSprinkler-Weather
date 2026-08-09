@@ -65,7 +65,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 		const localKey = keyToUse(this.API_KEY, pws);
 
 		// The OWM free API options changed so need to use the new API method
-		const weatherDataUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,hourly,alerts&appid=${ localKey }`
+		const weatherDataUrl = `https://api.openweathermap.org/data/3.0/onecall?units=imperial&lat=${ coordinates[ 0 ] }&lon=${ coordinates[ 1 ] }&exclude=minutely,alerts&appid=${ localKey }`
 
 		let weatherData;
 		try {
@@ -73,13 +73,15 @@ export default class OWMWeatherProvider extends WeatherProvider {
 
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from OWM:", err );
-			throw "An error occurred while retrieving weather information from OWM."
+			throw new CodedError( ErrorCode.WeatherApiError );
 		}
 
 		// Indicate weather data could not be retrieved if the forecast data is incomplete.
 		if (!weatherData || !weatherData.current || !weatherData.daily) {
-			throw "Necessary field(s) were missing from weather information returned by OWM.";
+			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
+
+		const finite = ( value: any ): value is number => typeof value === "number" && Number.isFinite( value );
 
 		const weather: WeatherData = {
 			weatherProvider: "OWM",
@@ -94,7 +96,8 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			minTemp: weatherData.daily[0].temp.min,
 			maxTemp: weatherData.daily[0].temp.max,
 			precip: (weatherData.daily[0].rain ? weatherData.daily[0].rain : 0) / 25.4,
-			forecast: []
+			forecast: [],
+			...( finite( weatherData.current.dt ) ? { observedAt: weatherData.current.dt } : {} )
 		};
 
 		for (let index = 0; index < weatherData.daily.length; index++) {
@@ -112,6 +115,25 @@ export default class OWMWeatherProvider extends WeatherProvider {
 				...(typeof daily.wind_speed === "number" ? { wind: daily.wind_speed } : {}),
 				...(typeof daily.uvi === "number" ? { uv: daily.uvi } : {})
 			});
+		}
+
+		if ( Array.isArray( weatherData.hourly ) ) {
+			const hourly = [] as NonNullable< WeatherData["hourly"] >;
+			for ( const hourlyData of weatherData.hourly.slice( 0, 24 ) ) {
+				if ( !finite( hourlyData.dt ) || !finite( hourlyData.temp ) ) continue;
+				const rain = finite( hourlyData.rain?.["1h"] ) ? hourlyData.rain["1h"] : 0;
+				const snow = finite( hourlyData.snow?.["1h"] ) ? hourlyData.snow["1h"] : 0;
+				const hour: NonNullable< WeatherData["hourly"] >[number] = {
+					time: hourlyData.dt,
+					temp: hourlyData.temp,
+					// OWM reports hourly rain and snow in millimetres even with imperial units.
+					precip: ( rain + snow ) / 25.4,
+					icon: typeof hourlyData.weather?.[0]?.icon === "string" ? hourlyData.weather[0].icon : "50d"
+				};
+				if ( finite( hourlyData.pop ) ) hour.pop = Math.round( hourlyData.pop * 100 );
+				hourly.push( hour );
+			}
+			if ( hourly.length > 0 ) weather.hourly = hourly;
 		}
 
 		return normalizeWeatherData( "OWM", weather );

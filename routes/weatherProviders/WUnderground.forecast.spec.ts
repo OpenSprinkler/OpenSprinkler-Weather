@@ -39,6 +39,7 @@ function forecastBody( { days = 3, afternoon = false } = {} ): object {
 function currentBody(): object {
 	return {
 		observations: [ {
+			epoch: 1717932600,
 			country: "US",
 			humidity: 41,
 			imperial: { temp: 72.6, windSpeed: 6.3, precipRate: 0, precipTotal: 0 },
@@ -46,10 +47,21 @@ function currentBody(): object {
 	};
 }
 
-function mockWU( forecast: object ): void {
+function hourlyBody( hours = 26 ): any {
+	return {
+		validTimeUtc: Array.from( { length: hours }, ( _, i ) => 1717934400 + i * 3600 ),
+		temperature: Array.from( { length: hours }, ( _, i ) => 65 + i ),
+		qpf: Array.from( { length: hours }, ( _, i ) => i * 0.01 ),
+		precipChance: Array.from( { length: hours }, ( _, i ) => i ),
+		iconCode: Array.from( { length: hours }, ( _, i ) => i === 0 ? 32 : 12 )
+	};
+}
+
+function mockWU( forecast: object, hourly: object = hourlyBody() ): void {
 	nock( "https://api.weather.com" )
 		.get( /v3\/wx\/forecast\/daily\/5day/ ).query( true ).reply( 200, forecast )
-		.get( /v2\/pws\/observations\/current/ ).query( true ).reply( 200, currentBody() );
+		.get( /v2\/pws\/observations\/current/ ).query( true ).reply( 200, currentBody() )
+		.get( /v3\/wx\/forecast\/hourly\/2day/ ).query( true ).reply( 200, hourly );
 }
 
 describe( "WUnderground.getWeatherData — forecast contract", () => {
@@ -113,5 +125,46 @@ describe( "WUnderground.getWeatherData — forecast contract", () => {
 		expect( weather.forecast[ 0 ].precip ).to.equal( 0 );
 		expect( weather.forecast[ 1 ].precip ).to.equal( 0 );
 		expect( weather.forecast[ 2 ].precip ).to.be.closeTo( 0.7, 1e-9 );
+	} );
+
+	it( "emits the next 24 hourly forecasts with WU icons mapped to OWM codes", async () => {
+		mockWU( forecastBody() );
+		const weather = await new WUnderground().getWeatherData( COORDS, PWS );
+		expect( weather.observedAt ).to.equal( 1717932600 );
+		expect( weather.hourly ).to.have.length( 24 );
+		expect( weather.hourly![0] ).to.deep.equal( {
+			time: 1717934400,
+			temp: 65,
+			precip: 0,
+			pop: 0,
+			icon: "01d"
+		} );
+		expect( weather.hourly![1].icon ).to.equal( "09d" );
+	} );
+
+	it( "tolerates null hourly fields without emitting invalid required values", async () => {
+		const hourly = hourlyBody();
+		hourly.qpf[1] = null;
+		hourly.precipChance[1] = null;
+		hourly.iconCode[1] = null;
+		hourly.temperature[2] = null;
+		mockWU( forecastBody(), hourly );
+		const weather = await new WUnderground().getWeatherData( COORDS, PWS );
+		expect( weather.hourly ).to.have.length( 23 );
+		expect( weather.hourly![1] ).to.deep.equal( {
+			time: 1717938000,
+			temp: 66,
+			precip: 0,
+			icon: "50d"
+		} );
+	} );
+	it( "still returns the daily forecast when the hourly endpoint fails", async () => {
+		nock( "https://api.weather.com" )
+			.get( /v3\/wx\/forecast\/daily\/5day/ ).query( true ).reply( 200, forecastBody() )
+			.get( /v2\/pws\/observations\/current/ ).query( true ).reply( 200, currentBody() )
+			.get( /v3\/wx\/forecast\/hourly\/2day/ ).query( true ).reply( 500, "upstream broke" );
+		const weather = await new WUnderground().getWeatherData( COORDS, PWS );
+		expect( weather.forecast ).to.have.length( 3 );
+		expect( weather.hourly ).to.equal( undefined );
 	} );
 } );

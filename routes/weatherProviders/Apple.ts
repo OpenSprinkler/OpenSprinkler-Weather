@@ -133,6 +133,7 @@ export default class AppleWeatherProvider extends WeatherProvider {
 		const precip = dailyPrecipMm !== undefined
 			? this.mmToInchesPerHour(dailyPrecipMm)
 			: this.mmToInchesPerHour(currentWeather.precipitationIntensity || 0) * 24;
+		const observedAt = typeof currentWeather.asOf === "string" ? moment( currentWeather.asOf ).unix() : undefined;
 
 		const weather: WeatherData = {
 			weatherProvider: "Apple",
@@ -146,7 +147,8 @@ export default class AppleWeatherProvider extends WeatherProvider {
 			minTemp: Math.floor(this.celsiusToFahrenheit(dailyForecasts[0].temperatureMin)),
 			maxTemp: Math.floor(this.celsiusToFahrenheit(dailyForecasts[0].temperatureMax)),
 			precip,
-			forecast: []
+			forecast: [],
+			...( Number.isFinite( observedAt ) ? { observedAt } : {} )
 		};
 
 		for (const dailyData of dailyForecasts) {

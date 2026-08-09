@@ -102,7 +102,8 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			minTemp: Math.floor( forecast.daily.data[ 0 ].temperatureMin ),
 			maxTemp: Math.floor( forecast.daily.data[ 0 ].temperatureMax ),
 			precip: forecast.daily.data[ 0 ].precipIntensity * 24,
-			forecast: []
+			forecast: [],
+			...( Number.isFinite( forecast.currently.time ) ? { observedAt: forecast.currently.time } : {} )
 		};
 
 		for ( let index = 0; index < forecast.daily.data.length; index++ ) {

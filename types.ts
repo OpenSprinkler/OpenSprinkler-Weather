@@ -41,7 +41,24 @@ export interface WeatherData {
     maxTemp: number;
     /** The forecasted total precipitation for the current day (in inches). */
     precip: number;
-    forecast: WeatherDataForecast[]
+    forecast: WeatherDataForecast[];
+    /** The next approximately 24 hours of forecast data, in imperial units. */
+    hourly?: Array<{
+        /** The timestamp of this forecast hour (in Unix epoch seconds). */
+        time: number;
+        /** The forecast temperature (in Fahrenheit). */
+        temp: number;
+        /** The forecast precipitation for this hour (in inches). */
+        precip: number;
+        /** The probability of precipitation (percent, 0–100). */
+        pop?: number;
+        /** An OpenWeatherMap-style icon ID. */
+        icon: string;
+    }>;
+    /** The timestamp of the current-conditions observation (in Unix epoch seconds). */
+    observedAt?: number;
+    /** The timestamp when the service assembled this response (in Unix epoch seconds). */
+    generatedAt?: number;
 }
 
 /** The forecasted weather for a specific day in the future. */
@@ -69,6 +86,8 @@ export interface WeatherDataForecast {
     wind?: number;
     /** The forecasted maximum UV index for this day. */
     uv?: number;
+    /** Approximate reference evapotranspiration for this day (in inches/day). */
+    eto?: number;
 }
 
 export interface BaseWateringData {

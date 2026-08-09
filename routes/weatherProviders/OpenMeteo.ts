@@ -151,6 +151,7 @@ export default class OpenMeteoWeatherProvider extends EnhancedWeatherProvider {
 			maxTemp: current.daily.temperature_2m_max[0],
 			precip: current.daily.precipitation_sum[0],
 			forecast: [],
+			...( Number.isFinite( current.current_weather.time ) ? { observedAt: current.current_weather.time } : {} )
 		};
 
 		for ( let day = 0; day < current.daily.time.length; day++ ) {
