@@ -34,7 +34,6 @@ ENV PERSISTENCE_LOCATION=/data
 ENV GEOCODER_CACHE_FILE=/data/geocoderCache.json
 RUN mkdir -p /data
 VOLUME ["/data"]
-COPY /package.json ./
 RUN mkdir baselineEToData
 COPY --from=build_eto /eto/Baseline_ETo_Data.bin ./baselineEToData
 COPY --from=build_node /weather/dist ./dist

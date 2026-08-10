@@ -50,6 +50,8 @@ Successful adjustment responses can contain:
 
 Weather restrictions may be included in `wto`: `minTemp`, `rainAmt` with `rainDays`, and `cali`.
 
+The `cali` restriction normally sums the two most recent complete historical days. If a provider supplies only one complete day, that day's precipitation can still activate the restriction; unavailable earlier history does not by itself force watering off.
+
 ## Weather Data
 
 `GET /weatherData?loc=latitude,longitude&wto=...` returns a JSON object used by the UI. Temperatures are Fahrenheit, wind is mph, precipitation is inches, and timestamps are Unix epoch seconds.
@@ -142,8 +144,11 @@ Provider caches are shared by adjustment, `/weatherData`, and `/weatherSensorDat
 | 11 | Required weather field missing |
 | 12 | Weather provider HTTP or parsing error |
 | 2, 20, 21, 22 | Location or geocoder errors |
+| 3 | Reserved PWS error-category code |
 | 30, 31, 32, 33, 34 | PWS validation, authentication, or capability errors |
 | 35 | Provider API key missing |
+| 4 | Reserved adjustment-method error-category code |
 | 40, 41 | Unsupported or invalid adjustment method |
+| 5 | Reserved adjustment-option error-category code |
 | 50, 51 | Malformed or incomplete adjustment options |
 | 99 | Unexpected internal error |

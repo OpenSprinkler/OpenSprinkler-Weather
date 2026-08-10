@@ -93,7 +93,10 @@ function shutdown(signal: NodeJS.Signals): void {
 	logger.info({ signal }, "Stopping weather service");
 	flushLocalObservations();
 
-	const timeout = setTimeout(() => process.exit(1), 10_000);
+	const timeout = setTimeout(() => {
+		logger.warn("Forcing weather service shutdown after grace period");
+		process.exit(0);
+	}, 5_000);
 	timeout.unref();
 	server.close(() => {
 		clearTimeout(timeout);
