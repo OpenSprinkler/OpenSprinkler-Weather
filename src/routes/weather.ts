@@ -36,6 +36,8 @@ import GoogleMapsGeocoder from "./geocoders/GoogleMaps";
 import WUndergroundGeocoder from "./geocoders/WUnderground";
 import { TZDate } from "@date-fns/tz";
 
+export { httpJSONRequest } from "./http";
+
 const WEATHER_PROVIDERS: { [K in Exclude<WeatherProviderShortId, "mock">]: WeatherProvider } = {
     Apple: new AppleWeatherProvider(),
     AW: new AccuWeatherWeatherProvider(),
@@ -248,32 +250,6 @@ export async function resolveCoordinates(
     } else {
         return GEOCODER.getLocation(location);
     }
-}
-
-/**
- * Makes an HTTP/HTTPS GET request to the specified URL and parses the JSON response body.
- * @param url The URL to fetch.
- * @param headers Headers for the request
- * @param body Body for the request
- * @return A Promise that will be resolved the with parsed response body if the request succeeds, or will be rejected
- * with an error if the request or JSON parsing fails. This error may contain information about the HTTP request or,
- * response including API keys and other sensitive information.
- */
-export async function httpJSONRequest(url: string, headers?: HeadersInit, body?: BodyInit): Promise< any > {
-	try {
-		const res = await fetch(url, {
-			headers,
-			body,
-		});
-		if (!res.ok) {
-			throw new CodedError(ErrorCode.WeatherApiError, `Weather provider returned HTTP ${res.status}.`);
-		}
-
-		return await res.json();
-	} catch (err) {
-		// Reject the promise if there was an error making the request or parsing the JSON.
-		throw err;
-	}
 }
 
 /**
