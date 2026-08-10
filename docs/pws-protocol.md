@@ -1,40 +1,39 @@
-## Personal Weather Station Upload Protocol
+# Personal Weather Station Upload Protocol
 
-**Background**
+The local weather service accepts Weather Underground-compatible observations through an HTTP GET request when `PWS=WU` is configured:
 
-To upload a PWS observation, you make a standard HTTP GET request with the weather conditions as the GET parameters.
-
-**Endpoint**
-
-The GET message should be directed to the local Weather Service server and with the same endpoint as used by legacy Weather Underground service:
-
-```
-http://<Local Weather Service IP:Port>/weatherstation/updateweatherstation.php
+```text
+GET /weatherstation/updateweatherstation.php
 ```
 
-**GET Parameters**
+The route returns `success` after accepting the request. Values equal to `-9999` and malformed numeric values are treated as unavailable. Partial observations are allowed, but adjustment methods require sufficient coverage of their respective fields.
 
-The following fields are required:
+## Fields
 
+| Field | Unit and format | Use |
+| --- | --- | --- |
+| `dateutc` | `YYYY-MM-DD HH:MM:SS` in UTC, or `now` | Observation timestamp. Supply this for every useful observation. |
+| `tempf` | °F | Temperature; required over the day for Zimmerman and ETo. |
+| `humidity` | 0–100% | Relative humidity; required over the day for Zimmerman and ETo. |
+| `dailyrainin` | inches | Cumulative rainfall since local midnight. Successive differences produce interval precipitation. |
+| `rainin` | inches over the previous hour | A positive value marks the station as currently raining. |
+| `windspeedmph` | mph | Wind speed; required over the day for local ETo. |
+| `solarradiation` | W/m² | Solar irradiance; required over the day for local ETo. |
 
-| Field Name | Format | Description |
-|---|:---:|---|
-| tempf | 55\.6 | Outdoor temperature in fahrenheit |
-| humidity | 0-100 | Outdoor humidity as a percentage |
-| rainin | 0.34 | Accumulated rainfall in inches over the last 60 min |
-| dailyrainin | 1.45 | Accumulated rainfall in inches for the current day (in local time) |
-| dateutc | 2019-03-12 07:45:10 | Time in UTC as YYYY-MM-DD HH:MM:SS (not local time) |
+The first cumulative-rain observation establishes a baseline. If `dailyrainin` decreases, the service treats it as a daily counter reset. Send observations in chronological order whenever possible.
 
-IMPORTANT all fields must be url escaped. For example, if the current time in utc is "`2019-01-01 10:32:35`" then the dateutc field should be sent as "`2019-01-01+10%3A32%3A35`". For reference see http://www.w3schools.com/tags/ref_urlencode.asp.
+## Coverage
 
-_[To Do: If the weather station is not capable of producing a timestamp then either omit the field or set the field value to "`now`"]_
+For a daily adjustment, samples must cover the previous local-calendar day without a gap greater than two hours. Zimmerman uses temperature, humidity, and precipitation. ETo also needs wind and solar radiation. Sending every 5–15 minutes is typical and provides comfortable margin for transient upload failures.
 
+The local provider retains eight days and exposes up to seven complete, contiguous days for multiday averaging. Enable `LOCAL_PERSISTENCE` so this history survives restarts.
 
-**Example GET Message**
+## Example
 
-Here is an example of a full URL:
+Query values must be URL-encoded. For example, a space in `dateutc` may be encoded as `+` and colons as `%3A`:
+
+```text
+http://192.168.1.10:3000/weatherstation/updateweatherstation.php?dateutc=2026-08-09+14%3A30%3A00&tempf=72.5&humidity=58&windspeedmph=4.2&solarradiation=420&rainin=0&dailyrainin=0.12
 ```
-https://<Local Weather Service IP:Port>/weatherstation/updateweatherstation.php?tempf=70.5&humidity=90&rainin=0&dailyrainin=0.54&dateutc=2000-01-01+10%3A32%3A35
-```
-The response text from the Weather Service server will be either "`success`" or an error message.
 
+For quick testing, `dateutc=now` uses the server's current time.

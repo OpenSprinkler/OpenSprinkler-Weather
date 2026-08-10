@@ -1,9 +1,11 @@
-# OpenMeteo (https://open-meteo.com/en)
+# Open-Meteo
 
-**WORLDWIDE WEATHER SERVICE**
+[Open-Meteo](https://open-meteo.com/) combines regional and global forecast models and is available worldwide without an API key. It is a practical default for self-hosted weather services.
 
-Open-Meteo combines local (2 km resolution) and global (11 km) weather models from national weather services. For every location on earth, the best forecast is available.
-National weather services include Deutscher Wetter Dienst (DWD), National Oceanic and Atmospheric Administration (NOAA), Meteofrance and Koninklijk Nederlands Meteorologisch Instituut.
-Just define `WEATHER_PROVIDER=OpenMeteo` in your .env File
+Select it in `.env`:
 
-**supports ETO aswell**
+```text
+WEATHER_PROVIDER=OpenMeteo
+```
+
+The provider supports current and forecast weather, historical data, Zimmerman adjustment, rain delay, ETo, and WeatherSensor values.

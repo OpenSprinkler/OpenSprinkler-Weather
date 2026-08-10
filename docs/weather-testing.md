@@ -7,6 +7,7 @@ The weather service uses three complementary test layers. Live weather alone is 
 Run the unit, provider-fixture, cache, and endpoint-contract tests before every merge:
 
 ```bash
+npm ci
 npm test
 npx tsc --noEmit
 npm run build
@@ -117,3 +118,26 @@ The default concurrency is two and no automatic retries are made. This avoids am
 - **Skip:** provider credentials or optional PWS setup are unavailable.
 
 The command exits nonzero only when one or more cases fail. Warnings and skips remain visible in the console and JSON report for release review.
+
+## Persistence Shutdown Check
+
+When local persistence changes, verify more than the periodic checkpoint:
+
+1. Start the service with `PWS=WU`, `LOCAL_PERSISTENCE=true`, and a temporary `PERSISTENCE_LOCATION`.
+2. Upload an observation with `dateutc=now` to `/weatherstation/updateweatherstation.php`.
+3. Send `SIGTERM` or press Ctrl+C before the 30-minute interval expires.
+4. Confirm `observations.json` exists, contains the uploaded observation, and loads after restart.
+
+This checks the graceful-shutdown path used by `docker stop` and systemd. It does not simulate an abrupt power or process failure, which can lose observations since the last periodic checkpoint.
+
+## Release Checklist
+
+Before deploying a release:
+
+1. Run the deterministic tests, type check, and production build from a clean `npm ci` installation.
+2. Run the default-provider smoke profile with the production Apple WeatherKit credentials.
+3. Run the Open-Meteo and DWD full profiles. Treat provider HTTP 5xx responses as upstream failures, but rerun before deployment.
+4. Run the synthetic local-PWS profile and the persistence shutdown check.
+5. Require GitHub's amd64 and arm64 Docker jobs to pass; the Docker build generates and packages the baseline ETo data.
+6. Deploy to a staging or canary instance and query `/0`, `/1`, `/2`, `/3`, `/weatherData`, `/weatherSensorData`, and `/baselineETo`.
+7. Confirm provider attribution, cache behavior, error logs, and local persistent volume ownership before promoting the image.
