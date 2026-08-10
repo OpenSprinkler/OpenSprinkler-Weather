@@ -27,6 +27,7 @@ const MAX_OBSERVATION_GAP_SECONDS = 2 * 60 * 60;
 const LOCAL_HISTORY_DAYS = 7;
 const LOCAL_RETENTION_DAYS = LOCAL_HISTORY_DAYS + 1;
 const OBSERVATIONS_FILE = resolvePersistenceFile("observations.json");
+const LOCAL_PERSISTENCE_ENABLED = localPersistenceEnabled();
 
 function roundedMeasurement(value: number, precision: number = 0): number | undefined {
 	if (!Number.isFinite(value)) return undefined;
@@ -210,7 +211,11 @@ function saveQueue() {
 	}
 }
 
-if ( localPersistenceEnabled() ) {
+export function flushLocalObservations(): void {
+	if ( LOCAL_PERSISTENCE_ENABLED ) saveQueue();
+}
+
+if ( LOCAL_PERSISTENCE_ENABLED ) {
 	if ( fs.existsSync( OBSERVATIONS_FILE ) ) {
 		try {
 			const stored = JSON.parse(fs.readFileSync(OBSERVATIONS_FILE, "utf8"));

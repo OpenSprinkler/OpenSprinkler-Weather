@@ -78,6 +78,23 @@ describe( "ETo AdjustmentMethod", () => {
 			ErrorCode.BadWeatherData
 		);
 	});
+
+	it("uses the valid leading history when an older day lacks ETo inputs", async () => {
+		const newest = makeWateringData();
+		const older = makeWateringData({
+			periodStartTime: Date.parse("2026-06-14T04:00:00Z") / 1000,
+			solarRadiation: undefined,
+		});
+		const result = await EToAdjustmentMethod.calculateWateringScale(
+			makeAdjustmentOptions(0.15),
+			[42, -75],
+			new StaticWeatherProvider([newest, older])
+		);
+
+		expect(result.scale).to.be.finite;
+		expect(result.scales).to.have.length(1);
+		expect(result.wateringData).to.deep.equal([newest]);
+	});
 } );
 
 function makeWateringData(overrides: Partial<WateringData> = {}): WateringData {

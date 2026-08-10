@@ -17,8 +17,8 @@ FROM node:lts-alpine AS build_node
 WORKDIR /weather
 
 COPY /tsconfig.json ./
-COPY /package.json ./
-RUN npm install
+COPY /package.json /package-lock.json ./
+RUN npm ci
 COPY /build.mjs ./
 
 COPY /src ./src
@@ -27,9 +27,9 @@ RUN npm run build
 FROM node:lts-alpine
 
 EXPOSE 3000
-EXPOSE 8080
 
 WORKDIR /weather
+ENV HOST=0.0.0.0
 ENV PERSISTENCE_LOCATION=/data
 ENV GEOCODER_CACHE_FILE=/data/geocoderCache.json
 RUN mkdir -p /data
@@ -39,4 +39,4 @@ RUN mkdir baselineEToData
 COPY --from=build_eto /eto/Baseline_ETo_Data.bin ./baselineEToData
 COPY --from=build_node /weather/dist ./dist
 
-CMD ["npm", "run", "start"]
+CMD ["node", "dist/index.cjs"]

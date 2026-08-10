@@ -5,7 +5,7 @@ import express from "express";
 import cors from "cors";
 
 import { getWateringData, getWeatherData, getWeatherSensorData } from "./routes/weather";
-import { captureWUStream } from "./routes/weatherProviders/local";
+import { captureWUStream, flushLocalObservations } from "./routes/weatherProviders/local";
 import { getBaselineETo } from "./routes/baselineETo";
 import {default as packageJson} from "../package.json";
 import { pinoHttp } from "pino-http";
@@ -78,10 +78,28 @@ app.use( function( req, res ) {
 } );
 
 // Start listening on the service port
-app.listen( port, host, function() {
+const server = app.listen( port, host, function() {
 	console.log( "%s now listening on %s:%d", packageJson.description, host, port );
 
 	if (pws !== "none" ) {
 		console.log( "%s now listening for local weather stream", packageJson.description );
 	}
 } );
+
+let shuttingDown = false;
+function shutdown(signal: NodeJS.Signals): void {
+	if (shuttingDown) return;
+	shuttingDown = true;
+	logger.info({ signal }, "Stopping weather service");
+	flushLocalObservations();
+
+	const timeout = setTimeout(() => process.exit(1), 10_000);
+	timeout.unref();
+	server.close(() => {
+		clearTimeout(timeout);
+		process.exit(0);
+	});
+}
+
+process.once("SIGINT", () => shutdown("SIGINT"));
+process.once("SIGTERM", () => shutdown("SIGTERM"));

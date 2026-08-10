@@ -410,14 +410,12 @@ export const getWeatherData = async function( req: express.Request, res: express
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
 	let weatherData: CachedResult<WeatherData>;
-
-	if (weatherData == undefined) {
 	try {
 		weatherData = await weatherProvider.getWeatherData( coordinates, pws );
 	} catch ( err ) {
 		res.send( "Error: " + err );
 		return;
-	}}
+	}
 
 	res.json( {
 		...timeData,

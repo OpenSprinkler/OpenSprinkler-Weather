@@ -45,14 +45,20 @@ async function calculateEToWateringScale(
 	}
 
 	const rawEtos = wateringData.map(data => calculateETo(data, elevation, coordinates));
-	if ( rawEtos.some((eto, i) => !Number.isFinite(eto) || !Number.isFinite(wateringData[i].precip) || wateringData[i].precip < 0) ) {
+	const firstInvalidDay = rawEtos.findIndex((eto, i) =>
+		!Number.isFinite(eto) || !Number.isFinite(wateringData[i].precip) || wateringData[i].precip < 0
+	);
+	const usableDayCount = firstInvalidDay < 0 ? wateringData.length : firstInvalidDay;
+	if ( usableDayCount === 0 ) {
 		throw new CodedError( ErrorCode.BadWeatherData );
 	}
+	const usableWateringData = wateringData.slice(0, usableDayCount);
+	const usableRawEtos = rawEtos.slice(0, usableDayCount);
 
 	// Calculate ETo value for first day to return (precipitation is not a part of it)
-	const returnETo = rawEtos[0];
+	const returnETo = usableRawEtos[0];
 	// Calculate ETo scores per day.
-	const etos = rawEtos.map((eto, i) => eto - wateringData[i].precip);
+	const etos = usableRawEtos.map((eto, i) => eto - usableWateringData[i].precip);
 
 	// Compute uncapped scales for each score
 	const uncappedScales = etos.map(score => score / baseETo * 100);
@@ -82,7 +88,7 @@ async function calculateEToWateringScale(
 			wind: Math.round( wateringData[0].windSpeed * 10 ) / 10,
 			p: Math.round( wateringData[0].precip * 100 ) / 100
 		},
-		wateringData: wateringData,
+		wateringData: usableWateringData,
 		scales: scales,
 		ttl: data.ttl,
 	}
