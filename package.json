@@ -2,7 +2,10 @@
   "name": "os-weather-service",
   "description": "OpenSprinkler Weather Service",
   "version": "3.0.2",
-  "repository": "https://github.com/OpenSprinkler/Weather-Weather",
+  "repository": "https://github.com/OpenSprinkler/OpenSprinkler-Weather",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "test": "mocha",
     "test:weather-live": "node tools/weather-live-test.js",

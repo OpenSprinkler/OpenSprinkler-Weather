@@ -470,13 +470,14 @@ export const getWateringData = async function( req: express.Request, res: expres
 		outputFormat: string				= getParameter(req.query.format),
 		remoteAddress: string				= getParameter(req.headers[ "x-forwarded-for" ]) || req.connection.remoteAddress,
 		adjustmentOptions: AdjustmentOptions;
+	const useJson = outputFormat === "json";
 
 	// X-Forwarded-For header may contain more than one IP address and therefore
 	// the string is split against a comma and the first value is selected
 	remoteAddress = remoteAddress.split( "," )[ 0 ];
 
 	if ( !adjustmentMethod ) {
-		sendWateringError( res, new CodedError( ErrorCode.InvalidAdjustmentMethod ));
+		sendWateringError( res, new CodedError( ErrorCode.InvalidAdjustmentMethod ), true, useJson );
 		return;
 	}
 
@@ -486,7 +487,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		adjustmentOptions = parseAdjustmentOptions(adjustmentOptionsString);
 	} catch ( err ) {
 		// If the JSON is not valid then abort the calculation
-		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ), adjustmentMethod != ManualAdjustmentMethod );
+		sendWateringError( res, new CodedError( ErrorCode.MalformedAdjustmentOptions ), adjustmentMethod != ManualAdjustmentMethod, useJson );
 		return;
 	}
 
@@ -497,7 +498,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 	try {
 		coordinates = await resolveCoordinates( location );
 	} catch ( err ) {
-		sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
+		sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod, useJson );
 		return;
 	}
 
@@ -510,7 +511,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		pws = parsePwsOptions(adjustmentOptions);
 		weatherProvider = selectWeatherProvider(adjustmentOptions, pws);
 	} catch (err) {
-		sendWateringError(res, makeCodedError(err), adjustmentMethod != ManualAdjustmentMethod);
+		sendWateringError(res, makeCodedError(err), adjustmentMethod != ManualAdjustmentMethod, useJson);
 		return;
 	}
 
@@ -536,7 +537,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 			adjustmentOptions, coordinates, weatherProvider, pws
 		);
 	} catch ( err ) {
-		sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
+		sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod, useJson );
 		return;
 	}
 
@@ -555,7 +556,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 			try {
 				dataArr = await weatherProvider.getWateringData( coordinates, pws );
 			} catch ( err ) {
-				sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod );
+				sendWateringError( res, makeCodedError( err ), adjustmentMethod != ManualAdjustmentMethod, useJson );
 				return;
 			}
 			wateringData = dataArr.value;
@@ -577,7 +578,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		}
 	}
 
-	sendWateringData( res, data, outputFormat === "json" );
+	sendWateringData( res, data, useJson );
 };
 
 /**
@@ -599,10 +600,10 @@ function sendWateringError(
         console.error(`An unexpected error occurred:`, error);
     }
 
-    sendWateringData(res, {
-        errCode: error.errCode,
-        scale: resetScale ? 100 : undefined,
-    });
+	sendWateringData(res, {
+		errCode: error.errCode,
+		scale: resetScale ? 100 : undefined,
+	}, useJson);
 }
 
 /**

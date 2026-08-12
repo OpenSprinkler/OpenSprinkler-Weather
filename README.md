@@ -12,7 +12,7 @@ The OpenSprinkler Weather Service supplies weather data, time-zone and sunrise/s
 
 ## Quick Start
 
-Use a current Node.js LTS release. Clone the repository, install the locked dependencies, and build the service:
+Use Node.js 24 LTS. With NVM, `nvm use` selects the version declared in `.nvmrc`. Clone the repository, install the locked dependencies, and build the service:
 
 ```bash
 git clone https://github.com/OpenSprinkler/OpenSprinkler-Weather.git

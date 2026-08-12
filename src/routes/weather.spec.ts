@@ -36,6 +36,28 @@ describe("Watering Data", () => {
 		expect(result.sunset).to.be.a("number");
 	});
 
+	it("returns adjustment errors as JSON when requested", async () => {
+		const { request, response } = createExpressMocks(9);
+		await getWateringData(request, response);
+
+		expect(response._getJSON()).to.eql({ errCode: 41, scale: 100 });
+	});
+
+	it("preserves the legacy adjustment error format by default", async () => {
+		const { request, response } = createExpressMocks(9, false);
+		await getWateringData(request, response);
+
+		expect(response._getString()).to.equal("&errCode=41&scale=100");
+	});
+
+	it("honors JSON format for errors after selecting an adjustment method", async () => {
+		const { request, response } = createExpressMocks(1);
+		request.query.wto = '"provider":';
+		await getWateringData(request, response);
+
+		expect(response._getJSON()).to.eql({ errCode: 50, scale: 100 });
+	});
+
 	it("calculates Zimmerman adjustment from normalized historical data", async () => {
 		const provider = new MockWeatherProvider({
 			wateringData: [{
@@ -225,13 +247,13 @@ describe("Weather Sensor Data", () => {
 	});
 });
 
-function createExpressMocks(method: number) {
+function createExpressMocks(method: number, useJson = true) {
 	const request = new MockRequestConstructor({
 		method: "GET",
 		url: `/${method}?loc=${location}`,
 		query: {
 			loc: location,
-			format: "json",
+			format: useJson ? "json" : undefined,
 		},
 		params: [method],
 		headers: {
