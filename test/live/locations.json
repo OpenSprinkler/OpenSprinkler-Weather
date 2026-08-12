@@ -1,0 +1,19 @@
+[
+  { "id": "new-york", "name": "New York, US", "lat": 40.7128, "lon": -74.0060, "smoke": true },
+  { "id": "phoenix", "name": "Phoenix, US", "lat": 33.4484, "lon": -112.0740, "smoke": true },
+  { "id": "seattle", "name": "Seattle, US", "lat": 47.6062, "lon": -122.3321, "smoke": false },
+  { "id": "miami", "name": "Miami, US", "lat": 25.7617, "lon": -80.1918, "smoke": false },
+  { "id": "denver", "name": "Denver, US", "lat": 39.7392, "lon": -104.9903, "smoke": false },
+  { "id": "anchorage", "name": "Anchorage, US", "lat": 61.2181, "lon": -149.9003, "smoke": false },
+  { "id": "honolulu", "name": "Honolulu, US", "lat": 21.3099, "lon": -157.8581, "smoke": false },
+  { "id": "berlin", "name": "Berlin, Germany", "lat": 52.5200, "lon": 13.4050, "smoke": true },
+  { "id": "munich", "name": "Munich, Germany", "lat": 48.1351, "lon": 11.5820, "smoke": false },
+  { "id": "london", "name": "London, UK", "lat": 51.5074, "lon": -0.1278, "smoke": false },
+  { "id": "singapore", "name": "Singapore", "lat": 1.3521, "lon": 103.8198, "smoke": false },
+  { "id": "tokyo", "name": "Tokyo, Japan", "lat": 35.6762, "lon": 139.6503, "smoke": false },
+  { "id": "sydney", "name": "Sydney, Australia", "lat": -33.8688, "lon": 151.2093, "smoke": true },
+  { "id": "cape-town", "name": "Cape Town, South Africa", "lat": -33.9249, "lon": 18.4241, "smoke": false },
+  { "id": "sao-paulo", "name": "Sao Paulo, Brazil", "lat": -23.5505, "lon": -46.6333, "smoke": false },
+  { "id": "dubai", "name": "Dubai, UAE", "lat": 25.2048, "lon": 55.2708, "smoke": false },
+  { "id": "reykjavik", "name": "Reykjavik, Iceland", "lat": 64.1466, "lon": -21.9426, "smoke": false }
+]

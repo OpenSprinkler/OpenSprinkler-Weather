@@ -18,27 +18,33 @@ export interface TimeData {
 export interface WeatherData {
 	/** The WeatherProvider that generated this data. */
 	weatherProvider: WeatherProviderId;
-	/** The current temperature (in Fahrenheit). */
-	temp: number;
-	/** The current humidity (as a percentage). */
-	humidity: number;
-	/** The current wind speed (in miles per hour). */
-	wind: number;
-	/** A flag if it is currently raining. */
-	raining: boolean;
+	/** The current temperature (in Fahrenheit), if available. */
+	temp?: number;
+	/** The current humidity (as a percentage), if available. */
+	humidity?: number;
+	/** The current wind speed (in miles per hour), if available. */
+	wind?: number;
+	/** A flag indicating whether it is currently raining, if available. */
+	raining?: boolean;
 	/** A human-readable description of the weather. */
 	description: string;
 	/** An icon ID that represents the current weather. This will be used in http://openweathermap.org/img/w/<ICON_ID>.png */
 	icon: string;
 	region: string;
 	city: string;
-	/** The forecasted minimum temperature for the current day (in Fahrenheit). */
-	minTemp: number;
-	/** The forecasted minimum temperature for the current day (in Fahrenheit). */
-	maxTemp: number;
-	/** The forecasted total precipitation for the current day (in inches). */
-	precip: number;
+	/** The forecasted minimum temperature for the current day (in Fahrenheit), if available. */
+	minTemp?: number;
+	/** The forecasted maximum temperature for the current day (in Fahrenheit), if available. */
+	maxTemp?: number;
+	/** The forecasted total precipitation for the current day (in inches), if available. */
+	precip?: number;
 	forecast: WeatherDataForecast[]
+	/** Provider attribution that must accompany displayed weather data, when required by the provider. */
+	attribution?: {
+		name?: string;
+		url?: string;
+		logo?: string;
+	};
 }
 
 /** The forecasted weather for a specific day in the future. */
@@ -81,13 +87,13 @@ export interface WateringData {
 	minHumidity: number;
 	/** The maximum relative humidity over the time period (as a percentage). */
 	maxHumidity: number;
-	/** The solar radiation, accounting for cloud coverage (in kilowatt hours per square meter per day). */
-	solarRadiation: number;
+	/** The solar radiation, accounting for cloud coverage (in kilowatt hours per square meter per day), if available. */
+	solarRadiation?: number;
 	/**
-	 * The average wind speed measured at 2 meters over the time period (in miles per hour). A measurement taken at a
-	 * different height can be standardized to 2m using the `standardizeWindSpeed` function in EToAdjustmentMethod.
+	 * The average wind speed measured at 2 meters over the time period (in miles per hour), if available. A measurement
+	 * taken at a different height can be standardized to 2m using the `standardizeWindSpeed` function in EToAdjustmentMethod.
 	 */
-	windSpeed: number;
+	windSpeed?: number;
 }
 
 export type WeatherProviderId = "OWM" | "PirateWeather" | "local" | "mock" | "WUnderground" | "DWD" | "OpenMeteo" | "AccuWeather" | "Apple";

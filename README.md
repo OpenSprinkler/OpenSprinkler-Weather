@@ -1,123 +1,103 @@
-<img align="left" height="150" src="http://albahra.com/opensprinkler/icon-new.png"><h3>&nbsp;OpenSprinkler Weather Service [![GitHub version](https://img.shields.io/github/package-json/v/opensprinkler/opensprinkler-weather.svg)](https://github.com/OpenSprinkler/OpenSprinkler-Weather)</h3>
-&nbsp;[![Build Status](https://api.travis-ci.org/OpenSprinkler/OpenSprinkler-Weather.svg?branch=master)](https://travis-ci.org/) [![devDependency Status](https://david-dm.org/OpenSprinkler/OpenSprinkler-Weather/status.svg)](https://david-dm.org/OpenSprinkler/OpenSprinkler-Weather#info=dependencies)<br>
-&nbsp;[Official Site][official] | [Support][help] | [Changelog][changelog]
-<br>
-This script works with the OpenSprinkler Unified Firmware to automatically adjust station run times based on weather data. In addition to calculating the watering level, it also supplies details such as the user’s time zone, sunrise, and sunset times, based on the user's location information. The script is implemented in JavaScript and runs on Node.js.
+# OpenSprinkler Weather Service
 
----
+[![Docker](https://github.com/OpenSprinkler/OpenSprinkler-Weather/actions/workflows/build-ci.yml/badge.svg)](https://github.com/OpenSprinkler/OpenSprinkler-Weather/actions/workflows/build-ci.yml)
 
-[official]: https://opensprinkler.com
-[help]: http://support.opensprinkler.com
-[changelog]: https://github.com/OpenSprinkler/OpenSprinkler-Weather/releases
+The OpenSprinkler Weather Service supplies weather data, time-zone and sunrise/sunset information, watering adjustments, and weather-based restrictions to OpenSprinkler controllers. It supports multiple public weather providers and locally streamed personal weather station (PWS) data.
 
-## File Detail
+- [Configuration reference](docs/configuration.md)
+- [HTTP API reference](docs/api.md)
+- [Local service and PWS setup](docs/local-installation.md)
+- [Testing and release checks](docs/weather-testing.md)
+- [OpenSprinkler weather-adjustment guide](https://openthings.freshdesk.com/support/solutions/articles/5000823370-use-weather-adjustments)
 
-**server.js** is the primary file launching the API daemon.
+## Quick Start
 
-**src/routes/** contains all the endpoints for the API service, including weather data providers, adjustment methods, geocoders. The list of currently supported weather data providers, their capabilities, and details on various adjustment methods can be found at our [support website]: https://openthings.freshdesk.com/support/solutions/articles/5000823370-use-weather-adjustments
+Use Node.js 24 LTS. With NVM, `nvm use` selects the version declared in `.nvmrc`. Clone the repository, install the locked dependencies, and build the service:
 
----
-
-## Running the Weather Script Locally
-
-To run the weather script on your own computer, start by downloading the source code (either via `git clone` or a ZIP download). Then install dependencies and compile the TypeScript sources:
-
-```
-npm install
+```bash
+git clone https://github.com/OpenSprinkler/OpenSprinkler-Weather.git
+cd OpenSprinkler-Weather
+npm ci
 npm run build
 ```
 
-### 1. Compose `.env` file
-Before starting the service, you’ll need a `.env` file with configuration parameters such as the server port, default weather provider, geocoder, and any required API keys. A minimal example looks like this:
+Create `.env` from [.env.example](.env.example). Open-Meteo is a useful keyless default for a self-hosted instance:
 
-```
+```text
 HOST=0.0.0.0
 PORT=3000
-GEOCODER=GoogleMaps
-GOOGLE_MAPS_API_KEY=your_api_key
-```
-
-Note: The `GOOGLE_MAPS_API_KEY` does not need to be valid if you query the service directly with GPS coordinates. The Maps API is only used for geocoding (converting a city name or ZIP code into latitude/longitude).
-
-To set a default weather provider (e.g. `OpenMeteo`), include:
-
-```
 WEATHER_PROVIDER=OpenMeteo
 ```
 
-If your chosen provider requires an API key (for example, OpenWeatherMap or `OWM`), add:
+The baseline ETo endpoint also requires `baselineEToData/Baseline_ETo_Data.bin`. Generate it when it is not already present:
 
-```
-WEATHER_PROVIDER=OWM
-OWM_API_KEY=your_owm_api_key
-```
-
-Unlike earlier versions, this script also allows you to specify the weather provider and API key dynamically via the `wto` parameter in API queries. This means you don’t have to hardcode a default provider in `.env` unless you prefer to.
-
-### 2. Build the baselineETo data:
-
-```
+```bash
 cd baselineEToData
 sh prepareData.sh 20
 sh baseline.sh
+cd ..
 ```
 
-This command runs the data preparation script with `20` interpolation passes (the recommended default, explained in the `README` for that folder). When it finishes, it will produce the file `Baseline_ETo_Data.bin`, which is required by the weather service for ETo-based watering adjustments. This file only needs to be built once -- you don't need to generate it again if you already have it.
+Start the compiled service:
 
-### 3. Start the Service
-Once your `.env` file is ready and the baseline ETo data is prepared, start the service with:
-
-```
-npm run start
+```bash
+npm start
 ```
 
-The server will launch on the port you configured in `.env`.
+The root URL reports the running service version. API coordinates use `latitude,longitude`, for example:
 
----
+```text
+http://127.0.0.1:3000/1?loc=40.7128,-74.0060&wto="provider":"OpenMeteo","h":100,"t":100,"r":100,"bh":30,"bt":70,"br":0&format=json
+```
 
-## Running the Weather Service with Docker
+## Docker
 
-You can also run the precompiled weather service in Docker. The GitHub repository automatically publishes an up-to-date image, which you can pull with:
+The published image includes the generated baseline ETo data:
 
-`ghcr.io/opensprinkler/weather-server:release`
+```bash
+docker run -d --name opensprinkler-weather \
+  --env-file .env -p 3000:3000 \
+  ghcr.io/opensprinkler/weather-server:release
+```
 
-To launch it as a background service (daemon), run the container and point it to your `.env` file for configuration. The .env setup is the same as described above, but note that the Docker image already includes the `Baseline_ETo_Data.bin`, so you don’t need to generate it yourself.
+For a local PWS, enable persistence and retain `/data` across container replacement:
 
-If you prefer to build the Docker image locally, be aware that the process is resource-intensive. You will need at least 30 GB of free disk space and sufficient memory to complete the build, since generating the baseline ETo dataset is computationally heavy.
+```bash
+docker run -d --name opensprinkler-weather \
+  --env-file .env -e LOCAL_PERSISTENCE=true \
+  -v opensprinkler-weather-data:/data -p 3000:3000 \
+  ghcr.io/opensprinkler/weather-server:release
+```
 
----
+To build the image locally, run `docker build -t opensprinkler-weather .`. Generating the baseline ETo dataset makes this build CPU-, memory-, and disk-intensive.
 
-## Using the Weather Service
+## Endpoints
 
-When the weather server is running, it starts a web service at `<host>:3000`, where `<host>` is the IP/DNS of your computer and `3000` is the default port. The OpenSprinkler firmware and UI/app communicate with it through these endpoints:
+The principal routes are:
 
-- `<host>:3000`: Returns the weather service version.
+- `/0`, `/1`, `/2`, `/3`: manual, Zimmerman, rain-delay, and ETo adjustment responses.
+- `/weatherData`: current conditions and forecast data for the UI.
+- `/weatherSensorData`: compact current, forecast, and historical values for controller WeatherSensor instances.
+- `/baselineETo`: average daily baseline ETo for a location.
+- `/weatherstation/updateweatherstation.php`: local PWS observation upload when `PWS=WU`.
 
-- `<host>:3000/0?loc=[long],[lat]`: Used for **Manual** adjustment.
-  - `[long],[lat]` are GPS coordinates (e.g. `42,-75`).
-  - Returns time zone, sunrise/sunset times, and an error code if any.
-  - Time zone is encoded as `(GMT shift × 4) + 48`. For example, `GMT-4` is encoded as `32`.
-  - Sunrise/sunset are given in minutes since midnight.
-  - If a valid geocoder (e.g. Google Maps with API key) is set, location may also be provided as ZIP code, city, etc.
+See the [HTTP API reference](docs/api.md) for parameters, response schemas, units, caching, and error handling.
 
-- `<host>:3000/1?loc=[long],[lat]&wto="h":100,"t":100,"r":100,"bh":30,"bt":70,"br":0`: Used for **Zimmerman** adjustment method.
-  - `wto` specifies the optional adjustment parameters, such as weights and baselines of humidity, temperature, and rain.
-  - Returns all parameters from `/0`, plus:
-    - `scale`: watering level calculated by the Zimmerman algorithm from yesterday's data.
-    - `rawData`: the raw weather data used for Zimmerman calculation
-    - `scales`: multi-day averages based on available historic data. The length of this array depends on the selected weather data provider's capability.
+## Development
 
-- `<host>:3000/2?loc=[long],[lat]&wto="d":28`: Used for **Auto Rain Delay**, where `d` is the number of hours to delay if rain is currently reported.
+Run the deterministic release checks before submitting changes:
 
-- `<host>:3000/3?loc=[long],[lat]&wto="baseETo":0.34,"elevation":600`: Used for **ETo** adjustment. `baseETo` is the baseline ETo value in inches/day; `elevation` is the elevation in feet. Returns `scale`, `rawData` and `scales` array similar to Zimmerman.
+```bash
+npm ci
+npm test
+npx tsc --noEmit
+npm run build
+```
 
-- **Weather Constraints** can be added via `wto` to any adjustment method above. For example:
-  - `"minTemp":78` triggers a return parameter of `restrict=1` if the current temperature is below `78°F`.
-  - `"rainAmt":1.5,"rainDays":4` triggers `restrict=1` if the forecast rain is more than 1.5 (inches) in the next 4 days.
-  - `"cali":` enables California restriction (stop watering if ≥0.1″ rain in past 48h).
+Live-provider and deployed-server comparison tests are documented in [Weather Service Testing](docs/weather-testing.md).
 
-- **Weather Data Provider** can be specified with any adjustment method by adding `"provider":"X","key":Y` to `wto`. For example:
-  - `"provider":"OpenMeteo"` for OpenMeteo (no key required)
-  - `"provider":"AW","key":"xxxx"` for AccuWeather with the corresponding key.
+## License and Support
 
-- `<host>:3000/weatherData?loc=[long],[lat]`: Return forecast data. A provider can also be set via `wto`.
+- [OpenSprinkler](https://opensprinkler.com)
+- [Support](https://openthings.freshdesk.com/support/home)
+- [Releases](https://github.com/OpenSprinkler/OpenSprinkler-Weather/releases)

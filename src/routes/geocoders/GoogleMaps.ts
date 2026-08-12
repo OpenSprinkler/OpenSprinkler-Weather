@@ -1,6 +1,6 @@
 import { GeoCoordinates } from "../../types";
 import { CodedError, ErrorCode } from "../../errors";
-import { httpJSONRequest } from "../weather";
+import { httpJSONRequest } from "../http";
 import { Geocoder } from "./Geocoder";
 
 export default class GoogleMapsGeocoder extends Geocoder {
@@ -9,12 +9,13 @@ export default class GoogleMapsGeocoder extends Geocoder {
 	public constructor() {
 		super();
 		this.API_KEY = process.env.GOOGLE_MAPS_API_KEY;
-		if ( !this.API_KEY ) {
-			throw "GOOGLE_MAPS_API_KEY environment variable is not defined.";
-		}
 	}
 
 	public async geocodeLocation( location: string ): Promise<GeoCoordinates> {
+		if ( !this.API_KEY ) {
+			throw new CodedError( ErrorCode.NoAPIKeyProvided );
+		}
+
 		// Generate URL for Google Maps geocoding request
 		const url = `https://maps.googleapis.com/maps/api/geocode/json?key=${ this.API_KEY }&address=${ encodeURIComponent( location ) }`;
 

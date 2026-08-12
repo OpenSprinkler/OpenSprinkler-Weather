@@ -3,6 +3,16 @@ import { getTZ, httpJSONRequest, localTime } from "../weather";
 import { WeatherProvider } from "./WeatherProvider";
 import { CodedError, ErrorCode } from "../../errors";
 import { format, getUnixTime, startOfDay, subDays } from "date-fns";
+import { standardizeWindSpeed } from "../adjustmentMethods/EToAdjustmentMethod";
+import {
+	averageFinite,
+	completeHistoricalHourlyDays,
+	maxFinite,
+	minFinite,
+	sumFinite,
+} from "./providerUtils";
+
+const WIND_MEASUREMENT_HEIGHT_FEET = 10 * 3.281;
 
 export default class OpenMeteoWeatherProvider extends WeatherProvider {
 
@@ -22,7 +32,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
         const endTimestamp = format(currentDay, "yyyy-MM-dd");
 
 
-		const historicUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relativehumidity_2m,precipitation,direct_radiation,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&start_date=${startTimestamp}&end_date=${endTimestamp}&timezone=${tz}&timeformat=unixtime`;
+		const historicUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&hourly=temperature_2m,relative_humidity_2m,precipitation,shortwave_radiation,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&start_date=${startTimestamp}&end_date=${endTimestamp}&timezone=${tz}&timeformat=unixtime`;
 
 		let historicData;
 		try {
@@ -36,54 +46,58 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 			throw new CodedError( ErrorCode.MissingWeatherField );
 		}
 
-		// Cut data down to 7 days previous (midnight to midnight)
-		const start = getUnixTime(startOfDay(localTime(coordinates)));
-
-		const historicCutoff = historicData.hourly.time.findIndex( function( time ) {
-			return time >= start;
-		} );
-
-		for (const arr in historicData.hourly) {
-			historicData.hourly[arr].length = historicCutoff - historicCutoff % 24;
+		const sampleCount = historicData.hourly.time?.length || 0;
+		const samples = Array.from({ length: sampleCount }, (_, index) => ({
+			time: historicData.hourly.time[index],
+			temperature: historicData.hourly.temperature_2m?.[index],
+			humidity: historicData.hourly.relative_humidity_2m?.[index],
+			precipitation: historicData.hourly.precipitation?.[index],
+			solarRadiation: historicData.hourly.shortwave_radiation?.[index],
+			windSpeed: historicData.hourly.wind_speed_10m?.[index],
+		}));
+		const days = completeHistoricalHourlyDays(
+			samples,
+			sample => sample.time * 1000,
+			tz,
+			startOfDay(localTime(coordinates)),
+			7
+		);
+		if (!days.length) {
+			throw new CodedError(ErrorCode.InsufficientWeatherData);
 		}
 
 		const data: WateringData[] = [];
 
-		for(let i = 0; i < 7; i++){ //
-			let temp: number = 0, humidity: number = 0, precip: number = 0,
-				minHumidity: number = undefined, maxHumidity: number = undefined,
-				minTemp: number = undefined, maxTemp: number = undefined,
-				wind: number = 0, solar: number = 0;
-
-			for (let index = i*24; index < (i+1)*24; index++ ) {
-				temp += historicData.hourly.temperature_2m[index];
-				humidity += historicData.hourly.relativehumidity_2m[index];
-				precip += historicData.hourly.precipitation[index] || 0;
-
-				minTemp = minTemp < historicData.hourly.temperature_2m[index] ? minTemp : historicData.hourly.temperature_2m[index];
-				maxTemp = maxTemp > historicData.hourly.temperature_2m[index] ? maxTemp : historicData.hourly.temperature_2m[index];
-
-				if (historicData.hourly.windspeed_10m[index] > wind)
-					wind = historicData.hourly.windspeed_10m[index];
-
-				minHumidity = minHumidity < historicData.hourly.relativehumidity_2m[index] ? minHumidity : historicData.hourly.relativehumidity_2m[index];
-				maxHumidity = maxHumidity > historicData.hourly.relativehumidity_2m[index] ? maxHumidity : historicData.hourly.relativehumidity_2m[index];
-
-				solar += historicData.hourly.direct_radiation[index];
+		for (const day of days) {
+			const records = day.records;
+			const temp = averageFinite(records.map(record => record.temperature));
+			const humidity = averageFinite(records.map(record => record.humidity));
+			const precip = sumFinite(records.map(record => record.precipitation));
+			const minTemp = minFinite(records.map(record => record.temperature));
+			const maxTemp = maxFinite(records.map(record => record.temperature));
+			const minHumidity = minFinite(records.map(record => record.humidity));
+			const maxHumidity = maxFinite(records.map(record => record.humidity));
+			const wind = averageFinite(records.map(record => record.windSpeed));
+			const solar = sumFinite(records.map(record => record.solarRadiation));
+			if ([temp, humidity, precip, minTemp, maxTemp, minHumidity, maxHumidity, wind, solar]
+				.some(value => !Number.isFinite(value))) {
+				throw new CodedError(ErrorCode.InsufficientWeatherData);
 			}
 
 			const result: WateringData = {
 				weatherProvider: "OpenMeteo",
-				temp: temp / 24,
-				humidity: humidity / 24,
+				temp,
+				humidity,
 				precip: precip,
-				periodStartTime: historicData.hourly.time[i*24],
+				periodStartTime: records[0].time,
 				minTemp: minTemp,
 				maxTemp: maxTemp,
 				minHumidity: minHumidity,
 				maxHumidity: maxHumidity,
-				solarRadiation: solar / 1000, // API gives in Watts
-				windSpeed: wind
+				// Each value is the preceding hour's mean W/m2, so summing and dividing by
+				// 1000 produces daily kWh/m2.
+				solarRadiation: solar / 1000,
+				windSpeed: standardizeWindSpeed(wind, WIND_MEASUREMENT_HEIGHT_FEET)
 			}
 
 			data.push(result);
@@ -95,28 +109,28 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 	protected async getWeatherDataInternal( coordinates: GeoCoordinates, pws: PWS | undefined ): Promise< WeatherData > {
 		const timezone = getTZ(coordinates);
 
-		const currentUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timeformat=unixtime`;
+		const currentUrl = `https://api.open-meteo.com/v1/forecast?latitude=${ coordinates[ 0 ] }&longitude=${ coordinates[ 1 ] }&timezone=${ timezone }&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timeformat=unixtime`;
 
 		let current;
 		try {
 			current = await httpJSONRequest( currentUrl );
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from OpenMeteo:", err );
-			throw "An error occurred while retrieving weather information from OpenMeteo."
+			throw new CodedError(ErrorCode.WeatherApiError);
 		}
 
-		if ( !current || !current.daily || !current.current_weather ) {
-			throw "Necessary field(s) were missing from weather information returned by OpenMeteo.";
+		if ( !current || !current.daily || !current.current ) {
+			throw new CodedError(ErrorCode.MissingWeatherField);
 		}
 
 		const weather: WeatherData = {
 			weatherProvider: "OpenMeteo",
-			temp: current.current_weather.temperature,
-			humidity: 0,
-			wind: current.current_weather.windspeed,
-			raining: current.daily.precipitation_sum[0] > 0,
-			description: this.getWMOIconCode(current.current_weather.weathercode).desc,
-			icon: this.getWMOIconCode(current.current_weather.weathercode).icon,
+			temp: current.current.temperature_2m,
+			humidity: current.current?.relative_humidity_2m,
+			wind: current.current.wind_speed_10m,
+			raining: typeof current.current?.precipitation === "number" ? current.current.precipitation > 0 : undefined,
+			description: this.getWMOIconCode(current.current.weather_code).desc,
+			icon: this.getWMOIconCode(current.current.weather_code).icon,
 
 			region: "",
 			city: "",
@@ -132,8 +146,8 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				temp_max: current.daily.temperature_2m_max[day],
 				precip: current.daily.precipitation_sum[day],
 				date: current.daily.time[day],
-				icon: this.getWMOIconCode( current.daily.weathercode[day] ).icon,
-				description: this.getWMOIconCode( current.daily.weathercode[day] ).desc,
+				icon: this.getWMOIconCode( current.daily.weather_code[day] ).icon,
+				description: this.getWMOIconCode( current.daily.weather_code[day] ).desc,
 			} );
 		}
 
@@ -156,7 +170,7 @@ export default class OpenMeteoWeatherProvider extends WeatherProvider {
 				return {"icon": "01d", desc: "Clear Sky"};
 			case 1:
 				//1, 2, 3 	Mainly clear, partly cloudy, and overcast
-				return {"icon": "02d", desc: "Mainly cloudy"};
+				return {"icon": "02d", desc: "Mainly clear"};
 			case 2:
 				return {"icon": "03d", desc: "Partly cloudy"};
 			case 3:

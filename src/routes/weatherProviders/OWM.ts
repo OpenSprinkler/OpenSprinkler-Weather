@@ -91,12 +91,12 @@ export default class OWMWeatherProvider extends WeatherProvider {
 
 		} catch ( err ) {
 			console.error( "Error retrieving weather information from OWM:", err );
-			throw "An error occurred while retrieving weather information from OWM."
+			throw new CodedError(ErrorCode.WeatherApiError);
 		}
 
 		// Indicate weather data could not be retrieved if the forecast data is incomplete.
 		if (!weatherData || !weatherData.current || !weatherData.daily) {
-			throw "Necessary field(s) were missing from weather information returned by OWM.";
+			throw new CodedError(ErrorCode.MissingWeatherField);
 		}
 
 		const weather: WeatherData = {
@@ -104,7 +104,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			temp: weatherData.current.temp,
 			humidity: weatherData.current.humidity,
 			wind: weatherData.current.wind_speed,
-			raining: (weatherData.current.rain?.["1h"] || 0) > 0,
+			raining: ((weatherData.current.rain?.["1h"] ?? 0) + (weatherData.current.snow?.["1h"] ?? 0)) > 0,
 			description: weatherData.current.weather[0].description,
 			icon: weatherData.current.weather[0].icon,
 
@@ -112,7 +112,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			city: "",
 			minTemp: weatherData.daily[0].temp.min,
 			maxTemp: weatherData.daily[0].temp.max,
-			precip: (weatherData.daily[0].rain ? weatherData.daily[0].rain : 0) / 25.4,
+			precip: ((weatherData.daily[0].rain ?? 0) + (weatherData.daily[0].snow ?? 0)) / 25.4,
 			forecast: []
 		};
 
@@ -120,7 +120,7 @@ export default class OWMWeatherProvider extends WeatherProvider {
 			weather.forecast.push({
 				temp_min: weatherData.daily[index].temp.min,
 				temp_max: weatherData.daily[index].temp.max,
-				precip: (weatherData.daily[index].rain ? weatherData.daily[index].rain : 0) / 25.4,
+				precip: ((weatherData.daily[index].rain ?? 0) + (weatherData.daily[index].snow ?? 0)) / 25.4,
 				date: weatherData.daily[index].dt,
 				icon: weatherData.daily[index].weather[0].icon,
 				description: weatherData.daily[index].weather[0].description

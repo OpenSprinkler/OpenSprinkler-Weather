@@ -5,6 +5,7 @@ import { CodedError, ErrorCode } from "../../errors";
 import { Cached, CachedResult } from "../../cache";
 import { httpJSONRequest } from "../weather";
 import { addDays, addHours, endOfDay, startOfDay } from "date-fns";
+import { localDateKey, shiftLocalDate } from "./providerUtils";
 
 export class WeatherProvider {
 	/**
@@ -26,7 +27,10 @@ export class WeatherProvider {
 
 		const expiresAt = addDays(startOfDay(TZDate.tz(tz)), 1);
 
-		return this.wateringDataCache[key].get(() => this.getWateringDataInternal(coordinates, pws), expiresAt);
+		return this.wateringDataCache[key].get(
+			async () => normalizeWateringDataHistory(await this.getWateringDataInternal(coordinates, pws), coordinates),
+			expiresAt
+		);
 	}
 
 	/**
@@ -85,4 +89,34 @@ export class WeatherProvider {
 	protected async getWateringDataInternal(coordinates: GeoCoordinates, pws: PWS | undefined): Promise<readonly WateringData[]> {
 		throw new CodedError( ErrorCode.UnsupportedAdjustmentMethod );
 	}
+}
+
+export function normalizeWateringDataHistory(
+	data: readonly WateringData[],
+	coordinates: GeoCoordinates
+): readonly WateringData[] {
+	if (!Array.isArray(data) || !data.length) {
+		throw new CodedError(ErrorCode.InsufficientWeatherData);
+	}
+
+	const required: (keyof WateringData)[] = [
+		"periodStartTime", "temp", "humidity", "precip", "minTemp", "maxTemp", "minHumidity", "maxHumidity"
+	];
+	const sorted = [...data].sort((a, b) => b.periodStartTime - a.periodStartTime);
+	if (sorted.some(day => required.some(field => !Number.isFinite(day[field])))) {
+		throw new CodedError(ErrorCode.InsufficientWeatherData);
+	}
+
+	const timezone = geoTZ.find(coordinates[0], coordinates[1])[0];
+	const dates = sorted.map(day => localDateKey(day.periodStartTime * 1000, timezone));
+	if (new Set(dates).size !== dates.length) {
+		throw new CodedError(ErrorCode.InsufficientWeatherData);
+	}
+	for (let index = 1; index < dates.length; index++) {
+		if (dates[index] !== shiftLocalDate(dates[index - 1], -1, timezone)) {
+			throw new CodedError(ErrorCode.InsufficientWeatherData);
+		}
+	}
+
+	return sorted;
 }

@@ -1,6 +1,6 @@
 import { GeoCoordinates } from "../../types";
 import { CodedError, ErrorCode } from "../../errors";
-import { httpJSONRequest } from "../weather";
+import { httpJSONRequest } from "../http";
 import { Geocoder } from "./Geocoder";
 
 export default class WUndergroundGeocoder extends Geocoder {

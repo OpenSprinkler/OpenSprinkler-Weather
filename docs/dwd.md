@@ -1,8 +1,11 @@
-# New weather provider: DWD (Deutscher Wetter Dienst=German Weather Service)
+# DWD / Bright Sky
 
-**!!only usable for german locations!!**
+The DWD provider uses the [Bright Sky API](https://brightsky.dev/) to retrieve Deutscher Wetterdienst observations and forecasts. It is intended for locations in Germany and requires no API key.
 
-This provider uses https://brightSky.dev for querying data for a given location.
-Just define `WEATHER_PROVIDER=DWD` in your .env File
+Select it in `.env`:
 
-## Supports ETO as well
+```text
+WEATHER_PROVIDER=DWD
+```
+
+The provider supports current and forecast weather, historical data, Zimmerman adjustment, rain delay, ETo, and WeatherSensor values. Wind observations are standardized to a 2 m measurement height for ETo calculations.

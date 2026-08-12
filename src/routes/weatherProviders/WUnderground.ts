@@ -1,7 +1,8 @@
 import { GeoCoordinates, PWS, WeatherData, WateringData } from "../../types";
 import { WeatherProvider } from "./WeatherProvider";
-import { httpJSONRequest } from "../weather";
+import { getTZ, httpJSONRequest, localTime } from "../weather";
 import { CodedError, ErrorCode } from "../../errors";
+import { averageFinite, completeHistoricalHourlyDays, maxFinite, minFinite, sumFinite } from "./providerUtils";
 
 export default class WUndergroundWeatherProvider extends WeatherProvider {
 
@@ -21,64 +22,56 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 		}
 
 		if ( !historicData || !historicData.observations ) {
-			throw "Necessary field(s) were missing from weather information returned by Wunderground.";
+			throw new CodedError(ErrorCode.MissingWeatherField);
 		}
 
-		const hours = historicData.observations;
-
-		// Cut hours into 24 hour sections up to the end of day yesterday
-		hours.length -= (hours.length % 24); // remove the ending remainder since data starts from midnight 7 days ago
-
-		const daysInHours = [];
-		for (let i = 0; i < hours.length; i+=24){
-			daysInHours.push(hours.slice(i, i+24));
-		}
+		const hours: any[] = historicData.observations;
+		const timezone = hours[0]?.tz || getTZ(coordinates);
+		const daysInHours = completeHistoricalHourlyDays(
+			hours,
+			hour => hour.epoch * 1000,
+			timezone,
+			localTime(coordinates),
+			7
+		).map(group => group.records);
 
 		// Fail if not enough data is available.
-		if ( daysInHours.length < 1 || daysInHours[0].length !== 24 ) {
+		if (!daysInHours.length) {
 			throw new CodedError( ErrorCode.InsufficientWeatherData );
 		}
 
 		const data: WateringData[] = [];
 		for ( let i = 0; i < daysInHours.length; i++ ){
-			let temp: number = 0, humidity: number = 0, precip: number = 0,
-			minHumidity: number = undefined, maxHumidity: number = undefined,
-			minTemp: number = undefined, maxTemp: number = undefined,
-			wind: number = 0, solar: number = 0;
+			const day = daysInHours[i];
+			const temp = averageFinite(day.map(hour => hour.imperial?.tempAvg));
+			const humidity = averageFinite(day.map(hour => hour.humidityAvg));
+			const precip = maxFinite(day.map(hour => hour.imperial?.precipTotal));
+			const minTemp = minFinite(day.map(hour => hour.imperial?.tempLow));
+			const maxTemp = maxFinite(day.map(hour => hour.imperial?.tempHigh));
+			const wind = averageFinite(day.map(hour => hour.imperial?.windspeedAvg));
+			const solar = sumFinite(day.map(hour => hour.solarRadiationHigh));
+			const minHumidity = minFinite(day.map(hour => hour.humidityLow));
+			const maxHumidity = maxFinite(day.map(hour => hour.humidityHigh));
 
-			for ( const hour of daysInHours[i] ) {
-
-				temp += hour.imperial.tempAvg;
-				humidity += hour.humidityAvg;
-
-				// Each hour is accumulation to present, not per hour precipitation. Using greatest value means last hour of each day is used.
-				precip = precip > hour.imperial.precipTotal ? precip : hour.imperial.precipTotal;
-
-				minTemp = minTemp < hour.imperial.tempLow ? minTemp : hour.imperial.tempLow;
-				maxTemp = maxTemp > hour.imperial.tempHigh ? maxTemp : hour.imperial.tempHigh;
-
-				if (hour.imperial.windspeedAvg != null && hour.imperial.windspeedAvg > wind)
-					wind = hour.imperial.windspeedAvg;
-
-				if (hour.solarRadiationHigh != null)
-					solar += hour.solarRadiationHigh;
-
-				minHumidity = minHumidity < hour.humidityLow ? minHumidity : hour.humidityLow;
-				maxHumidity = maxHumidity > hour.humidityHigh ? maxHumidity : hour.humidityHigh;
+			if ([temp, humidity, precip, minTemp, maxTemp, wind, solar, minHumidity, maxHumidity]
+				.some(value => !Number.isFinite(value))) {
+				throw new CodedError(ErrorCode.InsufficientWeatherData);
 			}
 
 			data.push( {
 				weatherProvider: "WU",
-				temp: temp / 24,
-				humidity: humidity / 24,
+				temp: temp,
+				humidity: humidity,
 				precip: precip,
 				periodStartTime: daysInHours[i][0].epoch,
 				minTemp: minTemp,
 				maxTemp: maxTemp,
 				minHumidity: minHumidity,
 				maxHumidity: maxHumidity,
-				solarRadiation: solar / 1000, // Returned in Watts from API
-				// Assume wind speed measurements are taken at 2 meters.
+				// The API exposes hourly peak irradiance, not an hourly mean. Treating each peak
+				// as a one-hour mean is retained as a documented approximation.
+				solarRadiation: solar / 1000,
+				// PWS anemometer height is installation-specific.
 				windSpeed: wind
 			} );
 		}
@@ -114,7 +107,7 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 
 		const current = data.observations[0];
 
-		const icon = forecast.daypart[0].iconCode[0];
+		const icon = this.getDaypartValue(forecast.daypart[0].iconCode as number[], 0);
 
 		const maxTemp = forecast.temperatureMax[0];
 
@@ -125,13 +118,13 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 			wind: Math.floor( current.imperial.windSpeed ),
 			raining: current.imperial.precipRate > 0,
 			description: forecast.narrative[0],
-			icon: this.getWUIconCode( (icon === null) ? -1 : icon ), //Null after 3pm
+			icon: this.getWUIconCode(icon == null ? -1 : icon), // Null after 3pm
 
 			region: current.country,
 			city: "",
 			minTemp: Math.floor( forecast.temperatureMin[0] ),
 			maxTemp: Math.floor( (maxTemp === null ) ? current.imperial.temp : maxTemp ), //Null after 3pm
-			precip: forecast.qpf[0] + forecast.qpfSnow[0],
+			precip: forecast.qpf[0],
 			forecast: []
 		};
 
@@ -139,9 +132,9 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 			weather.forecast.push( {
 				temp_min: Math.floor( forecast.temperatureMin[index] ),
 				temp_max: Math.floor( forecast.temperatureMax[index] ),
-				precip: forecast.qpf[index] + forecast.qpfSnow[index],
+				precip: forecast.qpf[index],
 				date: forecast.validTimeUtc[index],
-				icon: this.getWUIconCode( forecast.daypart[0].iconCode[index] ),
+				icon: this.getWUIconCode(this.getDaypartValue(forecast.daypart[0].iconCode as number[], index) ?? -1),
 				description: forecast.narrative[index]
 			} );
 		}
@@ -151,6 +144,10 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 
 	public shouldCacheWateringScale(): boolean {
 		return false;
+	}
+
+	private getDaypartValue<T>(values: T[], day: number): T | undefined {
+		return values[day * 2] ?? values[day * 2 + 1];
 	}
 
 	private getWUIconCode(code: number) {
