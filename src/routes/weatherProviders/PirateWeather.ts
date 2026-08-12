@@ -83,7 +83,7 @@ export default class PirateWeatherWeatherProvider extends WeatherProvider {
 			temp: this.celsiusToFahrenheit(averageFinite(temperatures)),
 			humidity: averageFinite(humidities) * 100,
 			precip: this.cmToInches(liquidAccumulation),
-			periodStartTime: historicData.hourly.data[ 0 ].time,
+			periodStartTime: samples[0].time,
 			minTemp: this.celsiusToFahrenheit(minFinite(temperatures)),
 			maxTemp: this.celsiusToFahrenheit(maxFinite(temperatures)),
 			minHumidity: minFinite(humidities) * 100,

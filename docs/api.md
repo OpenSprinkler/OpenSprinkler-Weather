@@ -56,7 +56,7 @@ The `cali` restriction normally sums the two most recent complete historical day
 
 `GET /weatherData?loc=latitude,longitude&wto=...` returns a JSON object used by the UI. Temperatures are Fahrenheit, wind is mph, precipitation is inches, and timestamps are Unix epoch seconds.
 
-The response includes provider identity, current conditions when available, today's minimum and maximum temperature and precipitation, a daily `forecast` array, time-zone and sunrise/sunset data, cache `ttl`, resolved coordinates, and provider attribution when required.
+The response includes provider identity, current conditions when available, today's minimum and maximum temperature and precipitation, a daily `forecast` array, time-zone and sunrise/sunset data, cache `ttl`, and resolved coordinates. Provider attribution is included only when the provider supplies it in the weather response metadata; clients remain responsible for meeting the selected provider's attribution requirements.
 
 ## WeatherSensor Data
 

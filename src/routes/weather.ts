@@ -49,16 +49,16 @@ const WEATHER_PROVIDERS: { [K in Exclude<WeatherProviderShortId, "mock">]: Weath
     WU: new WUndergroundWeatherProvider(),
 };
 
-const GEOCODERS: { [name: string]: Geocoder } = {
-    GoogleMaps: new GoogleMapsGeocoder(),
-    WU: new WUndergroundGeocoder(),
+const GEOCODER_FACTORIES: { [name: string]: () => Geocoder } = {
+    GoogleMaps: () => new GoogleMapsGeocoder(),
+    WU: () => new WUndergroundGeocoder(),
 };
 
 const PWS_WEATHER_PROVIDER: WeatherProvider =
     WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] ||
     WEATHER_PROVIDERS["WU"];
 const GEOCODER: Geocoder =
-    GEOCODERS[process.env.GEOCODER] || GEOCODERS["WU"];
+    (GEOCODER_FACTORIES[process.env.GEOCODER] || GEOCODER_FACTORIES["WU"])();
 
 // Define regex filters to match against location
 const filters = {

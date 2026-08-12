@@ -215,7 +215,13 @@ describe("Weather provider normalization", () => {
 			cloudCover: 0,
 			windSpeed: 5,
 		}));
-		globalThis.fetch = (async () => jsonResponse({ hourly: { data: hourly } })) as typeof globalThis.fetch;
+		const precedingSample = {
+			...hourly[0],
+			time: window.start.getTime() / 1000 - 60 * 60,
+		};
+		globalThis.fetch = (async () => jsonResponse({
+			hourly: { data: [precedingSample, ...hourly] },
+		})) as typeof globalThis.fetch;
 
 		const data = await new TestPirateWeatherProvider().readWatering(coordinates);
 		expect(data).to.have.length(1);
@@ -341,7 +347,7 @@ describe("Weather provider normalization", () => {
 		expect(data[0].windSpeed).to.be.closeTo(12.5 * 0.621371, 0.0001);
 	});
 
-	it("returns Apple attribution with displayed weather", async () => {
+	it("passes through provider attribution metadata when present", async () => {
 		globalThis.fetch = (async () => jsonResponse({
 			currentWeather: {
 				temperature: 20,
