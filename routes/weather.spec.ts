@@ -22,6 +22,22 @@ const replies = require( '../test/replies.json' );
 
 const location = '01002';
 
+describe( 'convertToLegacyFormat multi-day scales passthrough', () => {
+	it( 'passes a non-empty scales array through the legacy whitelist', () => {
+		const enhanced = {
+			scale: 90, rd: undefined, tz: 32, sunrise: 100, sunset: 200, eip: 1, errCode: 0,
+			scales: [ 90, 70, 80 ], rawData: { wp: 'OWM' }
+		};
+		const out: any = convertToLegacyFormat( enhanced, ManualAdjustmentMethod );
+		expect( out.scales ).to.deep.equal( [ 90, 70, 80 ] );
+	} );
+	it( 'omits scales when absent or empty', () => {
+		const base = { scale: 90, tz: 32, sunrise: 100, sunset: 200, eip: 1, errCode: 0, rawData: { wp: 'OWM' } };
+		expect( ( convertToLegacyFormat( { ...base }, ManualAdjustmentMethod ) as any ).scales ).to.equal( undefined );
+		expect( ( convertToLegacyFormat( { ...base, scales: [] }, ManualAdjustmentMethod ) as any ).scales ).to.equal( undefined );
+	} );
+} );
+
 describe( 'convertToLegacyFormat skip passthrough', () => {
 	it( 'preserves skip / skipReason for any method', () => {
 		const enhanced = {

@@ -31,6 +31,7 @@ import WUnderground from "./weatherProviders/WUnderground";
 import LocalWeatherProvider from "./weatherProviders/local";
 import WUndergroundGeocoder from "./geocoders/WUnderground";
 import GoogleMaps from "./geocoders/GoogleMaps";
+import { recordDailyScale } from "./state/ScaleHistory";
 
 /** Name → ctor for the env-selected PWS provider / geocoder (was a runtime `require("./..."+env)`). */
 const PWS_PROVIDER_REGISTRY: { [ name: string ]: new () => WeatherProvider } = {
@@ -181,6 +182,11 @@ export function convertToLegacyFormat(enhancedData: any, adjustmentMethod: Adjus
 		sunrise: enhancedData.sunrise, sunset: enhancedData.sunset, eip: enhancedData.eip,
 		errCode: enhancedData.errCode || 0
 	};
+	// Multi-day rolling averages ride the same whitelist: the firmware parses `scales=[n,...]`
+	// (weather.cpp findKeyVal "scales") only on errCode 0, into /jc.wls.
+	if ( Array.isArray( enhancedData.scales ) && enhancedData.scales.length > 0 ) {
+		legacyData.scales = enhancedData.scales;
+	}
 	if (enhancedData.rawData) {
 		const rawDataSource = enhancedData.rawData;
 		legacyData.rawData = { wp: rawDataSource.wp || rawDataSource.weatherProvider || "local" };
@@ -625,6 +631,15 @@ export const getWateringData = async function( req: express.Request, res: expres
 		return;
 	}
 
+	// Multi-day rolling averages (firmware wto.mda): record today's computed scale for this
+	// location regardless of the toggle (history warms before the user enables the feature),
+	// and emit the scales array only when the controller's weather options request it.
+	let multiDayScales: number[] | undefined;
+	if ( typeof decision.scale === "number" ) {
+		const rolling = recordDailyScale( coordinates, timeData.timezone, decision.scale );
+		if ( ( adjustmentOptions as any ).mda && rolling.length > 0 ) multiDayScales = rolling;
+	}
+
 	let dataToSend: any = {
 		scale: decision.scale,
 		rd: decision.rainDelay,
@@ -633,6 +648,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sunset: timeData.sunset,
 		eip: ipToInt( remoteAddress ),
 		rawData: decision.rawData,
+		scales: multiDayScales,
 		restricted: decision.restricted ? 1 : undefined,
 		errCode: 0
 	};
