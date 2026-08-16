@@ -53,12 +53,12 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 			const minHumidity = minFinite(day.map(hour => hour.humidityLow));
 			const maxHumidity = maxFinite(day.map(hour => hour.humidityHigh));
 
-			if ([temp, humidity, precip, minTemp, maxTemp, wind, solar, minHumidity, maxHumidity]
+			if ([temp, humidity, precip, minTemp, maxTemp, minHumidity, maxHumidity]
 				.some(value => !Number.isFinite(value))) {
 				throw new CodedError(ErrorCode.InsufficientWeatherData);
 			}
 
-			data.push( {
+			const wateringData: WateringData = {
 				weatherProvider: "WU",
 				temp: temp,
 				humidity: humidity,
@@ -68,12 +68,17 @@ export default class WUndergroundWeatherProvider extends WeatherProvider {
 				maxTemp: maxTemp,
 				minHumidity: minHumidity,
 				maxHumidity: maxHumidity,
+			};
+			if (typeof solar === "number" && Number.isFinite(solar)) {
 				// The API exposes hourly peak irradiance, not an hourly mean. Treating each peak
 				// as a one-hour mean is retained as a documented approximation.
-				solarRadiation: solar / 1000,
+				wateringData.solarRadiation = solar / 1000;
+			}
+			if (typeof wind === "number" && Number.isFinite(wind)) {
 				// PWS anemometer height is installation-specific.
-				windSpeed: wind
-			} );
+				wateringData.windSpeed = wind;
+			}
+			data.push(wateringData);
 		}
 
 		return data.reverse();

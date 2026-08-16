@@ -21,7 +21,10 @@ async function calculateEToWateringScale(
 
 	// This will throw a CodedError if ETo data cannot be retrieved.
 	const data = await weatherProvider.getWateringData( coordinates, pws );
-	const wateringData: readonly WateringData[] = data.value;
+	// Some personal weather stations do not report wind or solar measurements. Preserve the
+	// historical zero-value fallback only for ETo calculations; provider data remains honest
+	// so weather sensors can distinguish unavailable measurements from measured zero values.
+	const wateringData = applyEToCompatibilityDefaults(data.value);
 
 	let baseETo: number;
 	// Default elevation is based on data from https://www.pnas.org/content/95/24/14009.
@@ -92,6 +95,17 @@ async function calculateEToWateringScale(
 		scales: scales,
 		ttl: data.ttl,
 	}
+}
+
+function applyEToCompatibilityDefaults(history: readonly WateringData[]): WateringData[] {
+	const windUnavailable = history.every(day => day.windSpeed == null);
+	const solarUnavailable = history.every(day => day.solarRadiation == null);
+
+	return history.map(day => ({
+		...day,
+		windSpeed: windUnavailable ? 0 : day.windSpeed,
+		solarRadiation: solarUnavailable ? 0 : day.solarRadiation,
+	}));
 }
 
 /* The implementation of this algorithm was guided by a step-by-step breakdown

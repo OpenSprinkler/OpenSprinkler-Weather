@@ -84,6 +84,30 @@ describe("Watering Data", () => {
 		expect(result.rawData).to.eql({ wp: "mock", h: 50, p: 0, t: 58.3 });
 	});
 
+	it("calculates Zimmerman adjustment without wind or solar measurements", async () => {
+		const provider = new MockWeatherProvider({
+			wateringData: [{
+				weatherProvider: "mock",
+				temp: 70,
+				humidity: 30,
+				precip: 0,
+				periodStartTime: 1557622800,
+				minTemp: 60,
+				maxTemp: 80,
+				minHumidity: 20,
+				maxHumidity: 40,
+			}],
+		});
+
+		const result = await ZimmermanAdjustmentMethod.calculateWateringScale(
+			{} as any,
+			[42, -75],
+			provider
+		);
+
+		expect(result.scale).to.equal(100);
+	});
+
 	it("sorts daily history newest-first before calculating rolling averages", async () => {
 		const makeDay = (periodStartTime: number, temp: number): WateringData => ({
 			weatherProvider: "mock",
