@@ -72,15 +72,44 @@ describe( "ETo AdjustmentMethod", () => {
 			makeWateringData({ maxHumidity: 101 }),
 			ErrorCode.BadWeatherData
 		);
-		await expectAdjustmentError(
-			makeAdjustmentOptions(0.15),
-			makeWateringData({ windSpeed: undefined, solarRadiation: undefined }),
-			ErrorCode.BadWeatherData
-		);
+		await expectAdjustmentError(makeAdjustmentOptions(0.15), makeWateringData({ windSpeed: -1 }), ErrorCode.BadWeatherData);
+		await expectAdjustmentError(makeAdjustmentOptions(0.15), makeWateringData({ solarRadiation: NaN }), ErrorCode.BadWeatherData);
 	});
 
-	it("uses the valid leading history when an older day lacks ETo inputs", async () => {
-		const newest = makeWateringData();
+	it("uses zero for unavailable ETo wind and solar measurements", async () => {
+		for (const missing of [
+			{ windSpeed: undefined },
+			{ solarRadiation: undefined },
+			{ windSpeed: undefined, solarRadiation: undefined },
+		]) {
+			const result = await EToAdjustmentMethod.calculateWateringScale(
+				makeAdjustmentOptions(0.15),
+				[42, -75],
+				new StaticWeatherProvider([makeWateringData(missing)])
+			);
+
+			expect(result.scale).to.be.finite;
+			expect(result.scales).to.have.length(1);
+			expect(result.wateringData[0].windSpeed).to.equal("windSpeed" in missing ? 0 : 3);
+			expect(result.wateringData[0].solarRadiation).to.equal("solarRadiation" in missing ? 0 : 5);
+		}
+	});
+
+	it("reports the effective ETo fallback inputs", async () => {
+		const source = makeWateringData({ windSpeed: undefined, solarRadiation: undefined });
+		const result = await EToAdjustmentMethod.calculateWateringScale(
+			makeAdjustmentOptions(0.15),
+			[42, -75],
+			new StaticWeatherProvider([source])
+		);
+
+		expect(result.rawData).to.include({ wind: 0, radiation: 0 });
+		expect(source.windSpeed).to.equal(undefined);
+		expect(source.solarRadiation).to.equal(undefined);
+	});
+
+	it("uses zero when an ETo measurement is unavailable throughout history", async () => {
+		const newest = makeWateringData({ solarRadiation: undefined });
 		const older = makeWateringData({
 			periodStartTime: Date.parse("2026-06-14T04:00:00Z") / 1000,
 			solarRadiation: undefined,
@@ -91,9 +120,41 @@ describe( "ETo AdjustmentMethod", () => {
 			new StaticWeatherProvider([newest, older])
 		);
 
-		expect(result.scale).to.be.finite;
+		expect(result.scales).to.have.length(2);
+		expect(result.wateringData.map(day => day.solarRadiation)).to.deep.equal([0, 0]);
+	});
+
+	it("truncates history at an intermittent ETo measurement gap", async () => {
+		const newest = makeWateringData();
+		const missing = makeWateringData({
+			periodStartTime: Date.parse("2026-06-14T04:00:00Z") / 1000,
+			solarRadiation: undefined,
+		});
+		const oldest = makeWateringData({
+			periodStartTime: Date.parse("2026-06-13T04:00:00Z") / 1000,
+		});
+		const result = await EToAdjustmentMethod.calculateWateringScale(
+			makeAdjustmentOptions(0.15),
+			[42, -75],
+			new StaticWeatherProvider([newest, missing, oldest])
+		);
+
 		expect(result.scales).to.have.length(1);
 		expect(result.wateringData).to.deep.equal([newest]);
+	});
+
+	it("rejects a newest-day gap when older history has that ETo measurement", async () => {
+		const newest = makeWateringData({ solarRadiation: undefined });
+		const older = makeWateringData({
+			periodStartTime: Date.parse("2026-06-14T04:00:00Z") / 1000,
+		});
+
+		await expectAdjustmentError(
+			makeAdjustmentOptions(0.15),
+			newest,
+			ErrorCode.BadWeatherData,
+			[older]
+		);
 	});
 } );
 
@@ -124,13 +185,18 @@ function makeAdjustmentOptions(baseETo: number): EToScalingAdjustmentOptions {
 	};
 }
 
-async function expectAdjustmentError(options: EToScalingAdjustmentOptions, data: WateringData, expected: ErrorCode) {
+async function expectAdjustmentError(
+	options: EToScalingAdjustmentOptions,
+	data: WateringData,
+	expected: ErrorCode,
+	additionalData: WateringData[] = []
+) {
 	let actual: ErrorCode | undefined;
 	try {
 		await EToAdjustmentMethod.calculateWateringScale(
 			options,
 			[42, -75],
-			new StaticWeatherProvider([data])
+			new StaticWeatherProvider([data, ...additionalData])
 		);
 	} catch (err) {
 		actual = (err as { errCode?: ErrorCode }).errCode;

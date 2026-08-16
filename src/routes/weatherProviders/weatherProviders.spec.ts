@@ -254,6 +254,32 @@ describe("Weather provider normalization", () => {
 		expect(data[0].solarRadiation).to.equal(2.4);
 	});
 
+	it("keeps Weather Underground history when wind and solar measurements are unavailable", async () => {
+		MockDate.set("2026-08-07T12:00:00Z");
+		const firstHour = getUnixTime(startOfDay(localTime(coordinates))) - 24 * 60 * 60;
+		const observations = sequence(24, i => ({
+			epoch: firstHour + i * 60 * 60,
+			tz: "America/New_York",
+			humidityAvg: 50,
+			humidityLow: 40,
+			humidityHigh: 60,
+			solarRadiationHigh: null,
+			imperial: {
+				tempAvg: 70,
+				tempLow: 60,
+				tempHigh: 80,
+				precipTotal: i / 100,
+			},
+		}));
+
+		globalThis.fetch = (async () => jsonResponse({ observations })) as typeof globalThis.fetch;
+		const data = await new TestWUndergroundProvider().readWatering(coordinates);
+		expect(data).to.have.length(1);
+		expect(data[0]).to.include({ temp: 70, humidity: 50, precip: 0.23 });
+		expect(data[0]).not.to.have.property("windSpeed");
+		expect(data[0]).not.to.have.property("solarRadiation");
+	});
+
 	it("uses Bright Sky measured solar energy and standardized 10-meter wind", async () => {
 		MockDate.set("2026-08-07T12:00:00Z");
 		const firstHour = getUnixTime(startOfDay(localTime(coordinates))) - 24 * 60 * 60;
