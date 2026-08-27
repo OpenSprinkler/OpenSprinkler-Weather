@@ -7,11 +7,14 @@ process.env.WEATHER_PROVIDER = "OWM";
 
 import {
 	buildWeatherSensorResponse,
+	checkCaliforniaRestriction,
+	checkMinTempRestriction,
+	checkRainRestriction,
 	fetchWeatherSensorData,
 	getWateringData,
 } from "./weather";
 import { CachedResult } from "../cache";
-import { GeoCoordinates, WeatherData, WateringData, PWS } from "../types";
+import { GeoCoordinates, WeatherData, WeatherDataForecast, WateringData, PWS } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 
@@ -135,6 +138,77 @@ describe("Watering Data", () => {
 		expect(result.scales).to.eql([100, 110, 100]);
 		expect(result.rawData).to.include({ t: 70 });
 	});
+});
+
+describe("Weather Restrictions", () => {
+	const makeForecast = (precip: number): WeatherDataForecast => ({
+		temp_min: 40,
+		temp_max: 60,
+		precip,
+		date: 1557705600,
+		icon: "clear",
+		description: "Clear",
+	});
+
+	describe("checkCaliforniaRestriction", () => {
+		it("triggers when the last two days of precipitation exceed 0.1\"", () => {
+			const wateringData: WateringData[] = [
+				{ ...({} as WateringData), precip: 0.05 },
+				{ ...({} as WateringData), precip: 0.1 },
+			];
+			expect(checkCaliforniaRestriction(true, wateringData)).to.equal(true);
+		});
+
+		it("does not trigger when disabled, even with heavy recent rain", () => {
+			const wateringData: WateringData[] = [{ ...({} as WateringData), precip: 5 }];
+			expect(checkCaliforniaRestriction(false, wateringData)).to.equal(false);
+		});
+
+		it("does not trigger without watering data", () => {
+			expect(checkCaliforniaRestriction(true, undefined)).to.equal(false);
+			expect(checkCaliforniaRestriction(true, [])).to.equal(false);
+		});
+	});
+
+	describe("checkMinTempRestriction", () => {
+		it("triggers when the current temperature is below the threshold", () => {
+			expect(checkMinTempRestriction(35, 30)).to.equal(true);
+		});
+
+		it("does not trigger when the current temperature is at or above the threshold", () => {
+			expect(checkMinTempRestriction(35, 35)).to.equal(false);
+		});
+
+		it("is disabled via the -40 sentinel", () => {
+			expect(checkMinTempRestriction(-40, -100)).to.equal(false);
+		});
+
+		it("fails open when no temperature was fetched (e.g. the provider request failed)", () => {
+			expect(checkMinTempRestriction(35, undefined)).to.equal(false);
+		});
+	});
+
+	describe("checkRainRestriction", () => {
+		it("triggers when forecasted precipitation over rainDays exceeds rainAmt", () => {
+			const forecast = [makeForecast(0.5), makeForecast(0.4), makeForecast(10)];
+			expect(checkRainRestriction(0.8, 2, forecast)).to.equal(true);
+		});
+
+		it("only sums the configured number of forecast days", () => {
+			const forecast = [makeForecast(0.05), makeForecast(10)];
+			expect(checkRainRestriction(0.1, 1, forecast)).to.equal(false);
+		});
+
+		it("stays inactive against an empty forecast, matching today's local-provider behavior", () => {
+			// FORECAST_WEATHER_PROVIDER=local reports forecast: [] since a local PWS stream has no forecast data.
+			expect(checkRainRestriction(0.1, 2, [])).to.equal(false);
+		});
+
+		it("fails open when no forecast was fetched (e.g. FORECAST_WEATHER_PROVIDER is unset or the request failed)", () => {
+			expect(checkRainRestriction(0.1, 2, undefined)).to.equal(false);
+		});
+	});
+
 });
 
 describe("Weather Sensor Data", () => {

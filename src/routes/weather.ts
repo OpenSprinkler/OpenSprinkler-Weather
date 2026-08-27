@@ -8,6 +8,7 @@ import {
     PWS,
     TimeData,
     WeatherData,
+    WeatherDataForecast,
     WeatherProviderShortId,
 } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
@@ -24,6 +25,7 @@ import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
 import { ParsedQs } from "qs";
 import { CachedResult } from "../cache";
+import { resolveForecastWeatherProvider } from "../config";
 import OWMWeatherProvider from "./weatherProviders/OWM";
 import WUndergroundWeatherProvider from "./weatherProviders/WUnderground";
 import AppleWeatherProvider from "./weatherProviders/Apple";
@@ -57,6 +59,9 @@ const GEOCODER_FACTORIES: { [name: string]: () => Geocoder } = {
 const PWS_WEATHER_PROVIDER: WeatherProvider =
     WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] ||
     WEATHER_PROVIDERS["WU"];
+const FORECAST_WEATHER_PROVIDER: WeatherProvider =
+    WEATHER_PROVIDERS[resolveForecastWeatherProvider()] ||
+    WEATHER_PROVIDERS["OpenMeteo"];
 const GEOCODER: Geocoder =
     (GEOCODER_FACTORIES[process.env.GEOCODER] || GEOCODER_FACTORIES["WU"])();
 
@@ -305,51 +310,67 @@ function getTimeData(coordinates: GeoCoordinates): TimeData {
 }
 
 /**
- * Checks if the weather data meets any of the restrictions set by OpenSprinkler. Restrictions prevent any watering
- * from occurring and are similar to 0% watering level. Known restrictions are:
- *
- * - California watering restriction prevents watering if precipitation over two days is greater than 0.1" over the past
- * 48 hours.
- * @param cali A boolean to enable the California restriction based on the old method.
- * @param wateringData Watering data to use to determine if any restrictions apply.
- * @param adjustmentOptions The adjustment options used, which gives restriction information.
- * @param weather Weather data to use to determine if any restrictions apply.
- * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
+ * Checks the California watering restriction, which prevents watering if precipitation over the past 48 hours
+ * (the two most recent days in wateringData) is greater than 0.1".
+ * @param cali A boolean indicating if the restriction is enabled, either via the legacy hardware flag or adjustmentOptions.cali.
+ * @param wateringData Historical watering data from the main weatherProvider, used to sum recent precipitation.
+ * @return A boolean indicating if the watering level should be set to 0% due to this restriction.
  */
-function checkWeatherRestriction( cali: boolean, wateringData?: readonly WateringData[], adjustmentOptions?: AdjustmentOptions, weather?: WeatherData ): boolean {
-
-	if ( ( cali || (adjustmentOptions && adjustmentOptions.cali ) ) && wateringData && wateringData.length ) {
-		// The most recent two days are at the beginning of the data array
-		const len = wateringData.length;
-		let rain = wateringData[0].precip;
-		if ( len > 1 ){
-			rain += wateringData[1].precip;
-		}
-
-		if ( rain > 0.1 ) {
-			return true;
-		}
+export function checkCaliforniaRestriction( cali: boolean, wateringData?: readonly WateringData[] ): boolean {
+	if ( !cali || !wateringData || !wateringData.length ) {
+		return false;
 	}
 
-	if ( adjustmentOptions.rainAmt && adjustmentOptions.rainAmt > 0 && adjustmentOptions.rainDays ) {
-		const days = weather.forecast.length > adjustmentOptions.rainDays ? adjustmentOptions.rainDays : weather.forecast.length;
-		let precip = 0;
-		for ( let i = 0; i < days; i++ ) {
-			precip += weather.forecast[i].precip;
-		}
-
-		if ( precip > adjustmentOptions.rainAmt ){
-			return true;
-		}
+	// The most recent two days are at the beginning of the data array
+	const len = wateringData.length;
+	let rain = wateringData[0].precip;
+	if ( len > 1 ) {
+		rain += wateringData[1].precip;
 	}
 
-	if ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp != -40 ) {
-		if ( weather.temp < adjustmentOptions.minTemp ) {
-			return true;
-		}
+	return rain > 0.1;
+}
+
+/**
+ * Checks the minimum temperature restriction, which prevents watering if the current temperature reported by the
+ * main weatherProvider is below the configured threshold.
+ * @param minTemp The configured minimum temperature threshold (in Fahrenheit), or -40/undefined if disabled.
+ * @param temp The current temperature (in Fahrenheit) from the main weatherProvider, if it was fetched successfully.
+ * @return A boolean indicating if the watering level should be set to 0% due to this restriction.
+ */
+export function checkMinTempRestriction( minTemp: number | undefined, temp: number | undefined ): boolean {
+	if ( typeof minTemp === "undefined" || minTemp === -40 || typeof temp === "undefined" ) {
+		return false;
 	}
 
-	return false;
+	return temp < minTemp;
+}
+
+/**
+ * Checks the rain forecast restriction, which prevents watering if the forecasted precipitation over the next
+ * rainDays exceeds rainAmt. Forecast data comes from the separately configurable FORECAST_WEATHER_PROVIDER, since
+ * not every WeatherProvider (e.g. local) supplies forecast data.
+ * @param rainAmt The configured precipitation threshold (in inches) that triggers the restriction.
+ * @param rainDays The configured number of upcoming forecast days to sum precipitation over.
+ * @param forecast Forecast data from the FORECAST_WEATHER_PROVIDER, if it was fetched successfully.
+ * @return A boolean indicating if the watering level should be set to 0% due to this restriction.
+ */
+export function checkRainRestriction(
+	rainAmt: number | undefined,
+	rainDays: number | undefined,
+	forecast?: readonly WeatherDataForecast[]
+): boolean {
+	if ( !rainAmt || rainAmt <= 0 || !rainDays || !forecast || !forecast.length ) {
+		return false;
+	}
+
+	const days = forecast.length > rainDays ? rainDays : forecast.length;
+	let precip = 0;
+	for ( let i = 0; i < days; i++ ) {
+		precip += forecast[i].precip;
+	}
+
+	return precip > rainAmt;
 }
 
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
@@ -562,18 +583,36 @@ export const getWateringData = async function( req: express.Request, res: expres
 			wateringData = dataArr.value;
 		}
 
-		let weatherData: WeatherData | undefined = undefined;
-		if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) ) {
+		// minTemp reads from the main weatherProvider. A failed fetch fails open (the restriction is simply not
+		// triggered) so it never blocks the watering scale response.
+		let minTempWeather: WeatherData | undefined;
+		if ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) {
 			try {
-				weatherData = (await weatherProvider.getWeatherData( coordinates, pws )).value;
+				minTempWeather = (await weatherProvider.getWeatherData( coordinates, pws )).value;
 			} catch ( err ) {
-				res.send( "Error: " + err );
-				return;
+				console.error( "Unable to fetch weather data for the minTemp restriction check.", err );
+			}
+		}
+
+		// The rain forecast restriction reads from the separately configurable FORECAST_WEATHER_PROVIDER, since not
+		// every weatherProvider (e.g. local) supplies forecast data. A failed fetch fails open, independently of the
+		// minTemp fetch above.
+		let forecastWeather: WeatherData | undefined;
+		if ( adjustmentOptions.rainAmt && adjustmentOptions.rainAmt > 0 && adjustmentOptions.rainDays ) {
+			try {
+				forecastWeather = (await FORECAST_WEATHER_PROVIDER.getWeatherData( coordinates, pws )).value;
+			} catch ( err ) {
+				console.error( "Unable to fetch forecast weather data for the rain restriction check.", err );
 			}
 		}
 
 		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-		if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) > 0 ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
+		const cali = ((wateringParam >> 7) & 1) > 0 || !!adjustmentOptions.cali;
+		if (
+			checkCaliforniaRestriction( cali, wateringData ) ||
+			checkMinTempRestriction( adjustmentOptions.minTemp, minTempWeather?.temp ) ||
+			checkRainRestriction( adjustmentOptions.rainAmt, adjustmentOptions.rainDays, forecastWeather?.forecast )
+		) {
 			data.restricted = 1;
 		}
 	}
