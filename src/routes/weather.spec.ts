@@ -264,7 +264,9 @@ describe("Weather Sensor Data", () => {
 			[42, -75],
 			{ current: true, forecast: true, historical: true },
 			weatherResult,
-			wateringResult
+			wateringResult,
+			600,
+			weatherResult
 		);
 
 		expect(result.c).to.eql({ at: 1557748800, t: 0, h: 0, r: 0 });
@@ -335,13 +337,93 @@ describe("Weather Sensor Data", () => {
 		const coordinates: GeoCoordinates = [42, -75];
 
 		await fetchWeatherSensorData(provider, coordinates, { current: true, forecast: false, historical: false });
-		await fetchWeatherSensorData(provider, coordinates, { current: false, forecast: true, historical: false });
-		await fetchWeatherSensorData(provider, coordinates, { current: true, forecast: true, historical: true });
+		await fetchWeatherSensorData(provider, coordinates, { current: false, forecast: true, historical: false }, undefined, provider);
+		await fetchWeatherSensorData(provider, coordinates, { current: true, forecast: true, historical: true }, undefined, provider);
 		await provider.getWeatherData(coordinates);
 		await provider.getWateringData(coordinates);
 
 		expect(provider.weatherCalls).to.equal(1);
 		expect(provider.wateringCalls).to.equal(1);
+	});
+
+	it("builds the forecast from FORECAST_WEATHER_PROVIDER, independent of a main provider with no forecast data", () => {
+		// Simulates WEATHER_PROVIDER=local (which always reports forecast: []) with FORECAST_WEATHER_PROVIDER set to
+		// a provider that does supply forecast data (e.g. OpenMeteo).
+		const localWeatherResult: CachedResult<WeatherData> = {
+			value: { ...weatherData, weatherProvider: "local", forecast: [] },
+			ttl: 1000,
+			cachedAt: 1557748800000,
+		};
+		const forecastResult: CachedResult<WeatherData> = {
+			value: {
+				...weatherData,
+				weatherProvider: "OpenMeteo",
+				minTemp: 55,
+				maxTemp: 72,
+				precip: 0.25,
+				forecast: [{
+					temp_min: 54,
+					temp_max: 71,
+					precip: 0.2,
+					date: 1557705600,
+					icon: "rain",
+					description: "Rain",
+				}],
+			},
+			ttl: 1000,
+			cachedAt: 1557748800000,
+		};
+
+		const result = buildWeatherSensorResponse(
+			[42, -75],
+			{ current: true, forecast: true, historical: false },
+			localWeatherResult,
+			undefined,
+			600,
+			forecastResult
+		);
+
+		expect(result.wp).to.equal("local");
+		expect(result.f).to.eql({ at: 1557705600, lo: 55, hi: 72, p: 0.25 });
+	});
+
+	it("omits the forecast instead of showing NaN when the forecast fetch fails", () => {
+		const localWeatherResult: CachedResult<WeatherData> = {
+			value: { ...weatherData, weatherProvider: "local", forecast: [] },
+			ttl: 1000,
+			cachedAt: 1557748800000,
+		};
+
+		const result = buildWeatherSensorResponse(
+			[42, -75],
+			{ current: true, forecast: true, historical: false },
+			localWeatherResult,
+			undefined,
+			600,
+			undefined
+		);
+
+		expect(result.f).to.equal(undefined);
+	});
+
+	it("fails open on a failed forecast fetch without blocking current or historical data", async () => {
+		// The base WeatherProvider's default getWeatherDataInternal() throws "not supported", which is enough to
+		// exercise the forecast fetch's failure path without a real network call.
+		const provider = new CountingMockWeatherProvider({ weatherData, wateringData: [wateringData] });
+		const forecastProvider = new WeatherProvider();
+
+		const result = await fetchWeatherSensorData(
+			provider,
+			[42, -75],
+			{ current: true, forecast: true, historical: true },
+			undefined,
+			forecastProvider
+		);
+
+		expect(result.weatherResult).to.not.equal(undefined);
+		expect(result.wateringResult).to.not.equal(undefined);
+		expect(result.forecastResult).to.equal(undefined);
+		expect(result.forecastError).to.not.equal(undefined);
 	});
 });
 

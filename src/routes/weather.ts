@@ -154,7 +154,8 @@ export function buildWeatherSensorResponse(
     scope: WeatherSensorScope,
     weatherResult?: CachedResult<WeatherData>,
     wateringResult?: CachedResult<readonly WateringData[]>,
-    elevation: number = 600
+    elevation: number = 600,
+    forecastResult?: CachedResult<WeatherData>
 ): WeatherSensorResponse {
     const result: WeatherSensorResponse = { v: 1, u: "us" };
 
@@ -171,16 +172,17 @@ export function buildWeatherSensorResponse(
                 r: typeof weather.raining === "boolean" ? (weather.raining ? 1 : 0) : undefined,
             });
         }
+    }
 
-        if (scope.forecast && weather.forecast.length) {
-            const forecast = weather.forecast[0];
-            result.f = omitUndefined({
-                at: forecast.date,
-                lo: roundFinite(weather.minTemp ?? forecast.temp_min, 1),
-                hi: roundFinite(weather.maxTemp ?? forecast.temp_max, 1),
-                p: roundFinite(weather.precip ?? forecast.precip, 3),
-            });
-        }
+    if (scope.forecast && forecastResult?.value.forecast.length) {
+        const forecastWeather = forecastResult.value;
+        const forecast = forecastWeather.forecast[0];
+        result.f = omitUndefined({
+            at: forecast.date,
+            lo: roundFinite(forecastWeather.minTemp ?? forecast.temp_min, 1),
+            hi: roundFinite(forecastWeather.maxTemp ?? forecast.temp_max, 1),
+            p: roundFinite(forecastWeather.precip ?? forecast.precip, 3),
+        });
     }
 
     if (scope.historical && wateringResult?.value.length) {
@@ -203,8 +205,10 @@ export function buildWeatherSensorResponse(
 type WeatherSensorFetchResult = {
     weatherResult?: CachedResult<WeatherData>;
     wateringResult?: CachedResult<readonly WateringData[]>;
+    forecastResult?: CachedResult<WeatherData>;
     weatherError?: CodedError;
     wateringError?: CodedError;
+    forecastError?: CodedError;
 };
 
 /** Fetches only the provider data required by the requested scope. */
@@ -212,7 +216,8 @@ export async function fetchWeatherSensorData(
     weatherProvider: WeatherProvider,
     coordinates: GeoCoordinates,
     scope: WeatherSensorScope,
-    pws?: PWS
+    pws?: PWS,
+    forecastProvider: WeatherProvider = FORECAST_WEATHER_PROVIDER
 ): Promise<WeatherSensorFetchResult> {
     const result: WeatherSensorFetchResult = {};
 
@@ -221,6 +226,16 @@ export async function fetchWeatherSensorData(
             result.weatherResult = await weatherProvider.getWeatherData(coordinates, pws);
         } catch (err) {
             result.weatherError = makeCodedError(err);
+        }
+    }
+    if (scope.forecast) {
+        // The forecast comes from the separately configurable FORECAST_WEATHER_PROVIDER, since not every
+        // weatherProvider (e.g. local) supplies forecast data. No pws is passed; that only applies to the main
+        // provider. A failed fetch fails open: forecastError is reported, but the rest of the response is unaffected.
+        try {
+            result.forecastResult = await forecastProvider.getWeatherData(coordinates);
+        } catch (err) {
+            result.forecastError = makeCodedError(err);
         }
     }
     if (scope.historical) {
@@ -449,11 +464,11 @@ export const getWeatherSensorData = async function(req: express.Request, res: ex
         return;
     }
 
-    const { weatherResult, wateringResult, weatherError, wateringError } =
+    const { weatherResult, wateringResult, forecastResult, weatherError, wateringError, forecastError } =
         await fetchWeatherSensorData(weatherProvider, coordinates, scope, pws);
 
-    if (!weatherResult && !wateringResult) {
-        const error = weatherError || wateringError || new CodedError(ErrorCode.BadWeatherData);
+    if (!weatherResult && !wateringResult && !forecastResult) {
+        const error = weatherError || wateringError || forecastError || new CodedError(ErrorCode.BadWeatherData);
         res.status(502).json({ errCode: error.errCode });
         return;
     }
@@ -464,13 +479,12 @@ export const getWeatherSensorData = async function(req: express.Request, res: ex
         scope,
         weatherResult,
         wateringResult,
-        Number.isFinite(elevation) ? elevation : 600
+        Number.isFinite(elevation) ? elevation : 600,
+        forecastResult
     );
     const errors: { c?: number; f?: number; h?: number } = {};
-    if (weatherError) {
-        if (scope.current) errors.c = weatherError.errCode;
-        if (scope.forecast) errors.f = weatherError.errCode;
-    }
+    if (weatherError && scope.current) errors.c = weatherError.errCode;
+    if (forecastError && scope.forecast) errors.f = forecastError.errCode;
     if (wateringError) errors.h = wateringError.errCode;
     if (Object.keys(errors).length) response.e = errors;
 
