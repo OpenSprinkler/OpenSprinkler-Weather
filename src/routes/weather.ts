@@ -388,6 +388,42 @@ export function checkRainRestriction(
 	return precip > rainAmt;
 }
 
+/**
+ * Fetches forecast weather data from the separately configurable FORECAST_WEATHER_PROVIDER, since not every
+ * weatherProvider (e.g. local) supplies forecast data. Fails open: returns undefined (and logs) instead of
+ * throwing, so a failed forecast fetch never blocks the rest of a weather response.
+ * @param coordinates The coordinates to retrieve the forecast for.
+ * @param forecastProvider The provider to fetch from. Defaults to FORECAST_WEATHER_PROVIDER; overridable for tests.
+ */
+export async function fetchForecastWeatherData(
+	coordinates: GeoCoordinates,
+	forecastProvider: WeatherProvider = FORECAST_WEATHER_PROVIDER
+): Promise<WeatherData | undefined> {
+	try {
+		return (await forecastProvider.getWeatherData( coordinates )).value;
+	} catch ( err ) {
+		console.error( "Unable to fetch forecast weather data for the weatherData response.", err );
+		return undefined;
+	}
+}
+
+/**
+ * Merges forecast, precip, minTemp, and maxTemp from a forecast fetch into weather data. All other fields (temp,
+ * humidity, wind, raining, ...) are left untouched, coming from the main weatherProvider. If no forecast was
+ * fetched (fetch failed or was never attempted), the weather data is returned unchanged.
+ */
+export function mergeForecastWeatherData( weather: WeatherData, forecast?: WeatherData ): WeatherData {
+	if ( !forecast ) return weather;
+
+	return {
+		...weather,
+		forecast: forecast.forecast,
+		precip: forecast.precip,
+		minTemp: forecast.minTemp,
+		maxTemp: forecast.maxTemp,
+	};
+}
+
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
 	const location: string = getParameter(req.query.loc);
 	let adjustmentOptionsString: string	= getParameter(req.query.wto),
@@ -429,9 +465,11 @@ export const getWeatherData = async function( req: express.Request, res: express
 		return;
 	}
 
+	const forecastData = await fetchForecastWeatherData( coordinates );
+
 	res.json( {
 		...timeData,
-		...weatherData.value,
+		...mergeForecastWeatherData( weatherData.value, forecastData ),
 		ttl: weatherData.ttl,
 		location: coordinates,
 	} );

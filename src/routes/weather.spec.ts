@@ -10,8 +10,11 @@ import {
 	checkCaliforniaRestriction,
 	checkMinTempRestriction,
 	checkRainRestriction,
+	fetchForecastWeatherData,
 	fetchWeatherSensorData,
 	getWateringData,
+	getWeatherData,
+	mergeForecastWeatherData,
 } from "./weather";
 import { CachedResult } from "../cache";
 import { GeoCoordinates, WeatherData, WeatherDataForecast, WateringData, PWS } from "../types";
@@ -137,6 +140,123 @@ describe("Watering Data", () => {
 
 		expect(result.scales).to.eql([100, 110, 100]);
 		expect(result.rawData).to.include({ t: 70 });
+	});
+});
+
+describe("Weather Data (getWeatherData)", () => {
+	const mainWeather: WeatherData = {
+		weatherProvider: "local",
+		temp: 68,
+		humidity: 55,
+		wind: 4,
+		raining: false,
+		description: "",
+		icon: "01d",
+		region: undefined,
+		city: undefined,
+		minTemp: undefined,
+		maxTemp: undefined,
+		precip: undefined,
+		forecast: [],
+	};
+	const forecastWeather: WeatherData = {
+		weatherProvider: "OpenMeteo",
+		description: "",
+		icon: "01d",
+		region: undefined,
+		city: undefined,
+		minTemp: 55,
+		maxTemp: 72,
+		precip: 0.25,
+		forecast: [{
+			temp_min: 54,
+			temp_max: 71,
+			precip: 0.2,
+			date: 1557705600,
+			icon: "rain",
+			description: "Rain",
+		}],
+	};
+
+	describe("mergeForecastWeatherData", () => {
+		it("merges forecast, precip, minTemp, and maxTemp while keeping other fields from the main provider", () => {
+			const result = mergeForecastWeatherData(mainWeather, forecastWeather);
+
+			// Unchanged: still sourced from the main provider (local).
+			expect(result.weatherProvider).to.equal("local");
+			expect(result.temp).to.equal(68);
+			expect(result.humidity).to.equal(55);
+			expect(result.wind).to.equal(4);
+			expect(result.raining).to.equal(false);
+
+			// Merged in: now sourced from the forecast provider (OpenMeteo).
+			expect(result.forecast).to.eql(forecastWeather.forecast);
+			expect(result.precip).to.equal(0.25);
+			expect(result.minTemp).to.equal(55);
+			expect(result.maxTemp).to.equal(72);
+		});
+
+		it("fails open and returns the weather data unchanged when no forecast was fetched", () => {
+			expect(mergeForecastWeatherData(mainWeather, undefined)).to.equal(mainWeather);
+		});
+	});
+
+	describe("fetchForecastWeatherData", () => {
+		it("returns the forecast provider's weather data on success", async () => {
+			const provider = new MockWeatherProvider({ weatherData: forecastWeather });
+
+			const result = await fetchForecastWeatherData([42, -75], provider);
+
+			expect(result).to.eql(forecastWeather);
+		});
+
+		it("fails open and returns undefined when the forecast provider throws", async () => {
+			// The base WeatherProvider's default getWeatherDataInternal() throws "not supported", which is enough
+			// to exercise the failure path without a real network call.
+			const provider = new WeatherProvider();
+
+			const result = await fetchForecastWeatherData([42, -75], provider);
+
+			expect(result).to.equal(undefined);
+		});
+	});
+
+	function createWeatherDataMocks(query: { [key: string]: string } = {}) {
+		const request = new MockRequestConstructor({
+			method: "GET",
+			url: "/weatherData",
+			query: { loc: location, ...query },
+		});
+
+		return { request, response: new MockExpressResponse({ request }) };
+	}
+
+	// These exercise getWeatherData's pre-existing early-return paths (malformed options, an unresolvable
+	// location, and a failed main-provider fetch), all of which return before the new forecast fetch is ever
+	// reached — so they stay deterministic and network-free while still guarding that the refactor didn't
+	// change this existing error handling.
+	describe("getWeatherData", () => {
+		it("returns an error for malformed adjustment options", async () => {
+			const { request, response } = createWeatherDataMocks({ wto: '"provider":' });
+			await getWeatherData(request, response);
+
+			expect(response._getString()).to.equal("&errCode=50&scale=100");
+		});
+
+		it("returns an error for an unresolvable location", async () => {
+			const { request, response } = createWeatherDataMocks({ loc: "" });
+			await getWeatherData(request, response);
+
+			expect(response._getString()).to.match(/^Error: Unable to resolve location/);
+		});
+
+		it("returns an error when the main provider fetch fails, without reaching the forecast fetch", async () => {
+			// "local" has no queued observations in this test environment, so its fetch throws deterministically.
+			const { request, response } = createWeatherDataMocks({ wto: '"provider":"local"' });
+			await getWeatherData(request, response);
+
+			expect(response._getString()).to.match(/^Error: /);
+		});
 	});
 });
 
