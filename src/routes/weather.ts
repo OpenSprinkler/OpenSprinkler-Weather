@@ -465,6 +465,13 @@ export const getWeatherData = async function( req: express.Request, res: express
 		return;
 	}
 
+	// Note: the official OpenSprinkler App currently derives the forecast attribution
+	// text from controller.settings.wto.provider (the main WEATHER_PROVIDER), not from
+	// this forecast-specific value (see www/js/modules/weather.js:798 in the
+	// OpenSprinkler-App repo). Users combining a local main provider with a separate
+	// FORECAST_WEATHER_PROVIDER will see "Powered by your Local PWS" even though the
+	// forecast itself comes from a different source. This is a known, documented
+	// limitation on the App side, not a bug in this service.
 	const forecastData = await fetchForecastWeatherData( coordinates );
 
 	res.json( {
