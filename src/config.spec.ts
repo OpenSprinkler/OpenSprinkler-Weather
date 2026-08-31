@@ -2,7 +2,6 @@ import { expect } from "chai";
 import path from "path";
 import {
 	localPersistenceEnabled,
-	resolveForecastWeatherProvider,
 	resolvePersistenceFile,
 	resolveServerPort,
 } from "./config";
@@ -28,20 +27,6 @@ describe("Server configuration", () => {
 		for (const value of ["", "0", "65536", "3000x", "1.5"]) {
 			expect(() => resolveServerPort({ PORT: value })).to.throw("Invalid server port");
 		}
-	});
-});
-
-describe("Forecast weather provider configuration", () => {
-	it("defaults to OpenMeteo when unset", () => {
-		expect(resolveForecastWeatherProvider({})).to.equal("OpenMeteo");
-	});
-
-	it("uses the configured FORECAST_WEATHER_PROVIDER value", () => {
-		expect(resolveForecastWeatherProvider({ FORECAST_WEATHER_PROVIDER: "local" })).to.equal("local");
-	});
-
-	it("falls back to the default for a blank value", () => {
-		expect(resolveForecastWeatherProvider({ FORECAST_WEATHER_PROVIDER: "  " })).to.equal("OpenMeteo");
 	});
 });
 

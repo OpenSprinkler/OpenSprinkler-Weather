@@ -10,12 +10,7 @@ export interface PersistenceEnvironment {
 	PERSISTENCE_LOCATION?: string;
 }
 
-export interface ForecastProviderEnvironment {
-	FORECAST_WEATHER_PROVIDER?: string;
-}
-
 const DEFAULT_SERVER_PORT = 3000;
-const DEFAULT_FORECAST_WEATHER_PROVIDER = "OpenMeteo";
 
 export function resolveServerPort(environment: ServerPortEnvironment = process.env): number {
 	const value = environment.PORT ?? environment.HTTP_PORT;
@@ -26,10 +21,6 @@ export function resolveServerPort(environment: ServerPortEnvironment = process.e
 		throw new Error(`Invalid server port: ${value}`);
 	}
 	return port;
-}
-
-export function resolveForecastWeatherProvider(environment: ForecastProviderEnvironment = process.env): string {
-	return environment.FORECAST_WEATHER_PROVIDER?.trim() || DEFAULT_FORECAST_WEATHER_PROVIDER;
 }
 
 export function localPersistenceEnabled(environment: PersistenceEnvironment = process.env): boolean {

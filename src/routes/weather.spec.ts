@@ -15,6 +15,7 @@ import {
 	getWateringData,
 	getWeatherData,
 	mergeForecastWeatherData,
+	resolveForecastProvider,
 } from "./weather";
 import { CachedResult } from "../cache";
 import { GeoCoordinates, WeatherData, WeatherDataForecast, WateringData, PWS } from "../types";
@@ -257,6 +258,41 @@ describe("Weather Data (getWeatherData)", () => {
 
 			expect(response._getString()).to.match(/^Error: /);
 		});
+	});
+});
+
+describe("resolveForecastProvider", () => {
+	afterEach(() => {
+		delete process.env.FORECAST_WEATHER_PROVIDER;
+	});
+
+	it("falls back to the resolved main weatherProvider when FORECAST_WEATHER_PROVIDER is unset", () => {
+		// Regression for the reviewer-reported bug: with WEATHER_PROVIDER=AccuWeather (or any other main provider)
+		// and FORECAST_WEATHER_PROVIDER unset, the forecast restriction/display must keep using that same provider
+		// instead of silently switching to a hardcoded default.
+		const accuWeatherLikeProvider = new MockWeatherProvider({});
+
+		expect(resolveForecastProvider(accuWeatherLikeProvider)).to.equal(accuWeatherLikeProvider);
+	});
+
+	it("also falls back to the main weatherProvider for a local main provider", () => {
+		const localLikeProvider = new MockWeatherProvider({});
+
+		expect(resolveForecastProvider(localLikeProvider)).to.equal(localLikeProvider);
+	});
+
+	it("uses the configured provider on explicit opt-in via FORECAST_WEATHER_PROVIDER", () => {
+		const mainProvider = new MockWeatherProvider({});
+		process.env.FORECAST_WEATHER_PROVIDER = "OpenMeteo";
+
+		expect(resolveForecastProvider(mainProvider)).to.not.equal(mainProvider);
+	});
+
+	it("falls back to the main weatherProvider for an unknown FORECAST_WEATHER_PROVIDER value", () => {
+		const mainProvider = new MockWeatherProvider({});
+		process.env.FORECAST_WEATHER_PROVIDER = "NotARealProvider";
+
+		expect(resolveForecastProvider(mainProvider)).to.equal(mainProvider);
 	});
 });
 

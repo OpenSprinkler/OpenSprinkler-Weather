@@ -25,7 +25,6 @@ import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
 import { ParsedQs } from "qs";
 import { CachedResult } from "../cache";
-import { resolveForecastWeatherProvider } from "../config";
 import OWMWeatherProvider from "./weatherProviders/OWM";
 import WUndergroundWeatherProvider from "./weatherProviders/WUnderground";
 import AppleWeatherProvider from "./weatherProviders/Apple";
@@ -59,9 +58,6 @@ const GEOCODER_FACTORIES: { [name: string]: () => Geocoder } = {
 const PWS_WEATHER_PROVIDER: WeatherProvider =
     WEATHER_PROVIDERS[process.env.PWS_WEATHER_PROVIDER] ||
     WEATHER_PROVIDERS["WU"];
-const FORECAST_WEATHER_PROVIDER: WeatherProvider =
-    WEATHER_PROVIDERS[resolveForecastWeatherProvider()] ||
-    WEATHER_PROVIDERS["OpenMeteo"];
 const GEOCODER: Geocoder =
     (GEOCODER_FACTORIES[process.env.GEOCODER] || GEOCODER_FACTORIES["WU"])();
 
@@ -104,6 +100,20 @@ function selectWeatherProvider(adjustmentOptions: AdjustmentOptions, pws?: PWS):
 
     const provider = adjustmentOptions.provider || process.env.WEATHER_PROVIDER;
     return WEATHER_PROVIDERS[provider] || WEATHER_PROVIDERS.Apple;
+}
+
+/**
+ * Resolves the WeatherProvider to use for forecast data (the rain-forecast restriction and the /weatherData
+ * forecast fields). Falls back to the already-resolved main weatherProvider - not to process.env.WEATHER_PROVIDER
+ * directly, since weatherProvider already accounts for per-request overrides from adjustmentOptions.provider - so
+ * nobody who hasn't set FORECAST_WEATHER_PROVIDER sees any change in behavior.
+ * @param weatherProvider The main weatherProvider already resolved for this request via selectWeatherProvider().
+ */
+export function resolveForecastProvider( weatherProvider: WeatherProvider ): WeatherProvider {
+    if ( !process.env.FORECAST_WEATHER_PROVIDER ) {
+        return weatherProvider;
+    }
+    return WEATHER_PROVIDERS[ process.env.FORECAST_WEATHER_PROVIDER ] || weatherProvider;
 }
 
 export type WeatherSensorScope = {
@@ -217,7 +227,7 @@ export async function fetchWeatherSensorData(
     coordinates: GeoCoordinates,
     scope: WeatherSensorScope,
     pws?: PWS,
-    forecastProvider: WeatherProvider = FORECAST_WEATHER_PROVIDER
+    forecastProvider: WeatherProvider = resolveForecastProvider(weatherProvider)
 ): Promise<WeatherSensorFetchResult> {
     const result: WeatherSensorFetchResult = {};
 
@@ -389,15 +399,15 @@ export function checkRainRestriction(
 }
 
 /**
- * Fetches forecast weather data from the separately configurable FORECAST_WEATHER_PROVIDER, since not every
+ * Fetches forecast weather data from the given forecast provider (see resolveForecastProvider()), since not every
  * weatherProvider (e.g. local) supplies forecast data. Fails open: returns undefined (and logs) instead of
  * throwing, so a failed forecast fetch never blocks the rest of a weather response.
  * @param coordinates The coordinates to retrieve the forecast for.
- * @param forecastProvider The provider to fetch from. Defaults to FORECAST_WEATHER_PROVIDER; overridable for tests.
+ * @param forecastProvider The provider to fetch from.
  */
 export async function fetchForecastWeatherData(
 	coordinates: GeoCoordinates,
-	forecastProvider: WeatherProvider = FORECAST_WEATHER_PROVIDER
+	forecastProvider: WeatherProvider
 ): Promise<WeatherData | undefined> {
 	try {
 		return (await forecastProvider.getWeatherData( coordinates )).value;
@@ -455,6 +465,8 @@ export const getWeatherData = async function( req: express.Request, res: express
 		sendWateringError(res, makeCodedError(err));
 		return;
 	}
+	const forecastProvider = resolveForecastProvider( weatherProvider );
+
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
 	let weatherData: CachedResult<WeatherData>;
@@ -472,7 +484,7 @@ export const getWeatherData = async function( req: express.Request, res: express
 	// FORECAST_WEATHER_PROVIDER will see "Powered by your Local PWS" even though the
 	// forecast itself comes from a different source. This is a known, documented
 	// limitation on the App side, not a bug in this service.
-	const forecastData = await fetchForecastWeatherData( coordinates );
+	const forecastData = await fetchForecastWeatherData( coordinates, forecastProvider );
 
 	res.json( {
 		...timeData,
@@ -594,7 +606,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sendWateringError(res, makeCodedError(err), adjustmentMethod != ManualAdjustmentMethod, useJson);
 		return;
 	}
-
+	const forecastProvider = resolveForecastProvider( weatherProvider );
 
 	const data = {
 		scale:		undefined,
@@ -653,13 +665,13 @@ export const getWateringData = async function( req: express.Request, res: expres
 			}
 		}
 
-		// The rain forecast restriction reads from the separately configurable FORECAST_WEATHER_PROVIDER, since not
-		// every weatherProvider (e.g. local) supplies forecast data. A failed fetch fails open, independently of the
-		// minTemp fetch above.
+		// The rain forecast restriction reads from resolveForecastProvider() (the main weatherProvider, unless
+		// FORECAST_WEATHER_PROVIDER is explicitly set), since not every weatherProvider (e.g. local) supplies
+		// forecast data. A failed fetch fails open, independently of the minTemp fetch above.
 		let forecastWeather: WeatherData | undefined;
 		if ( adjustmentOptions.rainAmt && adjustmentOptions.rainAmt > 0 && adjustmentOptions.rainDays ) {
 			try {
-				forecastWeather = (await FORECAST_WEATHER_PROVIDER.getWeatherData( coordinates, pws )).value;
+				forecastWeather = (await forecastProvider.getWeatherData( coordinates, pws )).value;
 			} catch ( err ) {
 				console.error( "Unable to fetch forecast weather data for the rain restriction check.", err );
 			}

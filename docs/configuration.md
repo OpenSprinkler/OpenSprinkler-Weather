@@ -28,6 +28,17 @@ If `WEATHER_PROVIDER` is missing or unrecognized, the service selects Apple. Sel
 
 `PWS_WEATHER_PROVIDER` selects the provider used when a request contains a PWS station ID; it defaults to `WU`.
 
+`FORECAST_WEATHER_PROVIDER` independently selects the provider used for forecast data: the rain-forecast weather restriction (`rainAmt`/`rainDays`) and the `/weatherData` forecast fields (`forecast`, `precip`, `minTemp`, `maxTemp`). When unset, it falls back to the same provider already resolved for the request (`WEATHER_PROVIDER`, or a per-request `adjustmentOptions.provider` override) — so nobody who hasn't set it sees any change in behavior. Set it explicitly (for example to `OpenMeteo`) when the main provider doesn't supply forecast data, such as `WEATHER_PROVIDER=local`, which always reports an empty forecast.
+
+> **Note on attribution:** The official OpenSprinkler App currently determines the
+> displayed weather attribution from the controller's main `WEATHER_PROVIDER`
+> setting, not from `FORECAST_WEATHER_PROVIDER`. If you set `FORECAST_WEATHER_PROVIDER`
+> to a different, attribution-required commercial provider (e.g. Apple, AccuWeather)
+> than your main provider, the App will not display the correct attribution for the
+> forecast data shown. You are responsible for ensuring compliance with that
+> provider's terms of service until this is addressed on the App side
+> (see OpenSprinkler/OpenSprinkler-App#[ISSUE-NUMMER]).
+
 ## Geocoding
 
 | Variable | Default | Description |
