@@ -35,9 +35,10 @@ If `WEATHER_PROVIDER` is missing or unrecognized, the service selects Apple. Sel
 > setting, not from `FORECAST_WEATHER_PROVIDER`. If you set `FORECAST_WEATHER_PROVIDER`
 > to a different, attribution-required commercial provider (e.g. Apple, AccuWeather)
 > than your main provider, the App will not display the correct attribution for the
-> forecast data shown. You are responsible for ensuring compliance with that
+> forecast data shown, even though the `/weatherData` response itself reports the
+> correct forecast provider. You are responsible for ensuring compliance with that
 > provider's terms of service until this is addressed on the App side
-> (see OpenSprinkler/OpenSprinkler-App#[ISSUE-NUMMER]).
+> (see OpenSprinkler/OpenSprinkler-App#306).
 
 ## Geocoding
 

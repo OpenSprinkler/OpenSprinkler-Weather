@@ -180,17 +180,18 @@ describe("Weather Data (getWeatherData)", () => {
 	};
 
 	describe("mergeForecastWeatherData", () => {
-		it("merges forecast, precip, minTemp, and maxTemp while keeping other fields from the main provider", () => {
+		it("merges forecast, precip, minTemp, maxTemp, and weatherProvider while keeping other fields from the main provider", () => {
 			const result = mergeForecastWeatherData(mainWeather, forecastWeather);
 
 			// Unchanged: still sourced from the main provider (local).
-			expect(result.weatherProvider).to.equal("local");
 			expect(result.temp).to.equal(68);
 			expect(result.humidity).to.equal(55);
 			expect(result.wind).to.equal(4);
 			expect(result.raining).to.equal(false);
 
-			// Merged in: now sourced from the forecast provider (OpenMeteo).
+			// Merged in: now sourced from the forecast provider (OpenMeteo), including the
+			// provider itself, so attribution reflects the actual forecast source.
+			expect(result.weatherProvider).to.equal("OpenMeteo");
 			expect(result.forecast).to.eql(forecastWeather.forecast);
 			expect(result.precip).to.equal(0.25);
 			expect(result.minTemp).to.equal(55);
