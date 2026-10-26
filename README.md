@@ -6,6 +6,7 @@ The OpenSprinkler Weather Service supplies weather data, time-zone and sunrise/s
 
 - [Configuration reference](docs/configuration.md)
 - [HTTP API reference](docs/api.md)
+- [ETo adjustment and baseline setup](docs/eto-adjustment.md)
 - [Local service and PWS setup](docs/local-installation.md)
 - [Testing and release checks](docs/weather-testing.md)
 - [OpenSprinkler weather-adjustment guide](https://openthings.freshdesk.com/support/solutions/articles/5000823370-use-weather-adjustments)

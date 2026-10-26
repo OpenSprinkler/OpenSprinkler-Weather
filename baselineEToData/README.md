@@ -1,5 +1,8 @@
 # Baseline ETo Data
 
+For choosing a baseline and setting watering durations, see
+[ETo Adjustment and Baseline Setup](../docs/eto-adjustment.md).
+
 The baseline ETo endpoint determines the baseline ETo for a location by reading a file generated using data from [MOD16](https://www.ntsg.umt.edu/project/modis/mod16.php).
 The data is stored in a binary file that has 4 key differences from the GeoTIFF provided by MOD16:
 * The bit depth is decreased from 16 bits to 8 bits to reduce the file size.

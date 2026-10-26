@@ -27,6 +27,10 @@ The numeric route identifies the adjustment method. Legacy `/weather0.py` throug
 | `/2` | Automatic rain delay | `d`: delay duration in hours. |
 | `/3` | ETo | `baseETo`: inches/day; `elevation`: feet. |
 
+For ETo, `baseETo` must be a finite positive value representing the conditions for
+which the programmed watering durations are appropriate at 100%. See
+[ETo Adjustment and Baseline Setup](eto-adjustment.md) before choosing this value.
+
 Example JSON request:
 
 ```text
@@ -112,11 +116,14 @@ Unavailable values and blocks are omitted. If every requested scope fails, the r
 
 ## Baseline ETo
 
-`GET /baselineETo?loc=latitude,longitude` returns the long-term average daily ETo in inches/day:
+`GET /baselineETo?loc=latitude,longitude` returns the long-term annual-average daily ETo in inches/day:
 
 ```json
 { "eto": 0.142 }
 ```
+
+See [ETo Adjustment and Baseline Setup](eto-adjustment.md) for how to match this
+estimate to programmed watering durations before supplying it as `/3`'s `baseETo`.
 
 This endpoint requires a readable `Baseline_ETo_Data.bin`. It returns HTTP 503 while the data is unavailable and HTTP 404 when the location cannot be resolved or has no dataset coverage.
 
