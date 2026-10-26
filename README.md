@@ -98,6 +98,13 @@ Live-provider and deployed-server comparison tests are documented in [Weather Se
 
 ## License and Support
 
+OpenSprinkler Weather Service is licensed under the GNU Affero General Public
+License, version 3 or (at your option) any later version
+(`AGPL-3.0-or-later`). See [LICENSE](LICENSE) for the full license text.
+
+Third-party dependencies and weather datasets remain subject to their respective
+licenses and terms.
+
 - [OpenSprinkler](https://opensprinkler.com)
 - [Support](https://openthings.freshdesk.com/support/home)
 - [Releases](https://github.com/OpenSprinkler/OpenSprinkler-Weather/releases)
