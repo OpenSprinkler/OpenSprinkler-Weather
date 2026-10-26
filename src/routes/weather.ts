@@ -25,6 +25,7 @@ import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
 import { ParsedQs } from "qs";
 import { CachedResult } from "../cache";
+import { resolveForecastProviderName } from "../config";
 import OWMWeatherProvider from "./weatherProviders/OWM";
 import WUndergroundWeatherProvider from "./weatherProviders/WUnderground";
 import AppleWeatherProvider from "./weatherProviders/Apple";
@@ -110,10 +111,8 @@ function selectWeatherProvider(adjustmentOptions: AdjustmentOptions, pws?: PWS):
  * @param weatherProvider The main weatherProvider already resolved for this request via selectWeatherProvider().
  */
 export function resolveForecastProvider( weatherProvider: WeatherProvider ): WeatherProvider {
-    if ( !process.env.FORECAST_WEATHER_PROVIDER ) {
-        return weatherProvider;
-    }
-    return WEATHER_PROVIDERS[ process.env.FORECAST_WEATHER_PROVIDER ] || weatherProvider;
+    const provider = resolveForecastProviderName();
+    return provider ? WEATHER_PROVIDERS[provider] : weatherProvider;
 }
 
 export type WeatherSensorScope = {
@@ -231,7 +230,8 @@ export async function fetchWeatherSensorData(
 ): Promise<WeatherSensorFetchResult> {
     const result: WeatherSensorFetchResult = {};
 
-    if (scope.current || scope.forecast) {
+    const sameProvider = forecastProvider === weatherProvider;
+    if (scope.current || (scope.forecast && sameProvider)) {
         try {
             result.weatherResult = await weatherProvider.getWeatherData(coordinates, pws);
         } catch (err) {
@@ -239,13 +239,16 @@ export async function fetchWeatherSensorData(
         }
     }
     if (scope.forecast) {
-        // The forecast comes from the separately configurable FORECAST_WEATHER_PROVIDER, since not every
-        // weatherProvider (e.g. local) supplies forecast data. No pws is passed; that only applies to the main
-        // provider. A failed fetch fails open: forecastError is reported, but the rest of the response is unaffected.
-        try {
-            result.forecastResult = await forecastProvider.getWeatherData(coordinates);
-        } catch (err) {
-            result.forecastError = makeCodedError(err);
+        if (sameProvider) {
+            result.forecastResult = result.weatherResult;
+            result.forecastError = result.weatherError;
+        } else {
+            // Controller credentials belong to the main provider only.
+            try {
+                result.forecastResult = await forecastProvider.getWeatherData(coordinates);
+            } catch (err) {
+                result.forecastError = makeCodedError(err);
+            }
         }
     }
     if (scope.historical) {
@@ -400,7 +403,7 @@ export function checkRainRestriction(
 
 /**
  * Fetches forecast weather data from the given forecast provider (see resolveForecastProvider()), since not every
- * weatherProvider (e.g. local) supplies forecast data. Fails open: returns undefined (and logs) instead of
+ * weatherProvider (e.g. local) supplies forecast data. Returns undefined (and logs) instead of
  * throwing, so a failed forecast fetch never blocks the rest of a weather response.
  * @param coordinates The coordinates to retrieve the forecast for.
  * @param forecastProvider The provider to fetch from.
@@ -408,9 +411,9 @@ export function checkRainRestriction(
 export async function fetchForecastWeatherData(
 	coordinates: GeoCoordinates,
 	forecastProvider: WeatherProvider
-): Promise<WeatherData | undefined> {
+): Promise<CachedResult<WeatherData> | undefined> {
 	try {
-		return (await forecastProvider.getWeatherData( coordinates )).value;
+		return await forecastProvider.getWeatherData( coordinates );
 	} catch ( err ) {
 		console.error( "Unable to fetch forecast weather data for the weatherData response.", err );
 		return undefined;
@@ -418,9 +421,8 @@ export async function fetchForecastWeatherData(
 }
 
 /**
- * Merges forecast, precip, minTemp, and maxTemp from a forecast fetch into weather data, together with the
- * forecast's weatherProvider so the response reports the actual source of the forecast (needed for correct
- * attribution). All other fields (temp, humidity, wind, raining, ...) are left untouched, coming from the main
+ * Merges forecast fields and their source into a new response without modifying cached provider data.
+ * All other fields (temp, humidity, wind, raining, weatherProvider, ...) come from the main
  * weatherProvider. If no forecast was fetched (fetch failed or was never attempted), the weather data is returned
  * unchanged.
  */
@@ -433,7 +435,7 @@ export function mergeForecastWeatherData( weather: WeatherData, forecast?: Weath
 		precip: forecast.precip,
 		minTemp: forecast.minTemp,
 		maxTemp: forecast.maxTemp,
-		weatherProvider: forecast.weatherProvider,
+		forecastProvider: forecast.weatherProvider,
 	};
 }
 
@@ -480,18 +482,13 @@ export const getWeatherData = async function( req: express.Request, res: express
 		return;
 	}
 
-	// The response's weatherProvider reflects the provider that actually supplied the
-	// forecast (see mergeForecastWeatherData). Note: the official OpenSprinkler App
-	// currently derives the forecast attribution text from controller.settings.wto.provider
-	// (the main WEATHER_PROVIDER) instead (www/js/modules/weather.js:798 in the
-	// OpenSprinkler-App repo); OpenSprinkler/OpenSprinkler-App#306 makes the App prefer
-	// the weatherProvider reported here.
-	const forecastData = await fetchForecastWeatherData( coordinates, forecastProvider );
+	const forecastData = forecastProvider === weatherProvider ? undefined
+		: await fetchForecastWeatherData( coordinates, forecastProvider );
 
 	res.json( {
 		...timeData,
-		...mergeForecastWeatherData( weatherData.value, forecastData ),
-		ttl: weatherData.ttl,
+		...mergeForecastWeatherData( weatherData.value, forecastData?.value ),
+		ttl: forecastData ? Math.min(weatherData.ttl, forecastData.ttl) : weatherData.ttl,
 		location: coordinates,
 	} );
 };
@@ -656,27 +653,24 @@ export const getWateringData = async function( req: express.Request, res: expres
 			wateringData = dataArr.value;
 		}
 
-		// minTemp reads from the main weatherProvider. A failed fetch fails open (the restriction is simply not
-		// triggered) so it never blocks the watering scale response.
+		const sameProvider = forecastProvider === weatherProvider;
+		const checkMinTemp = typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40;
+		const checkRain = !!(adjustmentOptions.rainAmt && adjustmentOptions.rainDays);
 		let minTempWeather: WeatherData | undefined;
-		if ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) {
-			try {
-				minTempWeather = (await weatherProvider.getWeatherData( coordinates, pws )).value;
-			} catch ( err ) {
-				console.error( "Unable to fetch weather data for the minTemp restriction check.", err );
-			}
-		}
-
-		// The rain forecast restriction reads from resolveForecastProvider() (the main weatherProvider, unless
-		// FORECAST_WEATHER_PROVIDER is explicitly set), since not every weatherProvider (e.g. local) supplies
-		// forecast data. A failed fetch fails open, independently of the minTemp fetch above.
 		let forecastWeather: WeatherData | undefined;
-		if ( adjustmentOptions.rainAmt && adjustmentOptions.rainAmt > 0 && adjustmentOptions.rainDays ) {
-			try {
-				forecastWeather = (await forecastProvider.getWeatherData( coordinates, pws )).value;
-			} catch ( err ) {
-				console.error( "Unable to fetch forecast weather data for the rain restriction check.", err );
+		try {
+			// Preserve the original single fetch and request credentials when sources match.
+			if (checkMinTemp || (checkRain && sameProvider)) {
+				minTempWeather = (await weatherProvider.getWeatherData(coordinates, pws)).value;
 			}
+			if (checkRain) {
+				forecastWeather = sameProvider ? minTempWeather
+					: (await forecastProvider.getWeatherData(coordinates)).value;
+			}
+		} catch (err) {
+			// An unchecked restriction is an error, not a successful unrestricted update.
+			res.send("Error: " + err);
+			return;
 		}
 
 		// Check for any user-set restrictions and change the scale to 0 if the criteria is met

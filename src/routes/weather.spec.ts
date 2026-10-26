@@ -180,7 +180,7 @@ describe("Weather Data (getWeatherData)", () => {
 	};
 
 	describe("mergeForecastWeatherData", () => {
-		it("merges forecast, precip, minTemp, maxTemp, and weatherProvider while keeping other fields from the main provider", () => {
+		it("merges forecast, precip, minTemp, maxTemp, and forecastProvider while keeping other fields from the main provider", () => {
 			const result = mergeForecastWeatherData(mainWeather, forecastWeather);
 
 			// Unchanged: still sourced from the main provider (local).
@@ -189,9 +189,9 @@ describe("Weather Data (getWeatherData)", () => {
 			expect(result.wind).to.equal(4);
 			expect(result.raining).to.equal(false);
 
-			// Merged in: now sourced from the forecast provider (OpenMeteo), including the
-			// provider itself, so attribution reflects the actual forecast source.
-			expect(result.weatherProvider).to.equal("OpenMeteo");
+			// Forecast fields carry their own source; the main provider identity is unchanged.
+			expect(result.weatherProvider).to.equal("local");
+			expect(result.forecastProvider).to.equal("OpenMeteo");
 			expect(result.forecast).to.eql(forecastWeather.forecast);
 			expect(result.precip).to.equal(0.25);
 			expect(result.minTemp).to.equal(55);
@@ -209,7 +209,7 @@ describe("Weather Data (getWeatherData)", () => {
 
 			const result = await fetchForecastWeatherData([42, -75], provider);
 
-			expect(result).to.eql(forecastWeather);
+			expect(result.value).to.eql(forecastWeather);
 		});
 
 		it("fails open and returns undefined when the forecast provider throws", async () => {
@@ -268,7 +268,7 @@ describe("resolveForecastProvider", () => {
 	});
 
 	it("falls back to the resolved main weatherProvider when FORECAST_WEATHER_PROVIDER is unset", () => {
-		// Regression for the reviewer-reported bug: with WEATHER_PROVIDER=AccuWeather (or any other main provider)
+		// Regression for the reviewer-reported bug: with WEATHER_PROVIDER=AW (or any other main provider)
 		// and FORECAST_WEATHER_PROVIDER unset, the forecast restriction/display must keep using that same provider
 		// instead of silently switching to a hardcoded default.
 		const accuWeatherLikeProvider = new MockWeatherProvider({});
@@ -289,11 +289,11 @@ describe("resolveForecastProvider", () => {
 		expect(resolveForecastProvider(mainProvider)).to.not.equal(mainProvider);
 	});
 
-	it("falls back to the main weatherProvider for an unknown FORECAST_WEATHER_PROVIDER value", () => {
+	it("rejects an unknown FORECAST_WEATHER_PROVIDER value", () => {
 		const mainProvider = new MockWeatherProvider({});
 		process.env.FORECAST_WEATHER_PROVIDER = "NotARealProvider";
 
-		expect(resolveForecastProvider(mainProvider)).to.equal(mainProvider);
+		expect(() => resolveForecastProvider(mainProvider)).to.throw("Invalid FORECAST_WEATHER_PROVIDER");
 	});
 });
 

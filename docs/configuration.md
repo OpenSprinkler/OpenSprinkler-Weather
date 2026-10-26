@@ -28,17 +28,58 @@ If `WEATHER_PROVIDER` is missing or unrecognized, the service selects Apple. Sel
 
 `PWS_WEATHER_PROVIDER` selects the provider used when a request contains a PWS station ID; it defaults to `WU`.
 
-`FORECAST_WEATHER_PROVIDER` independently selects the provider used for forecast data: the rain-forecast weather restriction (`rainAmt`/`rainDays`) and the `/weatherData` forecast fields (`forecast`, `precip`, `minTemp`, `maxTemp`). When unset, it falls back to the same provider already resolved for the request (`WEATHER_PROVIDER`, or a per-request `adjustmentOptions.provider` override) — so nobody who hasn't set it sees any change in behavior. Set it explicitly (for example to `OpenMeteo`) when the main provider doesn't supply forecast data, such as `WEATHER_PROVIDER=local`, which always reports an empty forecast.
+### Independent Forecast Provider
 
-> **Note on attribution:** The official OpenSprinkler App currently determines the
-> displayed weather attribution from the controller's main `WEATHER_PROVIDER`
-> setting, not from `FORECAST_WEATHER_PROVIDER`. If you set `FORECAST_WEATHER_PROVIDER`
-> to a different, attribution-required commercial provider (e.g. Apple, AccuWeather)
-> than your main provider, the App will not display the correct attribution for the
-> forecast data shown, even though the `/weatherData` response itself reports the
-> correct forecast provider. You are responsible for ensuring compliance with that
-> provider's terms of service until this is addressed on the App side
-> (see OpenSprinkler/OpenSprinkler-App#306).
+`FORECAST_WEATHER_PROVIDER` optionally selects a different source for the
+forecast-rain restriction (`rainAmt`/`rainDays`), the `/weatherData` forecast fields,
+and the `/weatherSensorData` forecast block. For example:
+
+```dotenv
+WEATHER_PROVIDER=local
+FORECAST_WEATHER_PROVIDER=OpenMeteo
+PWS=WU
+LOCAL_PERSISTENCE=true
+```
+
+Current observations, ETo/Zimmerman history, minimum-temperature restrictions,
+and California rain-history restrictions still use the main provider. Selecting
+an external forecast does not fill gaps in local observations.
+
+Leave the override unset or blank to preserve existing behavior, including
+per-controller provider selection and WU station credentials. When both sources
+resolve to the same provider, the service reuses its original result and request
+credentials.
+
+Supported override values are `OpenMeteo`, `DWD`, `Apple`, `OWM`, `AW`, and `PW`.
+Use these exact short IDs; long names such as `AccuWeather` are not aliases.
+`OWM`, `AW`, and `PW` require their respective server API keys from the table
+above. Apple requires its normal server-side WeatherKit credentials; DWD retains
+its geographic coverage limits. A separate forecast provider never receives the
+controller's main-provider key or station ID.
+
+Unknown overrides, `WU`, `local`, and keyed overrides without their server API
+key prevent startup with a configuration error. WU needs per-request station
+credentials, and local observations have no forecast; both remain supported as
+main providers when the override is unset. A keyed override requires its server
+key even if some requests select the same main provider.
+
+If a provider fails during an enabled rain or temperature restriction check,
+the watering endpoint returns its existing `Error: …` response, rather than a
+successful response that skips the restriction. This also prevents an updated
+watering scale from being returned on that request. It does not itself command
+the controller to stop watering; retained settings and timeout behavior depend
+on firmware. During a separate forecast outage, `/weatherData` returns the main
+provider's data unchanged, and `/weatherSensorData` reports a forecast error
+while retaining other successful requested scopes.
+
+For mixed `/weatherData` responses, `weatherProvider` remains the main source and
+`forecastProvider` identifies the external forecast source. Forecast attribution
+in the App must prefer `forecastProvider`, then fall back to older provider fields.
+[App PR #306](https://github.com/OpenSprinkler/OpenSprinkler-App/pull/306) needs this
+additional field preference; its original fallback reorder alone is insufficient.
+Until the App supports this field, mixed forecasts can display the main provider's
+attribution. Coordinate the App update before deploying mixed-source forecast
+pages, particularly when the provider requires attribution.
 
 ## Geocoding
 
