@@ -198,7 +198,7 @@ describe("Weather Data (getWeatherData)", () => {
 			expect(result.maxTemp).to.equal(72);
 		});
 
-		it("fails open and returns the weather data unchanged when no forecast was fetched", () => {
+		it("returns the weather data unchanged when no forecast was fetched", () => {
 			expect(mergeForecastWeatherData(mainWeather, undefined)).to.equal(mainWeather);
 		});
 	});
@@ -212,7 +212,7 @@ describe("Weather Data (getWeatherData)", () => {
 			expect(result.value).to.eql(forecastWeather);
 		});
 
-		it("fails open and returns undefined when the forecast provider throws", async () => {
+		it("returns undefined for the display forecast when the provider throws", async () => {
 			// The base WeatherProvider's default getWeatherDataInternal() throws "not supported", which is enough
 			// to exercise the failure path without a real network call.
 			const provider = new WeatherProvider();
@@ -340,7 +340,7 @@ describe("Weather Restrictions", () => {
 			expect(checkMinTempRestriction(-40, -100)).to.equal(false);
 		});
 
-		it("fails open when no temperature was fetched (e.g. the provider request failed)", () => {
+		it("returns false when the helper receives no temperature", () => {
 			expect(checkMinTempRestriction(35, undefined)).to.equal(false);
 		});
 	});
@@ -361,7 +361,7 @@ describe("Weather Restrictions", () => {
 			expect(checkRainRestriction(0.1, 2, [])).to.equal(false);
 		});
 
-		it("fails open when no forecast was fetched (e.g. FORECAST_WEATHER_PROVIDER is unset or the request failed)", () => {
+		it("returns false when the helper receives no forecast", () => {
 			expect(checkRainRestriction(0.1, 2, undefined)).to.equal(false);
 		});
 	});
@@ -563,7 +563,7 @@ describe("Weather Sensor Data", () => {
 		expect(result.f).to.equal(undefined);
 	});
 
-	it("fails open on a failed forecast fetch without blocking current or historical data", async () => {
+	it("reports a forecast fetch error while retaining current and historical data", async () => {
 		// The base WeatherProvider's default getWeatherDataInternal() throws "not supported", which is enough to
 		// exercise the forecast fetch's failure path without a real network call.
 		const provider = new CountingMockWeatherProvider({ weatherData, wateringData: [wateringData] });

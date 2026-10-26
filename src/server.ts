@@ -35,7 +35,12 @@ function getLogLevel(): LevelWithSilent {
 
 const logger = pino({ level: getLogLevel() });
 
-resolveForecastProviderName();
+try {
+	resolveForecastProviderName();
+} catch (error) {
+	console.error(`Configuration error: ${error instanceof Error ? error.message : String(error)}`);
+	process.exit(1);
+}
 const host = process.env.HOST || "127.0.0.1";
 const port = resolveServerPort();
 
