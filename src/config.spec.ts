@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import path from "path";
-import { localPersistenceEnabled, resolvePersistenceFile, resolveServerPort } from "./config";
+import { localPersistenceEnabled, resolvePersistenceFile, resolveServerPort, resolveForecastProviderName } from "./config";
 
 describe("Server configuration", () => {
 	it("uses the default port when neither port variable is set", () => {
@@ -46,5 +46,34 @@ describe("Persistence configuration", () => {
 			.to.equal(path.resolve("/data/observations.json"));
 		expect(resolvePersistenceFile("observations.json", {}))
 			.to.equal(path.resolve("observations.json"));
+	});
+});
+
+describe("Forecast provider configuration", () => {
+	it("allows an unset or blank override regardless of the main provider", () => {
+		for (const main of ["WU", "local", "OWM"]) {
+			for (const value of [undefined, "", "  "]) {
+				expect(resolveForecastProviderName({ WEATHER_PROVIDER: main, FORECAST_WEATHER_PROVIDER: value })).to.equal(undefined);
+			}
+		}
+	});
+	it("accepts supported providers with their server credentials", () => {
+		for (const provider of ["OpenMeteo", "DWD", "Apple", "OWM", "AW", "PW"]) {
+			expect(resolveForecastProviderName({ FORECAST_WEATHER_PROVIDER: provider,
+				OWM_API_KEY: "fixture", ACCUWEATHER_API_KEY: "fixture", PIRATEWEATHER_API_KEY: "fixture" })).to.equal(provider);
+		}
+	});
+	it("rejects unknown names and providers unsupported as overrides", () => {
+		for (const provider of ["WU", "local", "AccuWeather", "PirateWeather", "WUnderground", "typo", "toString", "__proto__"]) {
+			expect(() => resolveForecastProviderName({ FORECAST_WEATHER_PROVIDER: provider })).to.throw("Invalid FORECAST_WEATHER_PROVIDER");
+		}
+	});
+	it("requires server keys for keyed overrides, even if the main provider matches", () => {
+		for (const [provider, key] of [["OWM", "OWM_API_KEY"], ["AW", "ACCUWEATHER_API_KEY"], ["PW", "PIRATEWEATHER_API_KEY"]]) {
+			for (const value of [undefined, "", "  "]) {
+				expect(() => resolveForecastProviderName({ WEATHER_PROVIDER: provider, FORECAST_WEATHER_PROVIDER: provider, [key]: value }))
+					.to.throw(`requires ${key}`);
+			}
+		}
 	});
 });

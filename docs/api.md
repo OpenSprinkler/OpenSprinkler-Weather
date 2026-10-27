@@ -27,6 +27,10 @@ The numeric route identifies the adjustment method. Legacy `/weather0.py` throug
 | `/2` | Automatic rain delay | `d`: delay duration in hours. |
 | `/3` | ETo | `baseETo`: inches/day; `elevation`: feet. |
 
+For ETo, `baseETo` must be a finite positive value representing the conditions for
+which the programmed watering durations are appropriate at 100%. See
+[ETo Adjustment and Baseline Setup](eto-adjustment.md) before choosing this value.
+
 Example JSON request:
 
 ```text
@@ -52,11 +56,31 @@ Weather restrictions may be included in `wto`: `minTemp`, `rainAmt` with `rainDa
 
 The `cali` restriction normally sums the two most recent complete historical days. If a provider supplies only one complete day, that day's precipitation can still activate the restriction; unavailable earlier history does not by itself force watering off.
 
+With an [independent forecast provider](configuration.md#independent-forecast-provider),
+only the forecast-rain restriction uses that provider. If a required rain or
+temperature fetch fails, the endpoint preserves its plain `Error: …` response
+(including when `format=json` was requested); it does not return a successful
+unrestricted scale. This behavior does not itself force the controller to stop
+watering.
+
 ## Weather Data
 
 `GET /weatherData?loc=latitude,longitude&wto=...` returns a JSON object used by the UI. Temperatures are Fahrenheit, wind is mph, precipitation is inches, and timestamps are Unix epoch seconds.
 
 The response includes provider identity, current conditions when available, today's minimum and maximum temperature and precipitation, a daily `forecast` array, time-zone and sunrise/sunset data, cache `ttl`, and resolved coordinates. Provider attribution is included only when the provider supplies it in the weather response metadata; clients remain responsible for meeting the selected provider's attribution requirements.
+
+When a separate forecast provider succeeds, `forecast`, `precip`, `minTemp`, and
+`maxTemp` come from that provider. An optional `forecastProvider` identifies it;
+`weatherProvider` and current conditions still describe the main provider.
+The response `ttl` is the shorter of the two results' remaining lifetimes.
+If the separate forecast fetch fails, the main data and its TTL are returned
+unchanged and `forecastProvider` is omitted. A failed main fetch still returns an
+error. With no separate provider, the original single-provider response is unchanged.
+
+Forecast displays should prefer `forecastProvider` for attribution, falling back
+to `weatherProvider` for older responses. The existing `attribution` object, if
+present, still belongs to the main provider; it must not be assumed to describe
+the external forecast source.
 
 ## WeatherSensor Data
 
@@ -91,7 +115,7 @@ Top-level fields:
 | --- | --- |
 | `v` | Schema version; currently `1`. |
 | `u` | Unit system; currently `us`. |
-| `wp` | Provider that supplied the returned data. |
+| `wp` | Main provider, when main-provider data was fetched successfully. |
 | `c`, `f`, `h` | Current, forecast, and historical blocks requested by `scope`. |
 | `e` | Per-scope errors, such as `{ "f": 40 }`, when another requested scope still succeeded. |
 
@@ -110,13 +134,23 @@ Compact value fields:
 
 Unavailable values and blocks are omitted. If every requested scope fails, the route returns HTTP 502 with `{ "errCode": N }`. Invalid parameters return HTTP 400.
 
+With `FORECAST_WEATHER_PROVIDER` set to a separate source, `f` uses that source;
+`c` and `h` continue using the main provider. No additional provider field is
+included in this compact response. A forecast-only request fetches only the
+forecast provider and omits `wp` when no main-provider data was requested.
+Forecast failure is reported as `e.f` if another requested scope succeeds, or
+HTTP 502 if none succeeds.
+
 ## Baseline ETo
 
-`GET /baselineETo?loc=latitude,longitude` returns the long-term average daily ETo in inches/day:
+`GET /baselineETo?loc=latitude,longitude` returns the long-term annual-average daily ETo in inches/day:
 
 ```json
 { "eto": 0.142 }
 ```
+
+See [ETo Adjustment and Baseline Setup](eto-adjustment.md) for how to match this
+estimate to programmed watering durations before supplying it as `/3`'s `baseETo`.
 
 This endpoint requires a readable `Baseline_ETo_Data.bin`. It returns HTTP 503 while the data is unavailable and HTTP 404 when the location cannot be resolved or has no dataset coverage.
 

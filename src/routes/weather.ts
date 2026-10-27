@@ -8,6 +8,7 @@ import {
     PWS,
     TimeData,
     WeatherData,
+    WeatherDataForecast,
     WeatherProviderShortId,
 } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
@@ -24,6 +25,7 @@ import { CodedError, ErrorCode, makeCodedError } from "../errors";
 import { Geocoder } from "./geocoders/Geocoder";
 import { ParsedQs } from "qs";
 import { CachedResult } from "../cache";
+import { resolveForecastProviderName } from "../config";
 import OWMWeatherProvider from "./weatherProviders/OWM";
 import WUndergroundWeatherProvider from "./weatherProviders/WUnderground";
 import AppleWeatherProvider from "./weatherProviders/Apple";
@@ -101,6 +103,18 @@ function selectWeatherProvider(adjustmentOptions: AdjustmentOptions, pws?: PWS):
     return WEATHER_PROVIDERS[provider] || WEATHER_PROVIDERS.Apple;
 }
 
+/**
+ * Resolves the WeatherProvider to use for forecast data (the rain-forecast restriction and the /weatherData
+ * forecast fields). Falls back to the already-resolved main weatherProvider - not to process.env.WEATHER_PROVIDER
+ * directly, since weatherProvider already accounts for per-request overrides from adjustmentOptions.provider - so
+ * nobody who hasn't set FORECAST_WEATHER_PROVIDER sees any change in behavior.
+ * @param weatherProvider The main weatherProvider already resolved for this request via selectWeatherProvider().
+ */
+export function resolveForecastProvider( weatherProvider: WeatherProvider ): WeatherProvider {
+    const provider = resolveForecastProviderName();
+    return provider ? WEATHER_PROVIDERS[provider] : weatherProvider;
+}
+
 export type WeatherSensorScope = {
     current: boolean;
     forecast: boolean;
@@ -149,7 +163,8 @@ export function buildWeatherSensorResponse(
     scope: WeatherSensorScope,
     weatherResult?: CachedResult<WeatherData>,
     wateringResult?: CachedResult<readonly WateringData[]>,
-    elevation: number = 600
+    elevation: number = 600,
+    forecastResult?: CachedResult<WeatherData>
 ): WeatherSensorResponse {
     const result: WeatherSensorResponse = { v: 1, u: "us" };
 
@@ -166,16 +181,17 @@ export function buildWeatherSensorResponse(
                 r: typeof weather.raining === "boolean" ? (weather.raining ? 1 : 0) : undefined,
             });
         }
+    }
 
-        if (scope.forecast && weather.forecast.length) {
-            const forecast = weather.forecast[0];
-            result.f = omitUndefined({
-                at: forecast.date,
-                lo: roundFinite(weather.minTemp ?? forecast.temp_min, 1),
-                hi: roundFinite(weather.maxTemp ?? forecast.temp_max, 1),
-                p: roundFinite(weather.precip ?? forecast.precip, 3),
-            });
-        }
+    if (scope.forecast && forecastResult?.value.forecast.length) {
+        const forecastWeather = forecastResult.value;
+        const forecast = forecastWeather.forecast[0];
+        result.f = omitUndefined({
+            at: forecast.date,
+            lo: roundFinite(forecastWeather.minTemp ?? forecast.temp_min, 1),
+            hi: roundFinite(forecastWeather.maxTemp ?? forecast.temp_max, 1),
+            p: roundFinite(forecastWeather.precip ?? forecast.precip, 3),
+        });
     }
 
     if (scope.historical && wateringResult?.value.length) {
@@ -198,8 +214,10 @@ export function buildWeatherSensorResponse(
 type WeatherSensorFetchResult = {
     weatherResult?: CachedResult<WeatherData>;
     wateringResult?: CachedResult<readonly WateringData[]>;
+    forecastResult?: CachedResult<WeatherData>;
     weatherError?: CodedError;
     wateringError?: CodedError;
+    forecastError?: CodedError;
 };
 
 /** Fetches only the provider data required by the requested scope. */
@@ -207,15 +225,30 @@ export async function fetchWeatherSensorData(
     weatherProvider: WeatherProvider,
     coordinates: GeoCoordinates,
     scope: WeatherSensorScope,
-    pws?: PWS
+    pws?: PWS,
+    forecastProvider: WeatherProvider = resolveForecastProvider(weatherProvider)
 ): Promise<WeatherSensorFetchResult> {
     const result: WeatherSensorFetchResult = {};
 
-    if (scope.current || scope.forecast) {
+    const sameProvider = forecastProvider === weatherProvider;
+    if (scope.current || (scope.forecast && sameProvider)) {
         try {
             result.weatherResult = await weatherProvider.getWeatherData(coordinates, pws);
         } catch (err) {
             result.weatherError = makeCodedError(err);
+        }
+    }
+    if (scope.forecast) {
+        if (sameProvider) {
+            result.forecastResult = result.weatherResult;
+            result.forecastError = result.weatherError;
+        } else {
+            // Controller credentials belong to the main provider only.
+            try {
+                result.forecastResult = await forecastProvider.getWeatherData(coordinates);
+            } catch (err) {
+                result.forecastError = makeCodedError(err);
+            }
         }
     }
     if (scope.historical) {
@@ -305,51 +338,105 @@ function getTimeData(coordinates: GeoCoordinates): TimeData {
 }
 
 /**
- * Checks if the weather data meets any of the restrictions set by OpenSprinkler. Restrictions prevent any watering
- * from occurring and are similar to 0% watering level. Known restrictions are:
- *
- * - California watering restriction prevents watering if precipitation over two days is greater than 0.1" over the past
- * 48 hours.
- * @param cali A boolean to enable the California restriction based on the old method.
- * @param wateringData Watering data to use to determine if any restrictions apply.
- * @param adjustmentOptions The adjustment options used, which gives restriction information.
- * @param weather Weather data to use to determine if any restrictions apply.
- * @return A boolean indicating if the watering level should be set to 0% due to a restriction.
+ * Checks the California watering restriction, which prevents watering if precipitation over the past 48 hours
+ * (the two most recent days in wateringData) is greater than 0.1".
+ * @param cali A boolean indicating if the restriction is enabled, either via the legacy hardware flag or adjustmentOptions.cali.
+ * @param wateringData Historical watering data from the main weatherProvider, used to sum recent precipitation.
+ * @return A boolean indicating if the watering level should be set to 0% due to this restriction.
  */
-function checkWeatherRestriction( cali: boolean, wateringData?: readonly WateringData[], adjustmentOptions?: AdjustmentOptions, weather?: WeatherData ): boolean {
-
-	if ( ( cali || (adjustmentOptions && adjustmentOptions.cali ) ) && wateringData && wateringData.length ) {
-		// The most recent two days are at the beginning of the data array
-		const len = wateringData.length;
-		let rain = wateringData[0].precip;
-		if ( len > 1 ){
-			rain += wateringData[1].precip;
-		}
-
-		if ( rain > 0.1 ) {
-			return true;
-		}
+export function checkCaliforniaRestriction( cali: boolean, wateringData?: readonly WateringData[] ): boolean {
+	if ( !cali || !wateringData || !wateringData.length ) {
+		return false;
 	}
 
-	if ( adjustmentOptions.rainAmt && adjustmentOptions.rainAmt > 0 && adjustmentOptions.rainDays ) {
-		const days = weather.forecast.length > adjustmentOptions.rainDays ? adjustmentOptions.rainDays : weather.forecast.length;
-		let precip = 0;
-		for ( let i = 0; i < days; i++ ) {
-			precip += weather.forecast[i].precip;
-		}
-
-		if ( precip > adjustmentOptions.rainAmt ){
-			return true;
-		}
+	// The most recent two days are at the beginning of the data array
+	const len = wateringData.length;
+	let rain = wateringData[0].precip;
+	if ( len > 1 ) {
+		rain += wateringData[1].precip;
 	}
 
-	if ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp != -40 ) {
-		if ( weather.temp < adjustmentOptions.minTemp ) {
-			return true;
-		}
+	return rain > 0.1;
+}
+
+/**
+ * Checks the minimum temperature restriction, which prevents watering if the current temperature reported by the
+ * main weatherProvider is below the configured threshold.
+ * @param minTemp The configured minimum temperature threshold (in Fahrenheit), or -40/undefined if disabled.
+ * @param temp The current temperature (in Fahrenheit) from the main weatherProvider, if it was fetched successfully.
+ * @return A boolean indicating if the watering level should be set to 0% due to this restriction.
+ */
+export function checkMinTempRestriction( minTemp: number | undefined, temp: number | undefined ): boolean {
+	if ( typeof minTemp === "undefined" || minTemp === -40 || typeof temp === "undefined" ) {
+		return false;
 	}
 
-	return false;
+	return temp < minTemp;
+}
+
+/**
+ * Checks the rain forecast restriction, which prevents watering if the forecasted precipitation over the next
+ * rainDays exceeds rainAmt. Forecast data comes from the separately configurable FORECAST_WEATHER_PROVIDER, since
+ * not every WeatherProvider (e.g. local) supplies forecast data.
+ * @param rainAmt The configured precipitation threshold (in inches) that triggers the restriction.
+ * @param rainDays The configured number of upcoming forecast days to sum precipitation over.
+ * @param forecast Forecast data from the FORECAST_WEATHER_PROVIDER, if it was fetched successfully.
+ * @return A boolean indicating if the watering level should be set to 0% due to this restriction.
+ */
+export function checkRainRestriction(
+	rainAmt: number | undefined,
+	rainDays: number | undefined,
+	forecast?: readonly WeatherDataForecast[]
+): boolean {
+	if ( !rainAmt || rainAmt <= 0 || !rainDays || !forecast || !forecast.length ) {
+		return false;
+	}
+
+	const days = forecast.length > rainDays ? rainDays : forecast.length;
+	let precip = 0;
+	for ( let i = 0; i < days; i++ ) {
+		precip += forecast[i].precip;
+	}
+
+	return precip > rainAmt;
+}
+
+/**
+ * Fetches forecast weather data from the given forecast provider (see resolveForecastProvider()), since not every
+ * weatherProvider (e.g. local) supplies forecast data. Returns undefined (and logs) instead of
+ * throwing, so a failed forecast fetch never blocks the rest of a weather response.
+ * @param coordinates The coordinates to retrieve the forecast for.
+ * @param forecastProvider The provider to fetch from.
+ */
+export async function fetchForecastWeatherData(
+	coordinates: GeoCoordinates,
+	forecastProvider: WeatherProvider
+): Promise<CachedResult<WeatherData> | undefined> {
+	try {
+		return await forecastProvider.getWeatherData( coordinates );
+	} catch ( err ) {
+		console.error( "Unable to fetch forecast weather data for the weatherData response.", err );
+		return undefined;
+	}
+}
+
+/**
+ * Merges forecast fields and their source into a new response without modifying cached provider data.
+ * All other fields (temp, humidity, wind, raining, weatherProvider, ...) come from the main
+ * weatherProvider. If no forecast was fetched (fetch failed or was never attempted), the weather data is returned
+ * unchanged.
+ */
+export function mergeForecastWeatherData( weather: WeatherData, forecast?: WeatherData ): WeatherData {
+	if ( !forecast ) return weather;
+
+	return {
+		...weather,
+		forecast: forecast.forecast,
+		precip: forecast.precip,
+		minTemp: forecast.minTemp,
+		maxTemp: forecast.maxTemp,
+		forecastProvider: forecast.weatherProvider,
+	};
 }
 
 export const getWeatherData = async function( req: express.Request, res: express.Response ) {
@@ -383,6 +470,8 @@ export const getWeatherData = async function( req: express.Request, res: express
 		sendWateringError(res, makeCodedError(err));
 		return;
 	}
+	const forecastProvider = resolveForecastProvider( weatherProvider );
+
 	// Continue with the weather request
 	const timeData: TimeData = getTimeData( coordinates );
 	let weatherData: CachedResult<WeatherData>;
@@ -393,10 +482,13 @@ export const getWeatherData = async function( req: express.Request, res: express
 		return;
 	}
 
+	const forecastData = forecastProvider === weatherProvider ? undefined
+		: await fetchForecastWeatherData( coordinates, forecastProvider );
+
 	res.json( {
 		...timeData,
-		...weatherData.value,
-		ttl: weatherData.ttl,
+		...mergeForecastWeatherData( weatherData.value, forecastData?.value ),
+		ttl: forecastData ? Math.min(weatherData.ttl, forecastData.ttl) : weatherData.ttl,
 		location: coordinates,
 	} );
 };
@@ -428,11 +520,11 @@ export const getWeatherSensorData = async function(req: express.Request, res: ex
         return;
     }
 
-    const { weatherResult, wateringResult, weatherError, wateringError } =
+    const { weatherResult, wateringResult, forecastResult, weatherError, wateringError, forecastError } =
         await fetchWeatherSensorData(weatherProvider, coordinates, scope, pws);
 
-    if (!weatherResult && !wateringResult) {
-        const error = weatherError || wateringError || new CodedError(ErrorCode.BadWeatherData);
+    if (!weatherResult && !wateringResult && !forecastResult) {
+        const error = weatherError || wateringError || forecastError || new CodedError(ErrorCode.BadWeatherData);
         res.status(502).json({ errCode: error.errCode });
         return;
     }
@@ -443,13 +535,12 @@ export const getWeatherSensorData = async function(req: express.Request, res: ex
         scope,
         weatherResult,
         wateringResult,
-        Number.isFinite(elevation) ? elevation : 600
+        Number.isFinite(elevation) ? elevation : 600,
+        forecastResult
     );
     const errors: { c?: number; f?: number; h?: number } = {};
-    if (weatherError) {
-        if (scope.current) errors.c = weatherError.errCode;
-        if (scope.forecast) errors.f = weatherError.errCode;
-    }
+    if (weatherError && scope.current) errors.c = weatherError.errCode;
+    if (forecastError && scope.forecast) errors.f = forecastError.errCode;
     if (wateringError) errors.h = wateringError.errCode;
     if (Object.keys(errors).length) response.e = errors;
 
@@ -514,7 +605,7 @@ export const getWateringData = async function( req: express.Request, res: expres
 		sendWateringError(res, makeCodedError(err), adjustmentMethod != ManualAdjustmentMethod, useJson);
 		return;
 	}
-
+	const forecastProvider = resolveForecastProvider( weatherProvider );
 
 	const data = {
 		scale:		undefined,
@@ -562,18 +653,33 @@ export const getWateringData = async function( req: express.Request, res: expres
 			wateringData = dataArr.value;
 		}
 
-		let weatherData: WeatherData | undefined = undefined;
-		if ( ( adjustmentOptions.rainAmt && adjustmentOptions.rainDays ) || ( typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40 ) ) {
-			try {
-				weatherData = (await weatherProvider.getWeatherData( coordinates, pws )).value;
-			} catch ( err ) {
-				res.send( "Error: " + err );
-				return;
+		const sameProvider = forecastProvider === weatherProvider;
+		const checkMinTemp = typeof adjustmentOptions.minTemp !== "undefined" && adjustmentOptions.minTemp !== -40;
+		const checkRain = !!(adjustmentOptions.rainAmt && adjustmentOptions.rainDays);
+		let minTempWeather: WeatherData | undefined;
+		let forecastWeather: WeatherData | undefined;
+		try {
+			// Preserve the original single fetch and request credentials when sources match.
+			if (checkMinTemp || (checkRain && sameProvider)) {
+				minTempWeather = (await weatherProvider.getWeatherData(coordinates, pws)).value;
 			}
+			if (checkRain) {
+				forecastWeather = sameProvider ? minTempWeather
+					: (await forecastProvider.getWeatherData(coordinates)).value;
+			}
+		} catch (err) {
+			// An unchecked restriction is an error, not a successful unrestricted update.
+			res.send("Error: " + err);
+			return;
 		}
 
 		// Check for any user-set restrictions and change the scale to 0 if the criteria is met
-		if ( checkWeatherRestriction( ((wateringParam >> 7) & 1) > 0 ? true : false, wateringData, adjustmentOptions, weatherData ) ) {
+		const cali = ((wateringParam >> 7) & 1) > 0 || !!adjustmentOptions.cali;
+		if (
+			checkCaliforniaRestriction( cali, wateringData ) ||
+			checkMinTempRestriction( adjustmentOptions.minTemp, minTempWeather?.temp ) ||
+			checkRainRestriction( adjustmentOptions.rainAmt, adjustmentOptions.rainDays, forecastWeather?.forecast )
+		) {
 			data.restricted = 1;
 		}
 	}

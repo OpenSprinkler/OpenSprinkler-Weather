@@ -18,6 +18,8 @@ export interface TimeData {
 export interface WeatherData {
 	/** The WeatherProvider that generated this data. */
 	weatherProvider: WeatherProviderId;
+	/** Source of forecast fields when a separate forecast provider supplied them. */
+	forecastProvider?: WeatherProviderId;
 	/** The current temperature (in Fahrenheit), if available. */
 	temp?: number;
 	/** The current humidity (as a percentage), if available. */

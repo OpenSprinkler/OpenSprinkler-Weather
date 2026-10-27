@@ -7,11 +7,18 @@ process.env.WEATHER_PROVIDER = "OWM";
 
 import {
 	buildWeatherSensorResponse,
+	checkCaliforniaRestriction,
+	checkMinTempRestriction,
+	checkRainRestriction,
+	fetchForecastWeatherData,
 	fetchWeatherSensorData,
 	getWateringData,
+	getWeatherData,
+	mergeForecastWeatherData,
+	resolveForecastProvider,
 } from "./weather";
 import { CachedResult } from "../cache";
-import { GeoCoordinates, WeatherData, WateringData, PWS } from "../types";
+import { GeoCoordinates, WeatherData, WeatherDataForecast, WateringData, PWS } from "../types";
 import { WeatherProvider } from "./weatherProviders/WeatherProvider";
 import ZimmermanAdjustmentMethod from "./adjustmentMethods/ZimmermanAdjustmentMethod";
 
@@ -137,6 +144,230 @@ describe("Watering Data", () => {
 	});
 });
 
+describe("Weather Data (getWeatherData)", () => {
+	const mainWeather: WeatherData = {
+		weatherProvider: "local",
+		temp: 68,
+		humidity: 55,
+		wind: 4,
+		raining: false,
+		description: "",
+		icon: "01d",
+		region: undefined,
+		city: undefined,
+		minTemp: undefined,
+		maxTemp: undefined,
+		precip: undefined,
+		forecast: [],
+	};
+	const forecastWeather: WeatherData = {
+		weatherProvider: "OpenMeteo",
+		description: "",
+		icon: "01d",
+		region: undefined,
+		city: undefined,
+		minTemp: 55,
+		maxTemp: 72,
+		precip: 0.25,
+		forecast: [{
+			temp_min: 54,
+			temp_max: 71,
+			precip: 0.2,
+			date: 1557705600,
+			icon: "rain",
+			description: "Rain",
+		}],
+	};
+
+	describe("mergeForecastWeatherData", () => {
+		it("merges forecast, precip, minTemp, maxTemp, and forecastProvider while keeping other fields from the main provider", () => {
+			const result = mergeForecastWeatherData(mainWeather, forecastWeather);
+
+			// Unchanged: still sourced from the main provider (local).
+			expect(result.temp).to.equal(68);
+			expect(result.humidity).to.equal(55);
+			expect(result.wind).to.equal(4);
+			expect(result.raining).to.equal(false);
+
+			// Forecast fields carry their own source; the main provider identity is unchanged.
+			expect(result.weatherProvider).to.equal("local");
+			expect(result.forecastProvider).to.equal("OpenMeteo");
+			expect(result.forecast).to.eql(forecastWeather.forecast);
+			expect(result.precip).to.equal(0.25);
+			expect(result.minTemp).to.equal(55);
+			expect(result.maxTemp).to.equal(72);
+		});
+
+		it("returns the weather data unchanged when no forecast was fetched", () => {
+			expect(mergeForecastWeatherData(mainWeather, undefined)).to.equal(mainWeather);
+		});
+	});
+
+	describe("fetchForecastWeatherData", () => {
+		it("returns the forecast provider's weather data on success", async () => {
+			const provider = new MockWeatherProvider({ weatherData: forecastWeather });
+
+			const result = await fetchForecastWeatherData([42, -75], provider);
+
+			expect(result.value).to.eql(forecastWeather);
+		});
+
+		it("returns undefined for the display forecast when the provider throws", async () => {
+			// The base WeatherProvider's default getWeatherDataInternal() throws "not supported", which is enough
+			// to exercise the failure path without a real network call.
+			const provider = new WeatherProvider();
+
+			const result = await fetchForecastWeatherData([42, -75], provider);
+
+			expect(result).to.equal(undefined);
+		});
+	});
+
+	function createWeatherDataMocks(query: { [key: string]: string } = {}) {
+		const request = new MockRequestConstructor({
+			method: "GET",
+			url: "/weatherData",
+			query: { loc: location, ...query },
+		});
+
+		return { request, response: new MockExpressResponse({ request }) };
+	}
+
+	// These exercise getWeatherData's pre-existing early-return paths (malformed options, an unresolvable
+	// location, and a failed main-provider fetch), all of which return before the new forecast fetch is ever
+	// reached — so they stay deterministic and network-free while still guarding that the refactor didn't
+	// change this existing error handling.
+	describe("getWeatherData", () => {
+		it("returns an error for malformed adjustment options", async () => {
+			const { request, response } = createWeatherDataMocks({ wto: '"provider":' });
+			await getWeatherData(request, response);
+
+			expect(response._getString()).to.equal("&errCode=50&scale=100");
+		});
+
+		it("returns an error for an unresolvable location", async () => {
+			const { request, response } = createWeatherDataMocks({ loc: "" });
+			await getWeatherData(request, response);
+
+			expect(response._getString()).to.match(/^Error: Unable to resolve location/);
+		});
+
+		it("returns an error when the main provider fetch fails, without reaching the forecast fetch", async () => {
+			// "local" has no queued observations in this test environment, so its fetch throws deterministically.
+			const { request, response } = createWeatherDataMocks({ wto: '"provider":"local"' });
+			await getWeatherData(request, response);
+
+			expect(response._getString()).to.match(/^Error: /);
+		});
+	});
+});
+
+describe("resolveForecastProvider", () => {
+	afterEach(() => {
+		delete process.env.FORECAST_WEATHER_PROVIDER;
+	});
+
+	it("falls back to the resolved main weatherProvider when FORECAST_WEATHER_PROVIDER is unset", () => {
+		// Regression for the reviewer-reported bug: with WEATHER_PROVIDER=AW (or any other main provider)
+		// and FORECAST_WEATHER_PROVIDER unset, the forecast restriction/display must keep using that same provider
+		// instead of silently switching to a hardcoded default.
+		const accuWeatherLikeProvider = new MockWeatherProvider({});
+
+		expect(resolveForecastProvider(accuWeatherLikeProvider)).to.equal(accuWeatherLikeProvider);
+	});
+
+	it("also falls back to the main weatherProvider for a local main provider", () => {
+		const localLikeProvider = new MockWeatherProvider({});
+
+		expect(resolveForecastProvider(localLikeProvider)).to.equal(localLikeProvider);
+	});
+
+	it("uses the configured provider on explicit opt-in via FORECAST_WEATHER_PROVIDER", () => {
+		const mainProvider = new MockWeatherProvider({});
+		process.env.FORECAST_WEATHER_PROVIDER = "OpenMeteo";
+
+		expect(resolveForecastProvider(mainProvider)).to.not.equal(mainProvider);
+	});
+
+	it("rejects an unknown FORECAST_WEATHER_PROVIDER value", () => {
+		const mainProvider = new MockWeatherProvider({});
+		process.env.FORECAST_WEATHER_PROVIDER = "NotARealProvider";
+
+		expect(() => resolveForecastProvider(mainProvider)).to.throw("Invalid FORECAST_WEATHER_PROVIDER");
+	});
+});
+
+describe("Weather Restrictions", () => {
+	const makeForecast = (precip: number): WeatherDataForecast => ({
+		temp_min: 40,
+		temp_max: 60,
+		precip,
+		date: 1557705600,
+		icon: "clear",
+		description: "Clear",
+	});
+
+	describe("checkCaliforniaRestriction", () => {
+		it("triggers when the last two days of precipitation exceed 0.1\"", () => {
+			const wateringData: WateringData[] = [
+				{ ...({} as WateringData), precip: 0.05 },
+				{ ...({} as WateringData), precip: 0.1 },
+			];
+			expect(checkCaliforniaRestriction(true, wateringData)).to.equal(true);
+		});
+
+		it("does not trigger when disabled, even with heavy recent rain", () => {
+			const wateringData: WateringData[] = [{ ...({} as WateringData), precip: 5 }];
+			expect(checkCaliforniaRestriction(false, wateringData)).to.equal(false);
+		});
+
+		it("does not trigger without watering data", () => {
+			expect(checkCaliforniaRestriction(true, undefined)).to.equal(false);
+			expect(checkCaliforniaRestriction(true, [])).to.equal(false);
+		});
+	});
+
+	describe("checkMinTempRestriction", () => {
+		it("triggers when the current temperature is below the threshold", () => {
+			expect(checkMinTempRestriction(35, 30)).to.equal(true);
+		});
+
+		it("does not trigger when the current temperature is at or above the threshold", () => {
+			expect(checkMinTempRestriction(35, 35)).to.equal(false);
+		});
+
+		it("is disabled via the -40 sentinel", () => {
+			expect(checkMinTempRestriction(-40, -100)).to.equal(false);
+		});
+
+		it("returns false when the helper receives no temperature", () => {
+			expect(checkMinTempRestriction(35, undefined)).to.equal(false);
+		});
+	});
+
+	describe("checkRainRestriction", () => {
+		it("triggers when forecasted precipitation over rainDays exceeds rainAmt", () => {
+			const forecast = [makeForecast(0.5), makeForecast(0.4), makeForecast(10)];
+			expect(checkRainRestriction(0.8, 2, forecast)).to.equal(true);
+		});
+
+		it("only sums the configured number of forecast days", () => {
+			const forecast = [makeForecast(0.05), makeForecast(10)];
+			expect(checkRainRestriction(0.1, 1, forecast)).to.equal(false);
+		});
+
+		it("stays inactive against an empty forecast, matching today's local-provider behavior", () => {
+			// FORECAST_WEATHER_PROVIDER=local reports forecast: [] since a local PWS stream has no forecast data.
+			expect(checkRainRestriction(0.1, 2, [])).to.equal(false);
+		});
+
+		it("returns false when the helper receives no forecast", () => {
+			expect(checkRainRestriction(0.1, 2, undefined)).to.equal(false);
+		});
+	});
+
+});
+
 describe("Weather Sensor Data", () => {
 	const weatherData: WeatherData = {
 		weatherProvider: "mock",
@@ -190,7 +421,9 @@ describe("Weather Sensor Data", () => {
 			[42, -75],
 			{ current: true, forecast: true, historical: true },
 			weatherResult,
-			wateringResult
+			wateringResult,
+			600,
+			weatherResult
 		);
 
 		expect(result.c).to.eql({ at: 1557748800, t: 0, h: 0, r: 0 });
@@ -261,13 +494,93 @@ describe("Weather Sensor Data", () => {
 		const coordinates: GeoCoordinates = [42, -75];
 
 		await fetchWeatherSensorData(provider, coordinates, { current: true, forecast: false, historical: false });
-		await fetchWeatherSensorData(provider, coordinates, { current: false, forecast: true, historical: false });
-		await fetchWeatherSensorData(provider, coordinates, { current: true, forecast: true, historical: true });
+		await fetchWeatherSensorData(provider, coordinates, { current: false, forecast: true, historical: false }, undefined, provider);
+		await fetchWeatherSensorData(provider, coordinates, { current: true, forecast: true, historical: true }, undefined, provider);
 		await provider.getWeatherData(coordinates);
 		await provider.getWateringData(coordinates);
 
 		expect(provider.weatherCalls).to.equal(1);
 		expect(provider.wateringCalls).to.equal(1);
+	});
+
+	it("builds the forecast from FORECAST_WEATHER_PROVIDER, independent of a main provider with no forecast data", () => {
+		// Simulates WEATHER_PROVIDER=local (which always reports forecast: []) with FORECAST_WEATHER_PROVIDER set to
+		// a provider that does supply forecast data (e.g. OpenMeteo).
+		const localWeatherResult: CachedResult<WeatherData> = {
+			value: { ...weatherData, weatherProvider: "local", forecast: [] },
+			ttl: 1000,
+			cachedAt: 1557748800000,
+		};
+		const forecastResult: CachedResult<WeatherData> = {
+			value: {
+				...weatherData,
+				weatherProvider: "OpenMeteo",
+				minTemp: 55,
+				maxTemp: 72,
+				precip: 0.25,
+				forecast: [{
+					temp_min: 54,
+					temp_max: 71,
+					precip: 0.2,
+					date: 1557705600,
+					icon: "rain",
+					description: "Rain",
+				}],
+			},
+			ttl: 1000,
+			cachedAt: 1557748800000,
+		};
+
+		const result = buildWeatherSensorResponse(
+			[42, -75],
+			{ current: true, forecast: true, historical: false },
+			localWeatherResult,
+			undefined,
+			600,
+			forecastResult
+		);
+
+		expect(result.wp).to.equal("local");
+		expect(result.f).to.eql({ at: 1557705600, lo: 55, hi: 72, p: 0.25 });
+	});
+
+	it("omits the forecast instead of showing NaN when the forecast fetch fails", () => {
+		const localWeatherResult: CachedResult<WeatherData> = {
+			value: { ...weatherData, weatherProvider: "local", forecast: [] },
+			ttl: 1000,
+			cachedAt: 1557748800000,
+		};
+
+		const result = buildWeatherSensorResponse(
+			[42, -75],
+			{ current: true, forecast: true, historical: false },
+			localWeatherResult,
+			undefined,
+			600,
+			undefined
+		);
+
+		expect(result.f).to.equal(undefined);
+	});
+
+	it("reports a forecast fetch error while retaining current and historical data", async () => {
+		// The base WeatherProvider's default getWeatherDataInternal() throws "not supported", which is enough to
+		// exercise the forecast fetch's failure path without a real network call.
+		const provider = new CountingMockWeatherProvider({ weatherData, wateringData: [wateringData] });
+		const forecastProvider = new WeatherProvider();
+
+		const result = await fetchWeatherSensorData(
+			provider,
+			[42, -75],
+			{ current: true, forecast: true, historical: true },
+			undefined,
+			forecastProvider
+		);
+
+		expect(result.weatherResult).to.not.equal(undefined);
+		expect(result.wateringResult).to.not.equal(undefined);
+		expect(result.forecastResult).to.equal(undefined);
+		expect(result.forecastError).to.not.equal(undefined);
 	});
 });
 

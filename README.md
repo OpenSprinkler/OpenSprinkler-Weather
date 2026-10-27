@@ -6,6 +6,7 @@ The OpenSprinkler Weather Service supplies weather data, time-zone and sunrise/s
 
 - [Configuration reference](docs/configuration.md)
 - [HTTP API reference](docs/api.md)
+- [ETo adjustment and baseline setup](docs/eto-adjustment.md)
 - [Local service and PWS setup](docs/local-installation.md)
 - [Testing and release checks](docs/weather-testing.md)
 - [OpenSprinkler weather-adjustment guide](https://openthings.freshdesk.com/support/solutions/articles/5000823370-use-weather-adjustments)
@@ -97,6 +98,13 @@ npm run build
 Live-provider and deployed-server comparison tests are documented in [Weather Service Testing](docs/weather-testing.md).
 
 ## License and Support
+
+OpenSprinkler Weather Service is licensed under the GNU Affero General Public
+License, version 3 or (at your option) any later version
+(`AGPL-3.0-or-later`). See [LICENSE](LICENSE) for the full license text.
+
+Third-party dependencies and weather datasets remain subject to their respective
+licenses and terms.
 
 - [OpenSprinkler](https://opensprinkler.com)
 - [Support](https://openthings.freshdesk.com/support/home)

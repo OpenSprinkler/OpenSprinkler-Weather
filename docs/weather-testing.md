@@ -80,6 +80,49 @@ WU and local PWS requests are not sent to the comparison server because they con
 
 ## Local PWS
 
+### Local Observations with External Forecasts
+
+Run the isolated local + OpenMeteo smoke test with one command:
+
+```bash
+npm run test:local-forecast
+```
+
+This builds the service, starts a temporary loopback server with persistence
+disabled, and uploads 72 hours of synthetic observations through the WU upload
+endpoint. It records local-only results, then restarts with
+`FORECAST_WEATHER_PROVIDER=OpenMeteo` and uploads the identical observations.
+The extra history covers complete local-calendar days around daylight-saving
+transitions. No physical station, controller, API key, or baseline ETo data file
+is needed; the test supplies an explicit `baseETo`.
+
+The test checks current conditions, both provider identities, all sensor scopes
+(including forecast-only without `wp`), and unchanged local history and
+Zimmerman/ETo calculations. Mixed forecast fields must match a direct OpenMeteo
+request through the service. Rain restrictions must agree with the forecast;
+temperature restrictions must use the uploaded local temperature.
+
+It uses one location and cached OpenMeteo forecast data. Internet access is
+required; provider errors and missing forecasts fail the run. A dry forecast
+cannot exercise rain-restriction activation, so the report calls that out.
+Forced rain and provider outages remain covered by deterministic endpoint tests.
+
+The child servers inherit neither `.env` nor provider credentials and never
+contact a deployed weather service. Ports are selected automatically. Temporary
+servers and observation directories are cleaned up on completion, failure, or
+Ctrl+C. Results and bounded server logs are saved in ignored `artifacts/` files.
+The request timeout defaults to 30 seconds; the overall test has a two-minute
+limit after the build. Override the request timeout or report path with:
+
+```bash
+npm run test:local-forecast -- --timeout 15000 --report artifacts/local-forecast.json
+```
+
+If a run crosses local midnight in the test location (New York time), rerun it
+so both configurations use the same historical days.
+
+### Existing Local-Only Service
+
 Start the service with its local upload route and provider enabled:
 
 ```text
@@ -137,7 +180,7 @@ Before deploying a release:
 1. Run the deterministic tests, type check, and production build from a clean `npm ci` installation.
 2. Run the default-provider smoke profile with the production Apple WeatherKit credentials.
 3. Run the Open-Meteo and DWD full profiles. Treat provider HTTP 5xx responses as upstream failures, but rerun before deployment.
-4. Run the synthetic local-PWS profile and the persistence shutdown check.
+4. Run the synthetic local-PWS profile, `npm run test:local-forecast`, and the persistence shutdown check.
 5. Require GitHub's amd64 and arm64 Docker jobs to pass; the Docker build generates and packages the baseline ETo data.
 6. Deploy to a staging or canary instance and query `/0`, `/1`, `/2`, `/3`, `/weatherData`, `/weatherSensorData`, and `/baselineETo`.
 7. Confirm provider attribution, cache behavior, error logs, and local persistent volume ownership before promoting the image.
