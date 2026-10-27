@@ -2,7 +2,7 @@
   "name": "os-weather-service",
   "description": "OpenSprinkler Weather Service",
   "license": "AGPL-3.0-or-later",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "repository": "https://github.com/OpenSprinkler/OpenSprinkler-Weather",
   "engines": {
     "node": ">=24"
