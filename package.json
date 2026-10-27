@@ -12,6 +12,7 @@
     "test:weather-live": "node tools/weather-live-test.js",
     "test:weather-smoke": "node tools/weather-live-test.js --profile smoke",
     "test:weather-full": "node tools/weather-live-test.js --profile full",
+    "test:local-forecast": "npm run build && node tools/weather-local-forecast-smoke.js",
     "build": "node build.mjs",
     "start": "node dist/index.cjs"
   },
